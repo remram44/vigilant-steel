@@ -8,8 +8,9 @@ extern crate piston_window;
 extern crate sdl2_window;
 
 use gfx_core::Device;
+use graphics::Transformed;
 use piston::window::WindowSettings;
-use piston_window::{Context, G2d, OpenGL, PistonWindow};
+use piston_window::{OpenGL, PistonWindow};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
 
@@ -35,29 +36,86 @@ fn main() {
         .unwrap();
     info!("Window created");
 
+    // Point to collide
+    let mut target_x = 20.0;
+    let mut target_y = 20.0;
+
+    // Colliding square
+    let mut square_x = 200.0;
+    let mut square_y = 150.0;
+    let mut square_o = 0.0;
+
+    // Square movement vector
+    let mut square_move_x = 0.0;
+    let mut square_move_y = 10.0;
+
+    // Key status
+    let mut key_target_x = 0.0;
+    let mut key_target_y = 0.0;
+    let mut key_square_x = 0.0;
+    let mut key_square_y = 0.0;
+    let mut key_square_o = 0.0;
+    let mut key_square_move_x = 0.0;
+    let mut key_square_move_y = 0.0;
+    let mut shift = false;
+
+    // Collision indicator
+    let mut col = None;
+
     while let Some(event) = window.next() {
-        // Key
-        let key_event = if let Some(Button::Keyboard(key)) = event.press_args() {
-            info!("Pressed key '{:?}'", key);
-            Some((key, true))
+        // Keyboard input
+        if let Some(Button::Keyboard(key)) = event.press_args() {
+            match key {
+                Key::Escape => break,
+                Key::LShift => shift = true,
+                Key::A => key_target_x = -1.0,
+                Key::D => key_target_x =  1.0,
+                Key::S => key_target_y = -1.0,
+                Key::W => key_target_y =  1.0,
+                Key::J => if shift { key_square_move_x = -1.0 }
+                          else { key_square_x = -1.0 },
+                Key::L => if shift { key_square_move_x =  1.0 }
+                          else { key_square_x =  1.0 },
+                Key::K => if shift { key_square_move_y = -1.0 }
+                          else { key_square_y = -1.0 },
+                Key::I => if shift { key_square_move_y =  1.0 }
+                          else { key_square_y =  1.0 },
+                Key::O => key_square_o = -1.0,
+                Key::U => key_square_o =  1.0,
+                _ => {}
+            }
         } else if let Some(Button::Keyboard(key)) = event.release_args() {
-            info!("Released key '{:?}", key);
-            Some((key, false))
-        } else {
-            None
-        };
-        if let Some((key, pressed)) = key_event {
-            if key == Key::Escape {
-                break;
+            match key {
+                Key::LShift => shift = false,
+                Key::A | Key::D => key_target_x = 0.0,
+                Key::W | Key::S => key_target_y = 0.0,
+                Key::J | Key::L => { key_square_move_x = 0.0;
+                                     key_square_x = 0.0 },
+                Key::I | Key::K => { key_square_move_y = 0.0;
+                                     key_square_y = 0.0 },
+                Key::O | Key::U => key_square_o = 0.0,
+                _ => {}
             }
         }
 
-        // Call update method
+        // Update
         if let Some(u) = event.update_args() {
+            let dt = u.dt;
+            target_x += key_target_x * 200.0 * dt;
+            target_y += key_target_y * 200.0 * dt;
+            square_move_x += key_square_move_x * 200.0 * dt;
+            square_move_y += key_square_move_y * 200.0 * dt;
+            square_x += key_square_x * 200.0 * dt;
+            square_y += key_square_y * 200.0 * dt;
+            square_o += key_square_o * dt;
+
+            col =/*square_point_collision()*/Some(()).map(|t| {
+                (-370.0, 270.0)
+            });
         }
 
-        // Call draw method
-        if let Some(r) = event.render_args() {
+        // Draw
+        if event.render_args().is_some() {
             window.draw_2d(&event, |c, g| {
                 let (width, height) = if let Some(v) = c.viewport {
                     (v.rect[2], v.rect[3])
@@ -66,11 +124,47 @@ fn main() {
                     return;
                 };
 
-                graphics::clear([0.0, 0.0, 0.5, 1.0], g);
+                graphics::clear([0.0, 0.0, 0.1, 1.0], g);
 
-                graphics::rectangle([1.0, 1.0, 1.0, 1.0],
-                                    graphics::rectangle::centered([100.0, 100.0, 50.0, 50.0]),
-                                                                  c.transform, g);
+                let tr = c.transform
+                    .trans(width as f64 / 2.0, height as f64 / 2.0)
+                    .scale(1.0, -1.0);
+
+                graphics::rectangle(
+                    [1.0, 0.0, 0.0, 1.0],
+                    graphics::rectangle::centered([0.0, 0.0, 10.0, 10.0]),
+                    tr.trans(target_x, target_y),
+                    g);
+
+                graphics::rectangle(
+                    [0.8, 0.8, 1.0, 1.0],
+                    graphics::rectangle::centered([0.0, 0.0, 50.0, 50.0]),
+                    tr.trans(square_x, square_y).rot_rad(square_o),
+                    g);
+
+                graphics::Line::new(
+                    [0.0, 0.0, 1.0, 1.0],
+                    5.0
+                ).draw_arrow(
+                    [0.0, 0.0, square_move_x, square_move_y],
+                    20.0,
+                    &Default::default(),
+                    tr.trans(square_x, square_y),
+                    g);
+
+                if let Some((x, y)) = col {
+                    for l in &[
+                        [-25.0f64, -25., -25., 25.], [-25., 25., 25., 25.],
+                        [25., 25., 25., -25.], [25., -25., -25., -25.]]
+                    {
+                        graphics::line(
+                            [0.0, 1.0, 0.0, 1.0],
+                            1.0,
+                            l.clone(),
+                            tr.trans(x, y),
+                            g);
+                    }
+                }
             });
             window.device.cleanup();
         }
