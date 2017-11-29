@@ -1,0 +1,32 @@
+[package]
+name = "vigilant-engine"
+version = "0.1.0"
+authors = ["Remi Rampin <remirampin@gmail.com>"]
+license = "BSD-3-Clause"
+repository = "https://github.com/remram44/vigilant-engine"
+description = "Space game with Piston"
+readme = "README.md"
+keywords = ["game"]
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
+[dependencies]
+env_logger = "0.4"
+log = "0.3"
+rand = "0.3"
+
+# Abstract graphics
+conrod = { version = "0.56", features = ["piston"] }
+piston = "0.35"
+piston2d-graphics = "0.23"
+piston_window = "0.73"
+
+# Concrete graphics
+gfx_core = "0.7"
+pistoncore-sdl2_window = "0.46"
+sdl2 = "0.30"
+
+[features]
+use_sdl2_mac_framework = ["sdl2/use_mac_framework"]
