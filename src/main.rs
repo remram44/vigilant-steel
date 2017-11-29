@@ -6,6 +6,7 @@ extern crate rand;
 extern crate piston;
 extern crate piston_window;
 extern crate sdl2_window;
+extern crate vecmath;
 
 use gfx_core::Device;
 use graphics::Transformed;
@@ -13,6 +14,7 @@ use piston::window::WindowSettings;
 use piston_window::{OpenGL, PistonWindow};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
+use vecmath::*;
 
 type Window = PistonWindow<Sdl2Window>;
 
@@ -109,8 +111,17 @@ fn main() {
             square_y += key_square_y * 200.0 * dt;
             square_o += key_square_o * dt;
 
-            col =/*square_point_collision()*/Some(()).map(|t| {
-                (-370.0, 270.0)
+            // Find a collision
+            let tr = graphics::math::identity()
+                .trans(square_x, square_y)
+                .rot_rad(square_o)
+                .zoom(1./50.0);;
+            let tr_target = row_mat2x3_transform_pos2(tr, [target_x, target_y]);
+            let tr_move = row_mat2x3_transform_vec2(tr, [square_move_x, square_move_y]);
+            let t = square_point_collision(tr_target, tr_move);
+            col = t.map(|t| {
+                (square_x + square_move_x * t,
+                 square_y + square_move_y * t)
             });
         }
 
@@ -169,4 +180,9 @@ fn main() {
             window.device.cleanup();
         }
     }
+}
+
+fn square_point_collision<T>(target: Vector2<T>, square_move: Vector2<T>) -> Option<f64> {
+    // TODO
+    Some(1.0)
 }
