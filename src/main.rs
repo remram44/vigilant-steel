@@ -104,12 +104,12 @@ fn main() {
 
             // Find a collision
             let tr = graphics::math::identity()
-                .trans(square[0], square[1])
-                .rot_rad(square_o)
-                .zoom(1./50.0);;
+                .rot_rad(-square_o)
+                .zoom(1./100.0)
+                .trans(-square[0], -square[1]);
             let tr_target = row_mat2x3_transform_pos2(tr, target);
             let tr_move = row_mat2x3_transform_vec2(tr, square_move);
-            let t = square_point_collision(tr_target, tr_move);
+            let t = square_point_collision(tr_move, tr_target);
             col = t.map(|t| vec2_add(square, vec2_scale(square_move, t)));
         }
 
@@ -153,14 +153,14 @@ fn main() {
 
                 if let Some(pos) = col {
                     for l in &[
-                        [-25.0f64, -25., -25., 25.], [-25., 25., 25., 25.],
-                        [25., 25., 25., -25.], [25., -25., -25., -25.]]
+                        [-50.0f64, -50., -50., 50.], [-50., 50., 50., 50.],
+                        [50., 50., 50., -50.], [50., -50., -50., -50.]]
                     {
                         graphics::line(
                             [0.0, 1.0, 0.0, 1.0],
                             1.0,
                             l.clone(),
-                            tr.trans(pos[0], pos[1]),
+                            tr.trans(pos[0], pos[1]).rot_rad(square_o),
                             g);
                     }
                 }
@@ -170,7 +170,68 @@ fn main() {
     }
 }
 
-fn square_point_collision<T>(target: Vector2<T>, square_move: Vector2<T>) -> Option<f64> {
-    // TODO
-    Some(1.0)
+/// Sliding square/fixed point collision
+///
+/// Finds the time of collision between a moving square and a fixed point.
+/// The square is assumed to be aligned, centered on (0, 0) and of size 1.
+fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64>)
+    -> Option<f64>
+{
+    // Rotate so direction is positive
+    if square_move[0] < 0.0 {
+        if square_move[1] < 0.0 {
+            square_move = [-square_move[0], -square_move[1]];
+            target = [-target[0], -target[1]];
+        } else {
+            square_move = [square_move[1], -square_move[0]];
+            target = [target[1], -target[0]];
+        }
+    } else if square_move[1] < 0.0 {
+        square_move = [-square_move[1], square_move[0]];
+        target = [-target[1], target[0]];
+    }
+
+    // Find collision with top
+    let top = segment_point_collision([-0.5, 0.5], [0.5, 0.5],
+                                      square_move, target);
+    // Find collision with right
+    let right = segment_point_collision([0.5, 0.5], [0.5, -0.5],
+                                        square_move, target);
+    match (top, right) {
+        (Some(t), Some(r)) => Some(t.min(r)),
+        (None, r) => r,
+        (t, None) => t,
+    }
+}
+
+/// Sliding line segment/fixed point collision
+///
+/// Finds the time of collision between a moving line segment and a fixed point.
+fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
+                           seg_move: Vector2<f64>, target: Vector2<f64>)
+    -> Option<f64>
+{
+    let segdir = vec2_sub(seg_b, seg_a);
+    let perdir = [segdir[1], -segdir[0]];
+    // Assume segment has length 1, otherwise we'd normalize here
+
+    // Distance to collision
+    let dist = vec2_dot(perdir, vec2_sub(target, seg_a));
+    // Speed of travel along perpendicular to segment/
+    let proj = vec2_dot(perdir, seg_move);
+    // Time of collision with line
+    let t = dist / proj;
+    if t < 0.0 {
+        return None;
+    }
+
+    // We know when we hit the line, now find out if we hit the segment
+    let line_pos = vec2_dot(segdir, vec2_sub(
+        target,
+        vec2_add(seg_a, vec2_scale(seg_move, t))));
+    if 0.0 <= line_pos && line_pos <= 1.0 {
+        Some(t)
+    } else {
+        None
+    }
 }
