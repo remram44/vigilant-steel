@@ -39,26 +39,20 @@ fn main() {
     info!("Window created");
 
     // Point to collide
-    let mut target_x = 20.0;
-    let mut target_y = 20.0;
+    let mut target = [20.0, 20.0];
 
     // Colliding square
-    let mut square_x = 200.0;
-    let mut square_y = 150.0;
+    let mut square = [200.0, 150.0];
     let mut square_o = 0.0;
 
     // Square movement vector
-    let mut square_move_x = 0.0;
-    let mut square_move_y = 10.0;
+    let mut square_move = [0.0, 10.0];
 
     // Key status
-    let mut key_target_x = 0.0;
-    let mut key_target_y = 0.0;
-    let mut key_square_x = 0.0;
-    let mut key_square_y = 0.0;
+    let mut key_target = [0.0, 0.0];
+    let mut key_square = [0.0, 0.0];
     let mut key_square_o = 0.0;
-    let mut key_square_move_x = 0.0;
-    let mut key_square_move_y = 0.0;
+    let mut key_square_move = [0.0, 0.0];
     let mut shift = false;
 
     // Collision indicator
@@ -70,18 +64,18 @@ fn main() {
             match key {
                 Key::Escape => break,
                 Key::LShift => shift = true,
-                Key::A => key_target_x = -1.0,
-                Key::D => key_target_x =  1.0,
-                Key::S => key_target_y = -1.0,
-                Key::W => key_target_y =  1.0,
-                Key::J => if shift { key_square_move_x = -1.0 }
-                          else { key_square_x = -1.0 },
-                Key::L => if shift { key_square_move_x =  1.0 }
-                          else { key_square_x =  1.0 },
-                Key::K => if shift { key_square_move_y = -1.0 }
-                          else { key_square_y = -1.0 },
-                Key::I => if shift { key_square_move_y =  1.0 }
-                          else { key_square_y =  1.0 },
+                Key::A => key_target[0] = -1.0,
+                Key::D => key_target[0] =  1.0,
+                Key::S => key_target[1] = -1.0,
+                Key::W => key_target[1] =  1.0,
+                Key::J => if shift { key_square_move[0] = -1.0 }
+                          else { key_square[0] = -1.0 },
+                Key::L => if shift { key_square_move[0] =  1.0 }
+                          else { key_square[0] =  1.0 },
+                Key::K => if shift { key_square_move[1] = -1.0 }
+                          else { key_square[1] = -1.0 },
+                Key::I => if shift { key_square_move[1] =  1.0 }
+                          else { key_square[1] =  1.0 },
                 Key::O => key_square_o = -1.0,
                 Key::U => key_square_o =  1.0,
                 _ => {}
@@ -89,12 +83,12 @@ fn main() {
         } else if let Some(Button::Keyboard(key)) = event.release_args() {
             match key {
                 Key::LShift => shift = false,
-                Key::A | Key::D => key_target_x = 0.0,
-                Key::W | Key::S => key_target_y = 0.0,
-                Key::J | Key::L => { key_square_move_x = 0.0;
-                                     key_square_x = 0.0 },
-                Key::I | Key::K => { key_square_move_y = 0.0;
-                                     key_square_y = 0.0 },
+                Key::A | Key::D => key_target[0] = 0.0,
+                Key::W | Key::S => key_target[1] = 0.0,
+                Key::J | Key::L => { key_square_move[0] = 0.0;
+                                     key_square[0] = 0.0 },
+                Key::I | Key::K => { key_square_move[1] = 0.0;
+                                     key_square[1] = 0.0 },
                 Key::O | Key::U => key_square_o = 0.0,
                 _ => {}
             }
@@ -103,26 +97,20 @@ fn main() {
         // Update
         if let Some(u) = event.update_args() {
             let dt = u.dt;
-            target_x += key_target_x * 200.0 * dt;
-            target_y += key_target_y * 200.0 * dt;
-            square_move_x += key_square_move_x * 200.0 * dt;
-            square_move_y += key_square_move_y * 200.0 * dt;
-            square_x += key_square_x * 200.0 * dt;
-            square_y += key_square_y * 200.0 * dt;
+            target = vec2_add(target, vec2_scale(key_target, 200.0 * dt));
+            square_move = vec2_add(square_move, vec2_scale(key_square_move, 200.0 * dt));
+            square = vec2_add(square, vec2_scale(key_square, 200.0 * dt));
             square_o += key_square_o * dt;
 
             // Find a collision
             let tr = graphics::math::identity()
-                .trans(square_x, square_y)
+                .trans(square[0], square[1])
                 .rot_rad(square_o)
                 .zoom(1./50.0);;
-            let tr_target = row_mat2x3_transform_pos2(tr, [target_x, target_y]);
-            let tr_move = row_mat2x3_transform_vec2(tr, [square_move_x, square_move_y]);
+            let tr_target = row_mat2x3_transform_pos2(tr, target);
+            let tr_move = row_mat2x3_transform_vec2(tr, square_move);
             let t = square_point_collision(tr_target, tr_move);
-            col = t.map(|t| {
-                (square_x + square_move_x * t,
-                 square_y + square_move_y * t)
-            });
+            col = t.map(|t| vec2_add(square, vec2_scale(square_move, t)));
         }
 
         // Draw
@@ -144,26 +132,26 @@ fn main() {
                 graphics::rectangle(
                     [1.0, 0.0, 0.0, 1.0],
                     graphics::rectangle::centered([0.0, 0.0, 10.0, 10.0]),
-                    tr.trans(target_x, target_y),
+                    tr.trans(target[0], target[1]),
                     g);
 
                 graphics::rectangle(
                     [0.8, 0.8, 1.0, 1.0],
                     graphics::rectangle::centered([0.0, 0.0, 50.0, 50.0]),
-                    tr.trans(square_x, square_y).rot_rad(square_o),
+                    tr.trans(square[0], square[1]).rot_rad(square_o),
                     g);
 
                 graphics::Line::new(
                     [0.0, 0.0, 1.0, 1.0],
                     5.0
                 ).draw_arrow(
-                    [0.0, 0.0, square_move_x, square_move_y],
+                    [0.0, 0.0, square_move[0], square_move[1]],
                     20.0,
                     &Default::default(),
-                    tr.trans(square_x, square_y),
+                    tr.trans(square[0], square[1]),
                     g);
 
-                if let Some((x, y)) = col {
+                if let Some(pos) = col {
                     for l in &[
                         [-25.0f64, -25., -25., 25.], [-25., 25., 25., 25.],
                         [25., 25., 25., -25.], [25., -25., -25., -25.]]
@@ -172,7 +160,7 @@ fn main() {
                             [0.0, 1.0, 0.0, 1.0],
                             1.0,
                             l.clone(),
-                            tr.trans(x, y),
+                            tr.trans(pos[0], pos[1]),
                             g);
                     }
                 }
