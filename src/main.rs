@@ -207,13 +207,13 @@ fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64
 /// Sliding line segment/fixed point collision
 ///
 /// Finds the time of collision between a moving line segment and a fixed point.
+/// Assumes that the segment has length 1.
 fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
                            seg_move: Vector2<f64>, target: Vector2<f64>)
     -> Option<f64>
 {
     let segdir = vec2_sub(seg_b, seg_a);
     let perdir = [segdir[1], -segdir[0]];
-    // Assume segment has length 1, otherwise we'd normalize here
 
     // Distance to collision
     let dist = vec2_dot(perdir, vec2_sub(target, seg_a));
@@ -229,7 +229,7 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
     let line_pos = vec2_dot(segdir, vec2_sub(
         target,
         vec2_add(seg_a, vec2_scale(seg_move, t))));
-    if 0.0 <= line_pos && line_pos <= 1.0 {
+    if 0.0 <= line_pos && line_pos <= 1 { // 1 == vec2_square_len(segdir)
         Some(t)
     } else {
         None
