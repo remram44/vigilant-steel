@@ -30,4 +30,5 @@ pistoncore-sdl2_window = "0.46"
 sdl2 = "0.30"
 
 [features]
+default = ["sdl2/use_mac_framework"]
 use_sdl2_mac_framework = ["sdl2/use_mac_framework"]
