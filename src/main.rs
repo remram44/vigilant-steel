@@ -6,6 +6,7 @@ extern crate rand;
 extern crate piston;
 extern crate piston_window;
 extern crate sdl2_window;
+extern crate specs;
 extern crate vecmath;
 
 use gfx_core::Device;
@@ -14,9 +15,72 @@ use piston::window::WindowSettings;
 use piston_window::{OpenGL, PistonWindow};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
+use specs::{Component, DispatcherBuilder, System, World,
+            ReadStorage, WriteStorage, Join,
+            Fetch, VecStorage};
 use vecmath::*;
 
 type Window = PistonWindow<Sdl2Window>;
+
+// Position component, for entities that are in the world
+#[derive(Debug)]
+struct Position([f64; 2]);
+
+impl Component for Position {
+    type Storage = VecStorage<Self>;
+}
+
+// Velocity component, for entities that move
+#[derive(Debug)]
+struct Velocity([f64; 2]);
+
+impl Component for Velocity {
+    type Storage = VecStorage<Self>;
+}
+
+// Delta resource, stores the simulation step
+struct DeltaTime(f64);
+
+// Input resource, stores the keyboard state
+struct Input {
+    ship: [f64; 2],
+}
+
+impl Input {
+    fn new() -> Input {
+        Input { ship: [0.0, 0.0] }
+    }
+}
+
+// Input system, sets velocities from keyboard state
+struct SysInput;
+
+impl<'a> System<'a> for SysInput {
+    type SystemData = (Fetch<'a, Input>,
+                       WriteStorage<'a, Velocity>);
+
+    fn run(&mut self, (input, mut vel): Self::SystemData) {
+        for vel in (&mut vel).join() {
+            vel.0 = input.ship;
+        }
+    }
+}
+
+// Simulation system, updates positions from velocities
+struct SysSimu;
+
+impl<'a> System<'a> for SysSimu {
+    type SystemData = (Fetch<'a, DeltaTime>,
+                       WriteStorage<'a, Position>,
+                       ReadStorage<'a, Velocity>);
+
+    fn run(&mut self, (dt, mut pos, vel): Self::SystemData) {
+        let dt = dt.0;
+        for (pos, vel) in (&mut pos, &vel).join() {
+            pos.0 = vec2_add(pos.0, vec2_scale(vel.0, 200.0 * dt));
+        }
+    }
+}
 
 fn main() {
     env_logger::init().unwrap();
@@ -38,36 +102,56 @@ fn main() {
         .unwrap();
     info!("Window created");
 
-    let mut ship = [0.0, 0.0];
-    let mut ship_move = [0.0, 0.0];
+    let mut world = World::new();
+    world.register::<Position>();
+    world.register::<Velocity>();
+
+    world.create_entity()
+        .with(Position([0.0, 0.0]))
+        .with(Velocity([0.0, 0.0]))
+        .build();
+
+    world.add_resource(DeltaTime(0.0));
+    world.add_resource(Input::new());
+
+    let mut dispatcher = DispatcherBuilder::new()
+        .add(SysInput, "input", &[])
+        .add(SysSimu, "simu", &[])
+        .build();
 
     while let Some(event) = window.next() {
         // Keyboard input
         if let Some(Button::Keyboard(key)) = event.press_args() {
+            let mut input = world.write_resource::<Input>();
             match key {
                 Key::Escape => break,
-                Key::A => ship_move[0] = -1.0,
-                Key::D => ship_move[0] =  1.0,
-                Key::S => ship_move[1] = -1.0,
-                Key::W => ship_move[1] =  1.0,
+                Key::A => input.ship[0] = -1.0,
+                Key::D => input.ship[0] =  1.0,
+                Key::S => input.ship[1] = -1.0,
+                Key::W => input.ship[1] =  1.0,
                 _ => {}
             }
         } else if let Some(Button::Keyboard(key)) = event.release_args() {
+            let mut input = world.write_resource::<Input>();
             match key {
-                Key::A | Key::D => ship_move[0] = 0.0,
-                Key::S | Key::W => ship_move[1] = 0.0,
+                Key::A | Key::D => input.ship[0] = 0.0,
+                Key::S | Key::W => input.ship[1] = 0.0,
                 _ => {}
             }
         }
 
         // Update
         if let Some(u) = event.update_args() {
-            let dt = u.dt;
-            ship = vec2_add(ship, vec2_scale(ship_move, 200.0 * dt));
+            {
+                let mut dt = world.write_resource::<DeltaTime>();
+                *dt = DeltaTime(u.dt);
+            }
+            dispatcher.dispatch(&mut world.res);
         }
 
         // Draw
         if event.render_args().is_some() {
+            let pos = world.read::<Position>();
             window.draw_2d(&event, |c, g| {
                 let (width, height) = if let Some(v) = c.viewport {
                     (v.rect[2], v.rect[3])
@@ -82,11 +166,14 @@ fn main() {
                     .trans(width as f64 / 2.0, height as f64 / 2.0)
                     .scale(1.0, -1.0);
 
-                graphics::rectangle(
-                    [1.0, 0.0, 0.0, 1.0],
-                    graphics::rectangle::centered([0.0, 0.0, 10.0, 10.0]),
-                    tr.trans(ship[0], ship[1]),
-                    g);
+                for pos in pos.join() {
+                    let pos = pos.0;
+                    graphics::rectangle(
+                        [1.0, 0.0, 0.0, 1.0],
+                        graphics::rectangle::centered([0.0, 0.0, 10.0, 10.0]),
+                        tr.trans(pos[0], pos[1]),
+                        g);
+                }
             });
             window.device.cleanup();
         }

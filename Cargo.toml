@@ -16,6 +16,7 @@ path = "src/main.rs"
 env_logger = "0.4"
 log = "0.3"
 rand = "0.3"
+specs = "0.10"
 vecmath = "0.3"
 
 # Abstract graphics
