@@ -229,7 +229,7 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
     let line_pos = vec2_dot(segdir, vec2_sub(
         target,
         vec2_add(seg_a, vec2_scale(seg_move, t))));
-    if 0.0 <= line_pos && line_pos <= 1 { // 1 == vec2_square_len(segdir)
+    if 0.0 <= line_pos && line_pos <= 1.0 { // 1.0 == vec2_square_len(segdir)
         Some(t)
     } else {
         None
