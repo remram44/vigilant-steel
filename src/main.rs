@@ -9,129 +9,23 @@ extern crate sdl2_window;
 extern crate specs;
 extern crate vecmath;
 
+mod input;
+mod physics;
+
 use gfx_core::Device;
 use graphics::Transformed;
 use piston::window::WindowSettings;
 use piston_window::{OpenGL, PistonWindow};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
-use specs::{Component, DispatcherBuilder, System, World,
-            ReadStorage, WriteStorage, Join,
-            Fetch, NullStorage, VecStorage};
+use specs::{DispatcherBuilder, World, Join};
 use vecmath::*;
 
+use input::Input;
+use physics::{DeltaTime, Position, Velocity, LocalControl, Ship,
+              SysShipInput, SysSimu};
+
 type Window = PistonWindow<Sdl2Window>;
-
-// Position component, for entities that are in the world
-#[derive(Debug)]
-struct Position([f64; 2]);
-
-impl Component for Position {
-    type Storage = VecStorage<Self>;
-}
-
-// Velocity component, for entities that move
-#[derive(Debug)]
-struct Velocity([f64; 2]);
-
-impl Component for Velocity {
-    type Storage = VecStorage<Self>;
-}
-
-// This object is controlled by the local player
-#[derive(Default)]
-struct LocalControl;
-
-impl Component for LocalControl {
-    type Storage = NullStorage<Self>;
-}
-
-// A ship
-struct Ship {
-    thrust: [f64; 2],
-    fire: bool,
-    orientation: f64,
-    color: [f32; 3],
-}
-
-impl Ship {
-    fn new(color: [f32; 3]) -> Ship {
-        Ship {
-            thrust: [0.0, 0.0],
-            fire: false,
-            orientation: 0.0,
-            color: color,
-        }
-    }
-}
-
-impl Component for Ship {
-    type Storage = VecStorage<Self>;
-}
-
-// Delta resource, stores the simulation step
-struct DeltaTime(f64);
-
-// Input resource, stores the keyboard state
-struct Input {
-    movement: [f64; 2],
-    fire: bool,
-}
-
-impl Input {
-    fn new() -> Input {
-        Input {
-            movement: [0.0, 0.0],
-            fire: false,
-        }
-    }
-}
-
-// Input system, control ship from keyboard state
-struct SysShipInput;
-
-impl<'a> System<'a> for SysShipInput {
-    type SystemData = (Fetch<'a, DeltaTime>,
-                       Fetch<'a, Input>,
-                       WriteStorage<'a, Ship>,
-                       WriteStorage<'a, Velocity>,
-                       ReadStorage<'a, LocalControl>);
-
-    fn run(&mut self, (dt, input, mut ship, mut vel, local): Self::SystemData) {
-        let dt = dt.0;
-        for (mut ship, mut vel, _) in (&mut ship, &mut vel, &local).join() {
-            // Set ship status
-            ship.thrust[0] = -input.movement[0];
-            if input.movement[1] >= 0.0 {
-                ship.thrust[1] = input.movement[1];
-            }
-            ship.fire = input.fire;
-
-            // Update orientation
-            ship.orientation += ship.thrust[0] * 5.0 * dt;
-            // Update velocity
-            let thrust = [ship.orientation.cos(), ship.orientation.sin()];
-            vel.0 = vec2_add(vel.0,
-                             vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
-        }
-    }
-}
-
-// Simulation system, updates positions from velocities
-struct SysSimu;
-
-impl<'a> System<'a> for SysSimu {
-    type SystemData = (Fetch<'a, DeltaTime>,
-                       WriteStorage<'a, Position>,
-                       ReadStorage<'a, Velocity>);
-
-    fn run(&mut self, (dt, mut pos, vel): Self::SystemData) {
-        let dt = dt.0;
-        for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0 = vec2_add(pos.0, vec2_scale(vel.0, 200.0 * dt));
-        }
-    }
-}
 
 fn main() {
     env_logger::init().unwrap();
