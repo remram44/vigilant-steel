@@ -55,15 +55,15 @@ fn main() {
     world.register::<Asteroid>();
 
     world.create_entity()
-        .with(Position([0.0, 0.0]))
-        .with(Velocity([0.0, 0.0]))
+        .with(Position { pos: [0.0, 0.0], rot: 0.0 })
+        .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
         .with(LocalControl)
         .with(Ship::new([1.0, 0.0, 0.0]))
         .build();
 
     world.create_entity()
-        .with(Position([100.0, 50.0]))
-        .with(Velocity([0.0, 0.0]))
+        .with(Position { pos: [100.0, 50.0], rot: 0.0 })
+        .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
         .with(Ship::new([0.0, 0.0, 1.0]))
         .build();
 
@@ -131,10 +131,9 @@ fn main() {
                     .scale(1.0, -1.0);
 
                 for (pos, ship) in (&pos, &ship).join() {
-                    let pos = pos.0;
                     let ship_tr = tr
-                        .trans(pos[0], pos[1])
-                        .rot_rad(ship.orientation);
+                        .trans(pos.pos[0], pos.pos[1])
+                        .rot_rad(pos.rot);
                     let mut color = [0.0, 0.0, 0.0, 1.0];
                     color[0..3].copy_from_slice(&ship.color);
                     graphics::line(
@@ -157,11 +156,10 @@ fn main() {
                         g);
                 }
 
-                for (pos, asteroid) in (&pos, &asteroid).join() {
-                    let pos = pos.0;
+                for (pos, _) in (&pos, &asteroid).join() {
                     let asteroid_tr = tr
-                        .trans(pos[0], pos[1])
-                        .rot_rad(asteroid.orientation);
+                        .trans(pos.pos[0], pos.pos[1])
+                        .rot_rad(pos.rot);
                     graphics::rectangle(
                         [1.0, 1.0, 1.0, 1.0],
                         graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),

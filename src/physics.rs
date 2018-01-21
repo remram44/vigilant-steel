@@ -10,7 +10,10 @@ use input::Input;
 
 // Position component, for entities that are in the world
 #[derive(Debug)]
-pub struct Position(pub [f64; 2]);
+pub struct Position {
+    pub pos: [f64; 2],
+    pub rot: f64,
+}
 
 impl Component for Position {
     type Storage = VecStorage<Self>;
@@ -18,7 +21,10 @@ impl Component for Position {
 
 // Velocity component, for entities that move
 #[derive(Debug)]
-pub struct Velocity(pub [f64; 2]);
+pub struct Velocity {
+    pub vel: [f64; 2],
+    pub rot: f64,
+}
 
 impl Component for Velocity {
     type Storage = VecStorage<Self>;
@@ -36,7 +42,6 @@ impl Component for LocalControl {
 pub struct Ship {
     thrust: [f64; 2],
     fire: bool,
-    pub orientation: f64,
     pub color: [f32; 3],
 }
 
@@ -45,7 +50,6 @@ impl Ship {
         Ship {
             thrust: [0.0, 0.0],
             fire: false,
-            orientation: 0.0,
             color: color,
         }
     }
@@ -56,13 +60,11 @@ impl Component for Ship {
 }
 
 // An asteroid
-pub struct Asteroid {
-    pub orientation: f64,
-    rotation: f64,
-}
+#[derive(Default)]
+pub struct Asteroid;
 
 impl Component for Asteroid {
-    type Storage = VecStorage<Self>;
+    type Storage = NullStorage<Self>;
 }
 
 // Delta resource, stores the simulation step
@@ -74,11 +76,14 @@ pub struct SysShip;
 impl<'a> System<'a> for SysShip {
     type SystemData = (Fetch<'a, DeltaTime>,
                        Fetch<'a, Input>,
-                       WriteStorage<'a, Ship>,
+                       ReadStorage<'a, Position>,
                        WriteStorage<'a, Velocity>,
+                       WriteStorage<'a, Ship>,
                        ReadStorage<'a, LocalControl>);
 
-    fn run(&mut self, (dt, input, mut ship, mut vel, local): Self::SystemData) {
+    fn run(
+        &mut self, (dt, input, pos, mut vel, mut ship, local): Self::SystemData
+    ) {
         let dt = dt.0;
 
         // Control ship thrusters from input
@@ -91,23 +96,23 @@ impl<'a> System<'a> for SysShip {
         }
 
         // Apply thrust
-        for (mut ship, mut vel) in (&mut ship, &mut vel).join() {
+        for (pos, mut vel, mut ship) in (&pos, &mut vel, &mut ship).join() {
             // Update orientation
-            ship.orientation += ship.thrust[0] * 5.0 * dt;
-            ship.orientation %= 2.0 * PI;
+            vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
-            let thrust = [ship.orientation.cos(), ship.orientation.sin()];
-            vel.0 = vec2_add(vel.0,
-                             vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
+            let thrust = [pos.rot.cos(), pos.rot.sin()];
+            vel.vel = vec2_add(vel.vel,
+                               vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
 
             // Apply friction
-            vel.0 = vec2_add(vel.0,
-                             vec2_scale(vel.0, -0.8 * dt * vec2_len(vel.0)));
+            vel.vel = vec2_add(vel.vel,
+                               vec2_scale(vel.vel,
+                                          -0.8 * dt * vec2_len(vel.vel)));
         }
     }
 }
 
-// Asteroid physics
+// Asteroid spawning and removing
 pub struct SysAsteroid {
     spawn_delay: Option<f64>,
 }
@@ -133,16 +138,14 @@ impl<'a> System<'a> for SysAsteroid {
 
         // Update orientations
         let mut count = 0;
-        for (e, pos, mut asteroid) in (&*entities, &pos, &mut asteroid).join() {
-            let pos = pos.0;
+        for (entity, pos, _) in (&*entities, &pos, &asteroid).join() {
+            let pos = pos.pos;
             if pos[0] < -550.0 || pos[0] > 550.0 ||
                 pos[1] < -550.0 || pos[1] > 550.0
             {
                 warn!("Deleting asteroid");
-                entities.delete(e).unwrap();
+                entities.delete(entity).unwrap();
             }
-            asteroid.orientation += asteroid.rotation * dt;
-            asteroid.orientation %= 2.0 * PI;
             count += 1;
         }
 
@@ -159,22 +162,25 @@ impl<'a> System<'a> for SysAsteroid {
                 let entity = entities.create();
                 pos.insert(
                     entity,
-                    Position([
-                        xpos * 500.0 + ypos * rng.gen_range(-500.0, 500.0),
-                        ypos * 500.0 + xpos * rng.gen_range(-500.0, 500.0),
-                    ]),
+                    Position {
+                        pos: [
+                            xpos * 500.0 + ypos * rng.gen_range(-500.0, 500.0),
+                            ypos * 500.0 + xpos * rng.gen_range(-500.0, 500.0),
+                        ],
+                        rot: rng.gen_range(0.0, 2.0 * PI),
+                    },
                 );
                 vel.insert(
                     entity,
-                    Velocity([
-                        rng.gen_range(-0.3, 0.3) - xpos * 0.4,
-                        rng.gen_range(-0.3, 0.3) - ypos * 0.4,
-                    ]),
+                    Velocity {
+                        vel: [
+                            rng.gen_range(-0.3, 0.3) - xpos * 0.4,
+                            rng.gen_range(-0.3, 0.3) - ypos * 0.4,
+                        ],
+                        rot: rng.gen_range(-2.0, 2.0),
+                    },
                 );
-                asteroid.insert(entity, Asteroid {
-                    orientation: rng.gen_range(0.0, 2.0 * PI),
-                    rotation: rng.gen_range(-2.0, 2.0),
-                });
+                asteroid.insert(entity, Asteroid);
                 None
             } else {
                 Some(d - dt)
@@ -201,7 +207,9 @@ impl<'a> System<'a> for SysSimu {
     fn run(&mut self, (dt, mut pos, vel): Self::SystemData) {
         let dt = dt.0;
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.0 = vec2_add(pos.0, vec2_scale(vel.0, 200.0 * dt));
+            pos.pos = vec2_add(pos.pos, vec2_scale(vel.vel, 200.0 * dt));
+            pos.rot += vel.rot * dt;
+            pos.rot %= 2.0 * PI;
         }
     }
 }
