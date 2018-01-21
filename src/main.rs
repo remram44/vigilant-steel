@@ -11,6 +11,7 @@ extern crate vecmath;
 
 mod input;
 mod physics;
+mod utils;
 
 use gfx_core::Device;
 use graphics::Transformed;
