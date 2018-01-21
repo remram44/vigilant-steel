@@ -17,7 +17,7 @@ use piston::input::*;
 use sdl2_window::Sdl2Window;
 use specs::{Component, DispatcherBuilder, System, World,
             ReadStorage, WriteStorage, Join,
-            Fetch, VecStorage};
+            Fetch, NullStorage, VecStorage};
 use vecmath::*;
 
 type Window = PistonWindow<Sdl2Window>;
@@ -38,30 +38,81 @@ impl Component for Velocity {
     type Storage = VecStorage<Self>;
 }
 
+// This object is controlled by the local player
+#[derive(Default)]
+struct LocalControl;
+
+impl Component for LocalControl {
+    type Storage = NullStorage<Self>;
+}
+
+// A ship
+struct Ship {
+    thrust: [f64; 2],
+    fire: bool,
+    orientation: f64,
+    color: [f32; 3],
+}
+
+impl Ship {
+    fn new(color: [f32; 3]) -> Ship {
+        Ship {
+            thrust: [0.0, 0.0],
+            fire: false,
+            orientation: 0.0,
+            color: color,
+        }
+    }
+}
+
+impl Component for Ship {
+    type Storage = VecStorage<Self>;
+}
+
 // Delta resource, stores the simulation step
 struct DeltaTime(f64);
 
 // Input resource, stores the keyboard state
 struct Input {
-    ship: [f64; 2],
+    movement: [f64; 2],
+    fire: bool,
 }
 
 impl Input {
     fn new() -> Input {
-        Input { ship: [0.0, 0.0] }
+        Input {
+            movement: [0.0, 0.0],
+            fire: false,
+        }
     }
 }
 
-// Input system, sets velocities from keyboard state
-struct SysInput;
+// Input system, control ship from keyboard state
+struct SysShipInput;
 
-impl<'a> System<'a> for SysInput {
-    type SystemData = (Fetch<'a, Input>,
-                       WriteStorage<'a, Velocity>);
+impl<'a> System<'a> for SysShipInput {
+    type SystemData = (Fetch<'a, DeltaTime>,
+                       Fetch<'a, Input>,
+                       WriteStorage<'a, Ship>,
+                       WriteStorage<'a, Velocity>,
+                       ReadStorage<'a, LocalControl>);
 
-    fn run(&mut self, (input, mut vel): Self::SystemData) {
-        for vel in (&mut vel).join() {
-            vel.0 = input.ship;
+    fn run(&mut self, (dt, input, mut ship, mut vel, local): Self::SystemData) {
+        let dt = dt.0;
+        for (mut ship, mut vel, _) in (&mut ship, &mut vel, &local).join() {
+            // Set ship status
+            ship.thrust[0] = -input.movement[0];
+            if input.movement[1] >= 0.0 {
+                ship.thrust[1] = input.movement[1];
+            }
+            ship.fire = input.fire;
+
+            // Update orientation
+            ship.orientation += ship.thrust[0] * 5.0 * dt;
+            // Update velocity
+            let thrust = [ship.orientation.cos(), ship.orientation.sin()];
+            vel.0 = vec2_add(vel.0,
+                             vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
         }
     }
 }
@@ -105,17 +156,27 @@ fn main() {
     let mut world = World::new();
     world.register::<Position>();
     world.register::<Velocity>();
+    world.register::<LocalControl>();
+    world.register::<Ship>();
 
     world.create_entity()
         .with(Position([0.0, 0.0]))
         .with(Velocity([0.0, 0.0]))
+        .with(LocalControl)
+        .with(Ship::new([1.0, 0.0, 0.0]))
+        .build();
+
+    world.create_entity()
+        .with(Position([100.0, 50.0]))
+        .with(Velocity([0.0, 0.0]))
+        .with(Ship::new([0.0, 0.0, 1.0]))
         .build();
 
     world.add_resource(DeltaTime(0.0));
     world.add_resource(Input::new());
 
     let mut dispatcher = DispatcherBuilder::new()
-        .add(SysInput, "input", &[])
+        .add(SysShipInput, "input", &[])
         .add(SysSimu, "simu", &[])
         .build();
 
@@ -125,17 +186,18 @@ fn main() {
             let mut input = world.write_resource::<Input>();
             match key {
                 Key::Escape => break,
-                Key::A => input.ship[0] = -1.0,
-                Key::D => input.ship[0] =  1.0,
-                Key::S => input.ship[1] = -1.0,
-                Key::W => input.ship[1] =  1.0,
+                Key::A => input.movement[0] = -1.0,
+                Key::D => input.movement[0] =  1.0,
+                Key::S => input.movement[1] = -1.0,
+                Key::W => input.movement[1] =  1.0,
+                Key::Space => input.fire = true,
                 _ => {}
             }
         } else if let Some(Button::Keyboard(key)) = event.release_args() {
             let mut input = world.write_resource::<Input>();
             match key {
-                Key::A | Key::D => input.ship[0] = 0.0,
-                Key::S | Key::W => input.ship[1] = 0.0,
+                Key::A | Key::D => input.movement[0] = 0.0,
+                Key::S | Key::W => input.movement[1] = 0.0,
                 _ => {}
             }
         }
@@ -147,11 +209,15 @@ fn main() {
                 *dt = DeltaTime(u.dt);
             }
             dispatcher.dispatch(&mut world.res);
+
+            let mut input = world.write_resource::<Input>();
+            input.fire = false;
         }
 
         // Draw
         if event.render_args().is_some() {
             let pos = world.read::<Position>();
+            let ship = world.read::<Ship>();
             window.draw_2d(&event, |c, g| {
                 let (width, height) = if let Some(v) = c.viewport {
                     (v.rect[2], v.rect[3])
@@ -166,12 +232,30 @@ fn main() {
                     .trans(width as f64 / 2.0, height as f64 / 2.0)
                     .scale(1.0, -1.0);
 
-                for pos in pos.join() {
+                for (pos, ship) in (&pos, &ship).join() {
                     let pos = pos.0;
-                    graphics::rectangle(
-                        [1.0, 0.0, 0.0, 1.0],
-                        graphics::rectangle::centered([0.0, 0.0, 10.0, 10.0]),
-                        tr.trans(pos[0], pos[1]),
+                    let ship_tr = tr
+                        .trans(pos[0], pos[1])
+                        .rot_rad(ship.orientation);
+                    let mut color = [0.0, 0.0, 0.0, 1.0];
+                    color[0..3].copy_from_slice(&ship.color);
+                    graphics::line(
+                        color,
+                        1.0,
+                        [-10.0, 8.0, -10.0, -8.0],
+                        ship_tr,
+                        g);
+                    graphics::line(
+                        color,
+                        1.0,
+                        [-10.0, 8.0, 10.0, 0.0],
+                        ship_tr,
+                        g);
+                    graphics::line(
+                        color,
+                        1.0,
+                        [-10.0, -8.0, 10.0, 0.0],
+                        ship_tr,
                         g);
                 }
             });
