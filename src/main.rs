@@ -22,8 +22,8 @@ use specs::{DispatcherBuilder, World, Join};
 use vecmath::*;
 
 use input::Input;
-use physics::{DeltaTime, Position, Velocity, LocalControl, Ship,
-              SysShip, SysSimu};
+use physics::{DeltaTime, Position, Velocity, LocalControl, Ship, Asteroid,
+              SysShip, SysAsteroid, SysSimu};
 
 type Window = PistonWindow<Sdl2Window>;
 
@@ -52,6 +52,7 @@ fn main() {
     world.register::<Velocity>();
     world.register::<LocalControl>();
     world.register::<Ship>();
+    world.register::<Asteroid>();
 
     world.create_entity()
         .with(Position([0.0, 0.0]))
@@ -71,6 +72,7 @@ fn main() {
 
     let mut dispatcher = DispatcherBuilder::new()
         .add(SysShip, "ship", &[])
+        .add(SysAsteroid::new(), "asteroid", &[])
         .add(SysSimu, "simu", &[])
         .build();
 
@@ -103,6 +105,7 @@ fn main() {
                 *dt = DeltaTime(u.dt);
             }
             dispatcher.dispatch(&mut world.res);
+            world.maintain();
 
             let mut input = world.write_resource::<Input>();
             input.fire = false;
@@ -112,6 +115,7 @@ fn main() {
         if event.render_args().is_some() {
             let pos = world.read::<Position>();
             let ship = world.read::<Ship>();
+            let asteroid = world.read::<Asteroid>();
             window.draw_2d(&event, |c, g| {
                 let (width, height) = if let Some(v) = c.viewport {
                     (v.rect[2], v.rect[3])
@@ -150,6 +154,18 @@ fn main() {
                         1.0,
                         [-10.0, -8.0, 10.0, 0.0],
                         ship_tr,
+                        g);
+                }
+
+                for (pos, asteroid) in (&pos, &asteroid).join() {
+                    let pos = pos.0;
+                    let asteroid_tr = tr
+                        .trans(pos[0], pos[1])
+                        .rot_rad(asteroid.orientation);
+                    graphics::rectangle(
+                        [1.0, 1.0, 1.0, 1.0],
+                        graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),
+                        asteroid_tr,
                         g);
                 }
             });
