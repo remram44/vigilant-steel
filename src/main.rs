@@ -23,7 +23,7 @@ use vecmath::*;
 
 use input::Input;
 use physics::{DeltaTime, Position, Velocity, LocalControl, Ship,
-              SysShipInput, SysSimu};
+              SysShip, SysSimu};
 
 type Window = PistonWindow<Sdl2Window>;
 
@@ -70,7 +70,7 @@ fn main() {
     world.add_resource(Input::new());
 
     let mut dispatcher = DispatcherBuilder::new()
-        .add(SysShipInput, "input", &[])
+        .add(SysShip, "ship", &[])
         .add(SysSimu, "simu", &[])
         .build();
 

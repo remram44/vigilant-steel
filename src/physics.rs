@@ -55,10 +55,10 @@ impl Component for Ship {
 // Delta resource, stores the simulation step
 pub struct DeltaTime(pub f64);
 
-// Input system, control ship from keyboard state
-pub struct SysShipInput;
+// Ship physics and keyboard control
+pub struct SysShip;
 
-impl<'a> System<'a> for SysShipInput {
+impl<'a> System<'a> for SysShip {
     type SystemData = (Fetch<'a, DeltaTime>,
                        Fetch<'a, Input>,
                        WriteStorage<'a, Ship>,
@@ -67,20 +67,28 @@ impl<'a> System<'a> for SysShipInput {
 
     fn run(&mut self, (dt, input, mut ship, mut vel, local): Self::SystemData) {
         let dt = dt.0;
-        for (mut ship, mut vel, _) in (&mut ship, &mut vel, &local).join() {
-            // Set ship status
+
+        // Control ship thrusters from input
+        for (mut ship, _) in (&mut ship, &local).join() {
             ship.thrust[0] = -input.movement[0];
             if input.movement[1] >= 0.0 {
                 ship.thrust[1] = input.movement[1];
             }
             ship.fire = input.fire;
+        }
 
+        // Apply thrust
+        for (mut ship, mut vel) in (&mut ship, &mut vel).join() {
             // Update orientation
             ship.orientation += ship.thrust[0] * 5.0 * dt;
             // Update velocity
             let thrust = [ship.orientation.cos(), ship.orientation.sin()];
             vel.0 = vec2_add(vel.0,
                              vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
+
+            // Apply friction
+            vel.0 = vec2_add(vel.0,
+                             vec2_scale(vel.0, -0.8 * dt * vec2_len(vel.0)));
         }
     }
 }
