@@ -23,8 +23,9 @@ use specs::{DispatcherBuilder, World, Join};
 use vecmath::*;
 
 use input::Input;
-use physics::{DeltaTime, Position, Velocity, LocalControl, Ship, Asteroid,
-              SysShip, SysAsteroid, SysSimu};
+use physics::{DeltaTime, Position, Velocity, Collision,
+              LocalControl, Ship, Asteroid,
+              SysShip, SysAsteroid, SysCollision, SysSimu};
 
 type Window = PistonWindow<Sdl2Window>;
 
@@ -51,6 +52,7 @@ fn main() {
     let mut world = World::new();
     world.register::<Position>();
     world.register::<Velocity>();
+    world.register::<Collision>();
     world.register::<LocalControl>();
     world.register::<Ship>();
     world.register::<Asteroid>();
@@ -58,6 +60,7 @@ fn main() {
     world.create_entity()
         .with(Position { pos: [0.0, 0.0], rot: 0.0 })
         .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
+        .with(Collision { bounding_box: [10.0, 8.0] })
         .with(LocalControl)
         .with(Ship::new([1.0, 0.0, 0.0]))
         .build();
@@ -65,6 +68,7 @@ fn main() {
     world.create_entity()
         .with(Position { pos: [100.0, 50.0], rot: 0.0 })
         .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
+        .with(Collision { bounding_box: [10.0, 8.0] })
         .with(Ship::new([0.0, 0.0, 1.0]))
         .build();
 
@@ -74,6 +78,7 @@ fn main() {
     let mut dispatcher = DispatcherBuilder::new()
         .add(SysShip, "ship", &[])
         .add(SysAsteroid::new(), "asteroid", &[])
+        .add(SysCollision, "collision", &[])
         .add(SysSimu, "simu", &[])
         .build();
 

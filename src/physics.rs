@@ -7,6 +7,7 @@ use specs::{Component, System,
 use vecmath::*;
 
 use input::Input;
+use utils::IteratorExt;
 
 // Position component, for entities that are in the world
 #[derive(Debug)]
@@ -30,7 +31,16 @@ impl Component for Velocity {
     type Storage = VecStorage<Self>;
 }
 
-// This object is controlled by the local player
+// Collision shapes; currently only axes-oriented rectangle
+pub struct Collision {
+    pub bounding_box: [f64; 2],
+}
+
+impl Component for Collision {
+    type Storage = VecStorage<Self>;
+}
+
+// Marks that this entity is controlled by the local player
 #[derive(Default)]
 pub struct LocalControl;
 
@@ -100,7 +110,8 @@ impl<'a> System<'a> for SysShip {
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
-            let thrust = [pos.rot.cos(), pos.rot.sin()];
+            let (s, c) = pos.rot.sin_cos();
+            let thrust = [c, s];
             vel.vel = vec2_add(vel.vel,
                                vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
 
@@ -193,6 +204,76 @@ impl<'a> System<'a> for SysAsteroid {
         } else {
             None
         };
+    }
+}
+
+// Collision response
+pub struct SysCollision;
+
+fn check_sat_collision(
+    s_pos: &Position, s_col: &Collision,
+    o_pos: &Position, o_col: &Collision,
+    dir: [f64; 2],
+) -> bool {
+    // This is called for each normal of each rectangle
+    // It checks whether there is collision of the shape projected along it
+    let sides = &[(-1.0, -1.0), (-1.0, 1.0),
+                  (1.0, 1.0), (1.0, -1.0)];
+    // Project S rectangle
+    let (s, c) = s_pos.rot.sin_cos();
+    let s_proj = sides.iter().map(|&(xs, ys)| {
+        // Compute corner coordinates
+        let corner = vec2_add(s_pos.pos, [s_col.bounding_box[0] * xs * c +
+                                          s_col.bounding_box[1] * ys * (-s),
+                                          s_col.bounding_box[0] * xs * s +
+                                          s_col.bounding_box[1] * ys * c]);
+        // Dot product with dir vector gives the distance along that vector
+        vec2_dot(corner, dir) as f64
+    }).minmax().unwrap();
+    // Project O rectangle
+    let (s, c) = o_pos.rot.sin_cos();
+    let o_proj = sides.iter().map(|&(xs, ys)| {
+        // Compute corner coordinates
+        let corner = vec2_add(o_pos.pos, [o_col.bounding_box[0] * xs * c +
+                                          o_col.bounding_box[1] * ys * (-s),
+                                          o_col.bounding_box[0] * xs * s +
+                                          o_col.bounding_box[1] * ys * c]);
+        // Dot product with dir vector gives the distance along that vector
+        vec2_dot(corner, dir) as f64
+    }).minmax().unwrap();
+
+    s_proj.0 < o_proj.1 && o_proj.0 < s_proj.1
+}
+
+impl<'a> System<'a> for SysCollision {
+    type SystemData = (Entities<'a>,
+                       WriteStorage<'a, Position>,
+                       ReadStorage<'a, Collision>);
+
+    fn run(&mut self, (entities, pos, collision): Self::SystemData) {
+        //let mut collisions = Vec::new();
+        for (s_e, s_pos, s_col) in (&*entities, &pos, &collision).join() {
+            for (o_e, o_pos, o_col) in (&*entities, &pos, &collision).join() {
+                if s_e == o_e { continue; }
+                // Detect collisions using SAT
+                let (s_s, s_c) = s_pos.rot.sin_cos();
+                if check_sat_collision(s_pos, s_col, o_pos, o_col,
+                                       [s_c, s_s]) &&
+                    check_sat_collision(s_pos, s_col, o_pos, o_col,
+                                        [-s_s, s_c])
+                {
+                    let (o_s, o_c) = o_pos.rot.sin_cos();
+                    if check_sat_collision(s_pos, s_col, o_pos, o_col,
+                                           [o_c, o_s]) &&
+                        check_sat_collision(s_pos, s_col, o_pos, o_col,
+                                            [-o_s, o_c])
+                    {
+                        // Collision!
+                        warn!("COLLISION");
+                    }
+                }
+            }
+        }
     }
 }
 
