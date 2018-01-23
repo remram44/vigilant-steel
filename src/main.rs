@@ -9,8 +9,10 @@ extern crate sdl2_window;
 extern crate specs;
 extern crate vecmath;
 
+mod asteroid;
 mod input;
 mod physics;
+mod ship;
 mod utils;
 
 use gfx_core::Device;
@@ -22,10 +24,12 @@ use sdl2_window::Sdl2Window;
 use specs::{DispatcherBuilder, World, Join};
 use vecmath::*;
 
+use asteroid::{Asteroid, SysAsteroid};
 use input::Input;
 use physics::{DeltaTime, Position, Velocity, Collision,
-              LocalControl, Ship, Asteroid,
-              SysShip, SysAsteroid, SysCollision, SysSimu};
+              LocalControl,
+              SysCollision, SysSimu};
+use ship::{Ship, SysShip};
 
 type Window = PistonWindow<Sdl2Window>;
 
