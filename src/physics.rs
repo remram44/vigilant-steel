@@ -40,7 +40,7 @@ impl Component for Collision {
 
 // Collision information: this flags an entity has having collided
 pub struct Collided {
-    pub entity: Entity,
+    pub entities: Vec<Entity>,
 }
 
 impl Component for Collided {
@@ -142,7 +142,11 @@ impl<'a> System<'a> for SysCollision {
                                             [-o_s, o_c])
                     {
                         // Collision!
-                        collided.insert(s_e, Collided { entity: o_e });
+                        if let Some(col) = collided.get_mut(s_e) {
+                            col.entities.push(o_e);
+                            continue;
+                        }
+                        collided.insert(s_e, Collided { entities: vec![o_e] });
                     }
                 }
             }
