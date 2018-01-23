@@ -1,10 +1,9 @@
 extern crate env_logger;
-extern crate gfx_core;
 extern crate graphics;
 #[macro_use] extern crate log;
-extern crate rand;
+extern crate opengl_graphics;
 extern crate piston;
-extern crate piston_window;
+extern crate rand;
 extern crate sdl2_window;
 extern crate specs;
 extern crate vecmath;
@@ -15,10 +14,10 @@ mod physics;
 mod ship;
 mod utils;
 
-use gfx_core::Device;
 use graphics::Transformed;
+use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
-use piston_window::{OpenGL, PistonWindow};
+use piston::event_loop::{Events, EventSettings};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
 use specs::{DispatcherBuilder, World, Join};
@@ -30,8 +29,6 @@ use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl,
               SysCollision, SysSimu};
 use ship::{Ship, SysShip};
-
-type Window = PistonWindow<Sdl2Window>;
 
 pub struct Health(i32);
 
@@ -46,7 +43,7 @@ fn main() {
     let opengl = OpenGL::V3_2;
 
     // Create an SDL2 window.
-    let mut window: Window = WindowSettings::new(
+    let mut window: Sdl2Window = WindowSettings::new(
             "vigilant-engine",
             [width, height],
         )
@@ -54,6 +51,9 @@ fn main() {
         .build()
         .expect("Couldn't create an OpenGL window");
     info!("Window created");
+
+    let mut gl = GlGraphics::new(opengl);
+    info!("OpenGL initialized");
 
     let mut world = World::new();
     world.register::<Position>();
@@ -85,7 +85,8 @@ fn main() {
 
     let mut last_health = -1;
 
-    while let Some(event) = window.next() {
+    let mut events = Events::new(EventSettings::new());
+    while let Some(event) = events.next(&mut window) {
         // Keyboard input
         if let Some(Button::Keyboard(key)) = event.press_args() {
             let mut input = world.write_resource::<Input>();
@@ -125,11 +126,11 @@ fn main() {
         }
 
         // Draw
-        if event.render_args().is_some() {
+        if let Some(r) = event.render_args() {
             let pos = world.read::<Position>();
             let ship = world.read::<Ship>();
             let asteroid = world.read::<Asteroid>();
-            window.draw_2d(&event, |c, g| {
+            gl.draw(r.viewport(), |c, g| {
                 let (width, height) = if let Some(v) = c.viewport {
                     (v.rect[2], v.rect[3])
                 } else {
@@ -186,7 +187,6 @@ fn main() {
                     last_health = health;
                 }
             });
-            window.device.cleanup();
         }
     }
 }
