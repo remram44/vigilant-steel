@@ -76,10 +76,10 @@ fn main() {
     world.add_resource(Input::new());
 
     let mut dispatcher = DispatcherBuilder::new()
+        .add(SysSimu, "simu", &[])
+        .add(SysCollision, "collision", &[])
         .add(SysShip, "ship", &[])
         .add(SysAsteroid::new(), "asteroid", &[])
-        .add(SysCollision, "collision", &[])
-        .add(SysSimu, "simu", &[])
         .build();
 
     while let Some(event) = window.next() {
