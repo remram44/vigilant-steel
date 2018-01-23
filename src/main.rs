@@ -85,13 +85,12 @@ fn main() {
 
     let mut last_health = -1;
 
-    let mut events = Events::new(EventSettings::new());
-    while let Some(event) = events.next(&mut window) {
+    event_loop::run(&mut window, |window, event| {
         // Keyboard input
         if let Some(Button::Keyboard(key)) = event.press_args() {
             let mut input = world.write_resource::<Input>();
             match key {
-                Key::Escape => break,
+                Key::Escape => return false,
                 Key::A => input.movement[0] = -1.0,
                 Key::D => input.movement[0] =  1.0,
                 Key::S => input.movement[1] = -1.0,
@@ -118,7 +117,7 @@ fn main() {
             world.maintain();
 
             if world.read_resource::<Health>().0 <= 0 {
-                break;
+                return false;
             }
 
             let mut input = world.write_resource::<Input>();
@@ -188,7 +187,8 @@ fn main() {
                 }
             });
         }
-    }
+        true
+    });
 }
 
 /// Sliding square/fixed point collision
@@ -254,5 +254,28 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
         Some(t)
     } else {
         None
+    }
+}
+
+#[cfg(not(target_os = "emscripten"))]
+mod event_loop {
+    use piston::event_loop::{EventSettings, Events};
+    use piston::input::Event;
+    use piston::window::Window;
+    use sdl2_window::Sdl2Window;
+
+    pub fn run<F>(
+        mut window: &mut Sdl2Window,
+        mut handler: F,
+    )
+    where
+        F: FnMut(&mut Sdl2Window, Event) -> bool
+    {
+        let mut events = Events::new(EventSettings::new());
+        while let Some(e) = events.next(window) {
+            if !handler(window, e) {
+                break;
+            }
+        }
     }
 }
