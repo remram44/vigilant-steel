@@ -52,7 +52,7 @@ fn main() {
         )
         .opengl(opengl)
         .build()
-        .unwrap();
+        .expect("Couldn't create an OpenGL window");
     info!("Window created");
 
     let mut world = World::new();
