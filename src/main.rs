@@ -17,10 +17,9 @@ mod utils;
 use graphics::Transformed;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
-use piston::event_loop::{Events, EventSettings};
 use piston::input::*;
 use sdl2_window::Sdl2Window;
-use specs::{DispatcherBuilder, World, Join};
+use specs::{Dispatcher, DispatcherBuilder, World, Join};
 use vecmath::*;
 
 use asteroid::{Asteroid, SysAsteroid};
@@ -32,6 +31,18 @@ use ship::{Ship, SysShip};
 
 pub struct Health(i32);
 
+struct App {
+    gl: GlGraphics,
+    world: World,
+    dispatcher: Dispatcher<'static, 'static>,
+    last_health: i32,
+}
+
+#[cfg(not(target_os = "emscripten"))]
+const OPENGL: OpenGL = OpenGL::V3_2;
+#[cfg(target_os = "emscripten")]
+const OPENGL: OpenGL = OpenGL::V2_1;
+
 fn main() {
     env_logger::init().unwrap();
     info!("Starting up");
@@ -39,20 +50,18 @@ fn main() {
     let width = 800;
     let height = 600;
 
-    // Change this to OpenGL::V2_1 if not working.
-    let opengl = OpenGL::V3_2;
-
     // Create an SDL2 window.
-    let mut window: Sdl2Window = WindowSettings::new(
+    let window: Sdl2Window = WindowSettings::new(
             "vigilant-engine",
             [width, height],
         )
-        .opengl(opengl)
+        .opengl(OPENGL)
+        .srgb(false)
         .build()
         .expect("Couldn't create an OpenGL window");
     info!("Window created");
 
-    let mut gl = GlGraphics::new(opengl);
+    let gl = GlGraphics::new(OPENGL);
     info!("OpenGL initialized");
 
     let mut world = World::new();
@@ -76,119 +85,128 @@ fn main() {
     world.add_resource(Input::new());
     world.add_resource(Health(10));
 
-    let mut dispatcher = DispatcherBuilder::new()
+    let dispatcher = DispatcherBuilder::new()
         .add(SysSimu, "simu", &[])
         .add(SysCollision, "collision", &[])
         .add(SysShip, "ship", &[])
         .add(SysAsteroid::new(), "asteroid", &[])
         .build();
 
-    let mut last_health = -1;
+    let app = App {
+        gl: gl,
+        world: world,
+        dispatcher: dispatcher,
+        last_health: -1,
+    };
 
-    event_loop::run(&mut window, |window, event| {
-        // Keyboard input
-        if let Some(Button::Keyboard(key)) = event.press_args() {
-            let mut input = world.write_resource::<Input>();
-            match key {
-                Key::Escape => return false,
-                Key::A => input.movement[0] = -1.0,
-                Key::D => input.movement[0] =  1.0,
-                Key::S => input.movement[1] = -1.0,
-                Key::W => input.movement[1] =  1.0,
-                Key::Space => input.fire = true,
-                _ => {}
-            }
-        } else if let Some(Button::Keyboard(key)) = event.release_args() {
-            let mut input = world.write_resource::<Input>();
-            match key {
-                Key::A | Key::D => input.movement[0] = 0.0,
-                Key::S | Key::W => input.movement[1] = 0.0,
-                _ => {}
-            }
+    event_loop::run(window, handle_event, app);
+}
+
+fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
+    // Keyboard input
+    if let Some(Button::Keyboard(key)) = event.press_args() {
+        let mut input = app.world.write_resource::<Input>();
+        match key {
+            Key::Escape => return false,
+            Key::A => input.movement[0] = -1.0,
+            Key::D => input.movement[0] =  1.0,
+            Key::S => input.movement[1] = -1.0,
+            Key::W => input.movement[1] =  1.0,
+            Key::Space => input.fire = true,
+            _ => {}
+        }
+    } else if let Some(Button::Keyboard(key)) = event.release_args() {
+        let mut input = app.world.write_resource::<Input>();
+        match key {
+            Key::A | Key::D => input.movement[0] = 0.0,
+            Key::S | Key::W => input.movement[1] = 0.0,
+            _ => {}
+        }
+    }
+
+    // Update
+    if let Some(u) = event.update_args() {
+        {
+            let mut dt = app.world.write_resource::<DeltaTime>();
+            *dt = DeltaTime(u.dt);
+        }
+        app.dispatcher.dispatch(&mut app.world.res);
+        app.world.maintain();
+
+        if app.world.read_resource::<Health>().0 <= 0 {
+            return false;
         }
 
-        // Update
-        if let Some(u) = event.update_args() {
-            {
-                let mut dt = world.write_resource::<DeltaTime>();
-                *dt = DeltaTime(u.dt);
+        let mut input = app.world.write_resource::<Input>();
+        input.fire = false;
+    }
+
+    // Draw
+    if let Some(r) = event.render_args() {
+        let world = &mut app.world;
+        let pos = world.read::<Position>();
+        let ship = world.read::<Ship>();
+        let asteroid = world.read::<Asteroid>();
+        let last_health = &mut app.last_health;
+        app.gl.draw(r.viewport(), |c, g| {
+            let (width, height) = if let Some(v) = c.viewport {
+                (v.rect[2], v.rect[3])
+            } else {
+                warn!("Got Context with no attached Viewport");
+                return;
+            };
+
+            graphics::clear([0.0, 0.0, 0.1, 1.0], g);
+
+            let tr = c.transform
+                .trans(width as f64 / 2.0, height as f64 / 2.0)
+                .scale(1.0, -1.0);
+
+            for (pos, ship) in (&pos, &ship).join() {
+                let ship_tr = tr
+                    .trans(pos.pos[0], pos.pos[1])
+                    .rot_rad(pos.rot);
+                let mut color = [0.0, 0.0, 0.0, 1.0];
+                color[0..3].copy_from_slice(&ship.color);
+                graphics::line(
+                    color,
+                    1.0,
+                    [-10.0, 8.0, -10.0, -8.0],
+                    ship_tr,
+                    g);
+                graphics::line(
+                    color,
+                    1.0,
+                    [-10.0, 8.0, 10.0, 0.0],
+                    ship_tr,
+                    g);
+                graphics::line(
+                    color,
+                    1.0,
+                    [-10.0, -8.0, 10.0, 0.0],
+                    ship_tr,
+                    g);
             }
-            dispatcher.dispatch(&mut world.res);
-            world.maintain();
 
-            if world.read_resource::<Health>().0 <= 0 {
-                return false;
+            for (pos, _) in (&pos, &asteroid).join() {
+                let asteroid_tr = tr
+                    .trans(pos.pos[0], pos.pos[1])
+                    .rot_rad(pos.rot);
+                graphics::rectangle(
+                    [1.0, 1.0, 1.0, 1.0],
+                    graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),
+                    asteroid_tr,
+                    g);
             }
 
-            let mut input = world.write_resource::<Input>();
-            input.fire = false;
-        }
-
-        // Draw
-        if let Some(r) = event.render_args() {
-            let pos = world.read::<Position>();
-            let ship = world.read::<Ship>();
-            let asteroid = world.read::<Asteroid>();
-            gl.draw(r.viewport(), |c, g| {
-                let (width, height) = if let Some(v) = c.viewport {
-                    (v.rect[2], v.rect[3])
-                } else {
-                    warn!("Got Context with no attached Viewport");
-                    return;
-                };
-
-                graphics::clear([0.0, 0.0, 0.1, 1.0], g);
-
-                let tr = c.transform
-                    .trans(width as f64 / 2.0, height as f64 / 2.0)
-                    .scale(1.0, -1.0);
-
-                for (pos, ship) in (&pos, &ship).join() {
-                    let ship_tr = tr
-                        .trans(pos.pos[0], pos.pos[1])
-                        .rot_rad(pos.rot);
-                    let mut color = [0.0, 0.0, 0.0, 1.0];
-                    color[0..3].copy_from_slice(&ship.color);
-                    graphics::line(
-                        color,
-                        1.0,
-                        [-10.0, 8.0, -10.0, -8.0],
-                        ship_tr,
-                        g);
-                    graphics::line(
-                        color,
-                        1.0,
-                        [-10.0, 8.0, 10.0, 0.0],
-                        ship_tr,
-                        g);
-                    graphics::line(
-                        color,
-                        1.0,
-                        [-10.0, -8.0, 10.0, 0.0],
-                        ship_tr,
-                        g);
-                }
-
-                for (pos, _) in (&pos, &asteroid).join() {
-                    let asteroid_tr = tr
-                        .trans(pos.pos[0], pos.pos[1])
-                        .rot_rad(pos.rot);
-                    graphics::rectangle(
-                        [1.0, 1.0, 1.0, 1.0],
-                        graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),
-                        asteroid_tr,
-                        g);
-                }
-
-                let health = world.read_resource::<Health>().0;
-                if health != last_health {
-                    warn!("Health now {}", health);
-                    last_health = health;
-                }
-            });
-        }
-        true
-    });
+            let health = world.read_resource::<Health>().0;
+            if health != *last_health {
+                warn!("Health now {}", health);
+                *last_health = health;
+            }
+        });
+    }
+    true
 }
 
 /// Sliding square/fixed point collision
@@ -261,19 +279,16 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
 mod event_loop {
     use piston::event_loop::{EventSettings, Events};
     use piston::input::Event;
-    use piston::window::Window;
     use sdl2_window::Sdl2Window;
 
-    pub fn run<F>(
-        mut window: &mut Sdl2Window,
-        mut handler: F,
-    )
-    where
-        F: FnMut(&mut Sdl2Window, Event) -> bool
-    {
+    pub fn run<T>(
+        mut window: Sdl2Window,
+        handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
+        mut arg: T,
+    ) {
         let mut events = Events::new(EventSettings::new());
-        while let Some(e) = events.next(window) {
-            if !handler(window, e) {
+        while let Some(e) = events.next(&mut window) {
+            if !handler(&mut window, e, &mut arg) {
                 break;
             }
         }
@@ -284,7 +299,7 @@ mod event_loop {
 mod event_loop {
     extern crate emscripten_sys;
 
-    use piston::input::{AfterRenderArgs, Input, RenderArgs, UpdateArgs};
+    use piston::input::{Event, Loop, AfterRenderArgs, RenderArgs, UpdateArgs};
     use piston::window::Window;
     use sdl2_window::Sdl2Window;
     use std::mem;
@@ -293,12 +308,12 @@ mod event_loop {
     struct EventLoop<T> {
         last_updated: f64,
         window: Sdl2Window,
-        handler: fn(window: &mut Sdl2Window, e: Input, arg: &mut T),
+        handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
         arg: T,
     }
 
     pub fn run<T>(window: Sdl2Window,
-                  handler: fn(window: &mut Sdl2Window, e: Input, arg: &mut T),
+                  handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
                   arg: T) {
         unsafe {
             let mut events = Box::new(EventLoop {
@@ -315,17 +330,17 @@ mod event_loop {
 
     extern "C" fn main_loop_c<T>(arg: *mut c_void) {
         unsafe {
-            let mut events: &mut EventLoop<T> = mem::transmute(arg);
+            let events: &mut EventLoop<T> = mem::transmute(arg);
             let window = &mut events.window;
             let handler = events.handler;
             let arg = &mut events.arg;
             window.swap_buffers();
 
-            let e = Input::AfterRender(AfterRenderArgs);
+            let e = Event::Loop(Loop::AfterRender(AfterRenderArgs));
             handler(window, e, arg);
 
             while let Some(e) = window.poll_event() {
-                handler(window, e, arg);
+                handler(window, Event::Input(e), arg);
             }
 
             if window.should_close() {
@@ -334,21 +349,21 @@ mod event_loop {
             }
 
             let now = emscripten_sys::emscripten_get_now() as f64;
-            let dt = now - events.last_updated;
+            let dt = (now - events.last_updated) / 1000.0;
             events.last_updated = now;
 
-            let e = Input::Update(UpdateArgs { dt: dt });
+            let e = Event::Loop(Loop::Update(UpdateArgs { dt: dt }));
             handler(window, e, arg);
 
             let size = window.size();
             let draw_size = window.draw_size();
-            let e = Input::Render(RenderArgs {
+            let e = Event::Loop(Loop::Render(RenderArgs {
                 ext_dt: dt,
                 width: size.width,
                 height: size.height,
                 draw_width: draw_size.width,
                 draw_height: draw_size.height,
-            });
+            }));
             handler(window, e, arg);
         }
     }
