@@ -26,12 +26,14 @@ use vecmath::*;
 
 use asteroid::{Asteroid, SysAsteroid};
 use input::Input;
-use physics::{DeltaTime, Position, Velocity, Collision,
+use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl,
               SysCollision, SysSimu};
 use ship::{Ship, SysShip};
 
 type Window = PistonWindow<Sdl2Window>;
+
+pub struct Health(i32);
 
 fn main() {
     env_logger::init().unwrap();
@@ -57,6 +59,7 @@ fn main() {
     world.register::<Position>();
     world.register::<Velocity>();
     world.register::<Collision>();
+    world.register::<Collided>();
     world.register::<LocalControl>();
     world.register::<Ship>();
     world.register::<Asteroid>();
@@ -69,15 +72,9 @@ fn main() {
         .with(Ship::new([1.0, 0.0, 0.0]))
         .build();
 
-    world.create_entity()
-        .with(Position { pos: [100.0, 50.0], rot: 0.0 })
-        .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
-        .with(Collision { bounding_box: [10.0, 8.0] })
-        .with(Ship::new([0.0, 0.0, 1.0]))
-        .build();
-
     world.add_resource(DeltaTime(0.0));
     world.add_resource(Input::new());
+    world.add_resource(Health(10));
 
     let mut dispatcher = DispatcherBuilder::new()
         .add(SysSimu, "simu", &[])
@@ -85,6 +82,8 @@ fn main() {
         .add(SysShip, "ship", &[])
         .add(SysAsteroid::new(), "asteroid", &[])
         .build();
+
+    let mut last_health = -1;
 
     while let Some(event) = window.next() {
         // Keyboard input
@@ -116,6 +115,10 @@ fn main() {
             }
             dispatcher.dispatch(&mut world.res);
             world.maintain();
+
+            if world.read_resource::<Health>().0 <= 0 {
+                break;
+            }
 
             let mut input = world.write_resource::<Input>();
             input.fire = false;
@@ -175,6 +178,12 @@ fn main() {
                         graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),
                         asteroid_tr,
                         g);
+                }
+
+                let health = world.read_resource::<Health>().0;
+                if health != last_health {
+                    warn!("Health now {}", health);
+                    last_health = health;
                 }
             });
             window.device.cleanup();

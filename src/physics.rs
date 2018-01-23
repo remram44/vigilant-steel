@@ -2,7 +2,7 @@ use std::f64::consts::PI;
 
 use specs::{Component, System,
             Entities, ReadStorage, WriteStorage, Join,
-            Fetch, NullStorage, VecStorage};
+            Fetch, HashMapStorage, NullStorage, VecStorage};
 use vecmath::*;
 
 use utils::IteratorExt;
@@ -36,6 +36,13 @@ pub struct Collision {
 
 impl Component for Collision {
     type Storage = VecStorage<Self>;
+}
+
+// Collision information: this flags an entity has having collided
+pub struct Collided;
+
+impl Component for Collided {
+    type Storage = HashMapStorage<Self>;
 }
 
 // Marks that this entity is controlled by the local player
@@ -108,10 +115,14 @@ fn check_sat_collision(
 impl<'a> System<'a> for SysCollision {
     type SystemData = (Entities<'a>,
                        WriteStorage<'a, Position>,
-                       ReadStorage<'a, Collision>);
+                       ReadStorage<'a, Collision>,
+                       WriteStorage<'a, Collided>);
 
-    fn run(&mut self, (entities, pos, collision): Self::SystemData) {
-        //let mut collisions = Vec::new();
+    fn run(
+        &mut self,
+        (entities, pos, collision, mut collided): Self::SystemData)
+    {
+        collided.clear();
         for (s_e, s_pos, s_col) in (&*entities, &pos, &collision).join() {
             for (o_e, o_pos, o_col) in (&*entities, &pos, &collision).join() {
                 if s_e == o_e { continue; }
@@ -129,7 +140,7 @@ impl<'a> System<'a> for SysCollision {
                                             [-o_s, o_c])
                     {
                         // Collision!
-                        warn!("COLLISION");
+                        collided.insert(s_e, Collided);
                     }
                 }
             }

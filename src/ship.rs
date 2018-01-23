@@ -1,10 +1,11 @@
 use specs::{Component, System,
             ReadStorage, WriteStorage, Join,
-            Fetch, VecStorage};
+            Fetch, FetchMut, VecStorage};
 use vecmath::*;
 
 use input::Input;
-use physics::{DeltaTime, Position, Velocity, LocalControl};
+use super::Health;
+use physics::{DeltaTime, Position, Velocity, Collided, LocalControl};
 
 // A ship
 pub struct Ship {
@@ -33,15 +34,23 @@ pub struct SysShip;
 impl<'a> System<'a> for SysShip {
     type SystemData = (Fetch<'a, DeltaTime>,
                        Fetch<'a, Input>,
+                       FetchMut<'a, Health>,
                        ReadStorage<'a, Position>,
                        WriteStorage<'a, Velocity>,
+                       ReadStorage<'a, Collided>,
                        WriteStorage<'a, Ship>,
                        ReadStorage<'a, LocalControl>);
 
     fn run(
-        &mut self, (dt, input, pos, mut vel, mut ship, local): Self::SystemData
+        &mut self,
+        (dt, input, mut health,
+         pos, mut vel, collided, mut ship, local): Self::SystemData
     ) {
         let dt = dt.0;
+
+        for _ in (&collided, &ship, &local).join() {
+            health.0 -= 1;
+        }
 
         // Control ship thrusters from input
         for (mut ship, _) in (&mut ship, &local).join() {
