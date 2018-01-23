@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use specs::{Component, System,
+use specs::{Entity, Component, System,
             Entities, ReadStorage, WriteStorage, Join,
             Fetch, HashMapStorage, NullStorage, VecStorage};
 use vecmath::*;
@@ -39,7 +39,9 @@ impl Component for Collision {
 }
 
 // Collision information: this flags an entity has having collided
-pub struct Collided;
+pub struct Collided {
+    pub entity: Entity,
+}
 
 impl Component for Collided {
     type Storage = HashMapStorage<Self>;
@@ -140,7 +142,7 @@ impl<'a> System<'a> for SysCollision {
                                             [-o_s, o_c])
                     {
                         // Collision!
-                        collided.insert(s_e, Collided);
+                        collided.insert(s_e, Collided { entity: o_e });
                     }
                 }
             }

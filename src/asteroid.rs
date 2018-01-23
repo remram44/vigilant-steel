@@ -45,10 +45,12 @@ impl<'a> System<'a> for SysAsteroid {
         // Remove asteroids gone from the screen or hit
         let mut count = 0;
         for (entity, pos, _) in (&*entities, &pos, &asteroid).join() {
-            if collided.get(entity).is_some() {
-                info!("Deleting hit asteroid");
-                entities.delete(entity).unwrap();
-                continue;
+            if let Some(col) = collided.get(entity) {
+                if asteroid.get(col.entity).is_none() {
+                    info!("Deleting hit asteroid");
+                    entities.delete(entity).unwrap();
+                    continue;
+                }
             }
 
             let pos = pos.pos;
