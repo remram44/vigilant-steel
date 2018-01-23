@@ -48,8 +48,20 @@ impl<'a> System<'a> for SysShip {
     ) {
         let dt = dt.0;
 
+        // Handle collisions
         for _ in (&collided, &ship, &local).join() {
             health.0 -= 1;
+        }
+
+        // Prevent leaving the screen
+        for (pos, vel, _) in (&pos, &mut vel, &ship).join() {
+            if pos.pos[0] < -400.0 || pos.pos[0] > 400.0 ||
+                pos.pos[1] < -300.0 || pos.pos[1] > 300.0
+            {
+                health.0 -= 1;
+                vel.vel = vec2_sub([0.0, 0.0], pos.pos);
+                vel.vel = vec2_scale(vel.vel, 3.0 * vec2_inv_len(vel.vel));
+            }
         }
 
         // Control ship thrusters from input
