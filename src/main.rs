@@ -104,23 +104,27 @@ fn main() {
 
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Keyboard input
-    if let Some(Button::Keyboard(key)) = event.press_args() {
+    if let Some(button) = event.button_args() {
         let mut input = app.world.write_resource::<Input>();
-        match key {
-            Key::Escape => return false,
-            Key::A => input.movement[0] = -1.0,
-            Key::D => input.movement[0] =  1.0,
-            Key::S => input.movement[1] = -1.0,
-            Key::W => input.movement[1] =  1.0,
-            Key::Space => input.fire = true,
-            _ => {}
-        }
-    } else if let Some(Button::Keyboard(key)) = event.release_args() {
-        let mut input = app.world.write_resource::<Input>();
-        match key {
-            Key::A | Key::D => input.movement[0] = 0.0,
-            Key::S | Key::W => input.movement[1] = 0.0,
-            _ => {}
+        use Button::Keyboard;
+        if let Some(scancode) = button.scancode {
+            if button.state == ButtonState::Press {
+                match scancode {
+                    41 => return false,
+                    4 => input.movement[0] = -1.0,
+                    7 => input.movement[0] =  1.0,
+                    22 => input.movement[1] = -1.0,
+                    26 => input.movement[1] =  1.0,
+                    44 => input.fire = true,
+                    _ => {}
+                }
+            } else {
+                match scancode {
+                    4 | 7 => input.movement[0] = 0.0,
+                    22 | 26 => input.movement[1] = 0.0,
+                    _ => {}
+                }
+            }
         }
     }
 
