@@ -1,0 +1,34 @@
+stages:
+  - build
+  - deploy
+
+build_game:
+  stage: build
+  image: remram/emscripten-rust-sdl
+  script:
+    - cargo build
+    - cargo test
+    - EMMAKEN_CFLAGS='-s USE_SDL=2' cargo build --release --target=asmjs-unknown-emscripten
+    - mkdir output &&
+      cp target/asmjs-unknown-emscripten/release/client.js output/client.js &&
+      sed 's/"target\/asmjs-unknown-emscripten\/release\/client.js"/"client.js?'$(git rev-parse HEAD)'"/' <index.html >output/index.html
+  artifacts:
+    paths:
+      - output
+  cache:
+    paths:
+      - /root/.cargo/registry
+      - target
+  tags:
+    - docker
+
+pages:
+  stage: deploy
+  script:
+    - mkdir public
+    - cp output/index.html output/client.js public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
