@@ -36,6 +36,7 @@ struct App {
     gl: GlGraphics,
     world: World,
     dispatcher: Dispatcher<'static, 'static>,
+    game_over: bool,
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -57,6 +58,7 @@ fn main() {
         )
         .opengl(OPENGL)
         .srgb(false)
+        .exit_on_esc(true)
         .build()
         .expect("Couldn't create an OpenGL window");
     info!("Window created");
@@ -93,6 +95,7 @@ fn main() {
         gl: gl,
         world: world,
         dispatcher: dispatcher,
+        game_over: false,
     };
 
     event_loop::run(window, handle_event, app);
@@ -121,25 +124,26 @@ fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
 
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Keyboard input
-    if let Some(button) = event.button_args() {
-        let mut input = app.world.write_resource::<Input>();
-        if let Some(scancode) = button.scancode {
-            if button.state == ButtonState::Press {
-                match scancode {
-                    41 => return false,
-                    4 => input.movement[0] = -1.0,
-                    7 => input.movement[0] =  1.0,
-                    22 => input.movement[1] = -1.0,
-                    26 => input.movement[1] =  1.0,
-                    44 => input.fire = Press::PRESSED,
-                    _ => {}
-                }
-            } else {
-                match scancode {
-                    4 | 7 => input.movement[0] = 0.0,
-                    22 | 26 => input.movement[1] = 0.0,
-                    44 => input.fire = Press::UP,
-                    _ => {}
+    if !app.game_over {
+        if let Some(button) = event.button_args() {
+            let mut input = app.world.write_resource::<Input>();
+            if let Some(scancode) = button.scancode {
+                if button.state == ButtonState::Press {
+                    match scancode {
+                        4 => input.movement[0] = -1.0,
+                        7 => input.movement[0] =  1.0,
+                        22 => input.movement[1] = -1.0,
+                        26 => input.movement[1] =  1.0,
+                        44 => input.fire = Press::PRESSED,
+                        _ => {}
+                    }
+                } else {
+                    match scancode {
+                        4 | 7 => input.movement[0] = 0.0,
+                        22 | 26 => input.movement[1] = 0.0,
+                        44 => input.fire = Press::UP,
+                        _ => {}
+                    }
                 }
             }
         }
@@ -155,7 +159,9 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
         app.world.maintain();
 
         if app.world.read_resource::<Health>().0 <= 0 {
-            return false;
+            app.game_over = true;
+            let mut input = app.world.write_resource::<Input>();
+            *input = Input::new();
         }
 
         let mut input = app.world.write_resource::<Input>();
