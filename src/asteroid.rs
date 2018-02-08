@@ -59,8 +59,8 @@ impl<'a> System<'a> for SysAsteroid {
             }
 
             let pos = pos.pos;
-            if pos[0] < -550.0 || pos[0] > 550.0 ||
-                pos[1] < -550.0 || pos[1] > 550.0
+            if pos[0] < -500.0 || pos[0] > 500.0 ||
+                pos[1] < -500.0 || pos[1] > 500.0
             {
                 info!("Deleting asteroid");
                 entities.delete(entity).unwrap();
@@ -83,8 +83,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Position {
                         pos: [
-                            xpos * 500.0 + ypos * rng.gen_range(-500.0, 500.0),
-                            ypos * 500.0 + xpos * rng.gen_range(-500.0, 500.0),
+                            xpos * 450.0 + ypos * rng.gen_range(-350.0, 350.0),
+                            ypos * 450.0 + xpos * rng.gen_range(-350.0, 350.0),
                         ],
                         rot: rng.gen_range(0.0, 2.0 * PI),
                     },
@@ -93,8 +93,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Velocity {
                         vel: [
-                            rng.gen_range(-0.3, 0.3) - xpos * 0.4,
-                            rng.gen_range(-0.3, 0.3) - ypos * 0.4,
+                            rng.gen_range(-0.2, 0.2) - xpos * 0.5,
+                            rng.gen_range(-0.2, 0.2) - ypos * 0.5,
                         ],
                         rot: rng.gen_range(-2.0, 2.0),
                     },
