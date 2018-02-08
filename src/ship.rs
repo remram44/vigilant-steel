@@ -3,7 +3,7 @@ use specs::{Entity, Component, System, World,
             Fetch, FetchMut, VecStorage, NullStorage, LazyUpdate};
 use vecmath::*;
 
-use input::Input;
+use input::{Input, Press};
 use super::Health;
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl};
@@ -98,7 +98,11 @@ impl<'a> System<'a> for SysShip {
             if input.movement[1] >= 0.0 {
                 ship.thrust[1] = input.movement[1];
             }
-            ship.fire = input.fire;
+            match input.fire {
+                Press::UP => ship.fire = false,
+                Press::PRESSED => ship.fire = true,
+                _ => {}
+            }
         }
 
         // Apply thrust

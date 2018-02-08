@@ -24,7 +24,7 @@ use specs::{Dispatcher, DispatcherBuilder, World, Join};
 use vecmath::*;
 
 use asteroid::{Asteroid, SysAsteroid};
-use input::Input;
+use input::{Input, Press};
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl,
               SysCollision, SysSimu};
@@ -131,13 +131,14 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
                     7 => input.movement[0] =  1.0,
                     22 => input.movement[1] = -1.0,
                     26 => input.movement[1] =  1.0,
-                    44 => input.fire = true,
+                    44 => input.fire = Press::PRESSED,
                     _ => {}
                 }
             } else {
                 match scancode {
                     4 | 7 => input.movement[0] = 0.0,
                     22 | 26 => input.movement[1] = 0.0,
+                    44 => input.fire = Press::UP,
                     _ => {}
                 }
             }
@@ -158,7 +159,9 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
         }
 
         let mut input = app.world.write_resource::<Input>();
-        input.fire = false;
+        if input.fire == Press::PRESSED {
+            input.fire = Press::KEPT;
+        }
     }
 
     // Draw
