@@ -28,7 +28,7 @@ use input::Input;
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl,
               SysCollision, SysSimu};
-use ship::{Ship, SysShip};
+use ship::{Ship, SysShip, Projectile, SysProjectile};
 
 pub struct Health(i32);
 
@@ -71,6 +71,7 @@ fn main() {
     world.register::<Collided>();
     world.register::<LocalControl>();
     world.register::<Ship>();
+    world.register::<Projectile>();
     world.register::<Asteroid>();
 
     let ship = Ship::create_in_world(&mut world);
@@ -84,6 +85,7 @@ fn main() {
         .add(SysSimu, "simu", &[])
         .add(SysCollision, "collision", &[])
         .add(SysShip, "ship", &[])
+        .add(SysProjectile, "projectile", &[])
         .add(SysAsteroid::new(), "asteroid", &[])
         .build();
 
@@ -164,6 +166,7 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
         let world = &mut app.world;
         let pos = world.read::<Position>();
         let ship = world.read::<Ship>();
+        let projectile = world.read::<Projectile>();
         let asteroid = world.read::<Asteroid>();
         app.gl.draw(r.viewport(), |c, g| {
             let (width, height) = if let Some(v) = c.viewport {
@@ -214,6 +217,16 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
                         [38.0, 26.0],
                     ],
                     asteroid_tr, g);
+            }
+
+            for (pos, _) in (&pos, &projectile).join() {
+                let projectile_tr = tr
+                    .trans(pos.pos[0], pos.pos[1])
+                    .rot_rad(pos.rot);
+                graphics::line(
+                    [0.0, 1.0, 0.0, 1.0], 2.0,
+                    [-8.0, 0.0, 8.0, 0.0],
+                    projectile_tr, g);
             }
 
             let health = world.read_resource::<Health>().0;
