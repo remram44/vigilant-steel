@@ -15,6 +15,7 @@ mod ship;
 mod utils;
 
 use graphics::Transformed;
+use graphics::math::Matrix2d;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
 use piston::input::*;
@@ -102,11 +103,31 @@ fn main() {
     event_loop::run(window, handle_event, app);
 }
 
+fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
+                     points: &[Vector2<f64>], tr: Matrix2d, g: &mut G)
+    where G: graphics::Graphics
+{
+    let mut points = points.iter();
+    let first = match points.next() {
+        Some(p) => p,
+        None => return,
+    };
+    let mut previous = first;
+    for point in points {
+        graphics::line(color, radius,
+                       [previous[0], previous[1], point[0], point[1]],
+                       tr, g);
+        previous = point;
+    }
+    graphics::line(color, radius,
+                   [previous[0], previous[1], first[0], first[1]],
+                   tr, g);
+}
+
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Keyboard input
     if let Some(button) = event.button_args() {
         let mut input = app.world.write_resource::<Input>();
-        use Button::Keyboard;
         if let Some(scancode) = button.scancode {
             if button.state == ButtonState::Press {
                 match scancode {
@@ -172,35 +193,35 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
                     .rot_rad(pos.rot);
                 let mut color = [0.0, 0.0, 0.0, 1.0];
                 color[0..3].copy_from_slice(&ship.color);
-                graphics::line(
-                    color,
-                    1.0,
-                    [-10.0, 8.0, -10.0, -8.0],
-                    ship_tr,
-                    g);
-                graphics::line(
-                    color,
-                    1.0,
-                    [-10.0, 8.0, 10.0, 0.0],
-                    ship_tr,
-                    g);
-                graphics::line(
-                    color,
-                    1.0,
-                    [-10.0, -8.0, 10.0, 0.0],
-                    ship_tr,
-                    g);
+                draw_line_loop(
+                    color, 1.0,
+                    &[
+                        [-10.0, -8.0],
+                        [10.0, 0.0],
+                        [-10.0, 8.0],
+                    ],
+                    ship_tr, g);
             }
 
             for (pos, _) in (&pos, &asteroid).join() {
                 let asteroid_tr = tr
                     .trans(pos.pos[0], pos.pos[1])
                     .rot_rad(pos.rot);
-                graphics::rectangle(
-                    [1.0, 1.0, 1.0, 1.0],
-                    graphics::rectangle::centered([0.0, 0.0, 40.0, 40.0]),
-                    asteroid_tr,
-                    g);
+                draw_line_loop(
+                    [1.0, 1.0, 1.0, 1.0], 1.0,
+                    &[
+                        [-38.0, -26.0],
+                        [0.0, -46.0],
+                        [38.0, -26.0],
+                        [38.0, 26.0],
+                        [0.0, 46.0],
+                        [-38.0, 26.0],
+                        [-38.0, -26.0],
+                        [38.0, -26.0],
+                        [-38.0, 26.0],
+                        [38.0, 26.0],
+                    ],
+                    asteroid_tr, g);
             }
 
             let health = world.read_resource::<Health>().0;
