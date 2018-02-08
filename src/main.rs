@@ -36,7 +36,6 @@ struct App {
     gl: GlGraphics,
     world: World,
     dispatcher: Dispatcher<'static, 'static>,
-    last_health: i32,
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -79,7 +78,7 @@ fn main() {
 
     world.add_resource(DeltaTime(0.0));
     world.add_resource(Input::new());
-    world.add_resource(Health(10));
+    world.add_resource(Health(8));
 
     let dispatcher = DispatcherBuilder::new()
         .add(SysSimu, "simu", &[])
@@ -92,7 +91,6 @@ fn main() {
         gl: gl,
         world: world,
         dispatcher: dispatcher,
-        last_health: -1,
     };
 
     event_loop::run(window, handle_event, app);
@@ -167,7 +165,6 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
         let pos = world.read::<Position>();
         let ship = world.read::<Ship>();
         let asteroid = world.read::<Asteroid>();
-        let last_health = &mut app.last_health;
         app.gl.draw(r.viewport(), |c, g| {
             let (width, height) = if let Some(v) = c.viewport {
                 (v.rect[2], v.rect[3])
@@ -220,10 +217,15 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
             }
 
             let health = world.read_resource::<Health>().0;
-            if health != *last_health {
-                warn!("Health now {}", health);
-                *last_health = health;
-            }
+            let poly = &[
+                [0.0, 0.0], [0.0, 1.0],
+                [0.707, 0.707], [1.0, 0.0], [0.707, -0.707], [0.0, -1.0],
+                [-0.707, -0.707], [-1.0, 0.0], [-0.707, 0.707], [0.0, 1.0],
+            ];
+            graphics::polygon(
+                [0.0, 0.0, 1.0, 1.0],
+                &poly[0..(2 + health.max(0) as usize)],
+                tr.trans(-350.0, 250.0).scale(50.0, 50.0), g);
         });
     }
     true
