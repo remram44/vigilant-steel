@@ -107,9 +107,9 @@ impl<'a> System<'a> for SysAsteroid {
             } else {
                 Some(d - dt)
             }
-        } else if count < 10 {
+        } else if count < 30 {
             info!("Currently {} asteroids", count);
-            let delay = 3.0 - 0.4 * (10 - count) as f64;
+            let delay = 2.0 - 0.2 * (20 - count) as f64;
             info!("Spawning asteroid in {} seconds", delay);
             Some(delay)
         } else {
