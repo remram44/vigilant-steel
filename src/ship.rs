@@ -1,11 +1,12 @@
-use specs::{Component, System,
-            ReadStorage, WriteStorage, Join,
+use specs::{Entity, Component, System, World,
+            Entities, ReadStorage, WriteStorage, Join,
             Fetch, FetchMut, VecStorage};
 use vecmath::*;
 
 use input::Input;
 use super::Health;
-use physics::{DeltaTime, Position, Velocity, Collided, LocalControl};
+use physics::{DeltaTime, Position, Velocity, Collision, Collided,
+              LocalControl};
 
 // A ship
 pub struct Ship {
@@ -21,6 +22,29 @@ impl Ship {
             fire: false,
             color: color,
         }
+    }
+
+    pub fn create(
+        entities: Entities,
+        mut pos: WriteStorage<Position>, mut vel: WriteStorage<Velocity>,
+        mut collision: WriteStorage<Collision>, mut ship: WriteStorage<Ship>,
+    ) -> Entity
+    {
+        let entity = entities.create();
+        pos.insert(entity, Position { pos: [0.0, 0.0], rot: 0.0 });
+        vel.insert(entity, Velocity { vel: [0.0, 0.0], rot: 0.0 });
+        collision.insert(entity, Collision { bounding_box: [10.0, 8.0] });
+        ship.insert(entity, Ship::new([1.0, 0.0, 0.0]));
+        entity
+    }
+
+    pub fn create_in_world(world: &mut World) -> Entity {
+        Ship::create(
+            world.entities(),
+            world.write::<Position>(),
+            world.write::<Velocity>(),
+            world.write::<Collision>(),
+            world.write::<Ship>())
     }
 }
 

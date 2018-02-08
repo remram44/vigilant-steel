@@ -74,13 +74,8 @@ fn main() {
     world.register::<Ship>();
     world.register::<Asteroid>();
 
-    world.create_entity()
-        .with(Position { pos: [0.0, 0.0], rot: 0.0 })
-        .with(Velocity { vel: [0.0, 0.0], rot: 0.0 })
-        .with(Collision { bounding_box: [10.0, 8.0] })
-        .with(LocalControl)
-        .with(Ship::new([1.0, 0.0, 0.0]))
-        .build();
+    let ship = Ship::create_in_world(&mut world);
+    world.write::<LocalControl>().insert(ship, LocalControl);
 
     world.add_resource(DeltaTime(0.0));
     world.add_resource(Input::new());
