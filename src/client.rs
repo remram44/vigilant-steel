@@ -1,4 +1,4 @@
-//! Entrypoint, eventloop, and rendering.
+//! Entrypoint and eventloop for SDL client.
 
 extern crate env_logger;
 extern crate graphics;
@@ -25,6 +25,7 @@ use sdl2_window::Sdl2Window;
 
 use game::Game;
 use input::{Input, Press};
+use render::Viewport;
 
 /// The application context, passed through the `event_loop` module.
 struct App {
@@ -64,7 +65,7 @@ fn main() {
         gl: gl,
         game: Game::new(),
     };
-    app.game.resize_viewport([width, height]);
+    app.game.world.add_resource(Viewport::new([width, height]));
 
     // Use the event_loop module to handle SDL/Emscripten differences
     event_loop::run(window, handle_event, app);
@@ -74,7 +75,8 @@ fn main() {
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Window resize
     if let Some(newsize) = event.resize_args() {
-        app.game.resize_viewport(newsize);
+        let mut viewport = app.game.world.write_resource::<Viewport>();
+        *viewport = Viewport::new(newsize);
     }
 
     // Keyboard input

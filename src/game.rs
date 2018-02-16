@@ -6,7 +6,6 @@ use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl, SysCollision, SysSimu};
-use render::Viewport;
 use ship::{Ship, SysShip, Projectile, SysProjectile};
 
 /// Global resource storing the player's health points.
@@ -40,7 +39,6 @@ impl Game {
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());
         world.add_resource(Health(8));
-        world.add_resource(Viewport::new([800, 800]));
 
         let dispatcher = DispatcherBuilder::new()
             .add(SysSimu, "simu", &[])
@@ -75,10 +73,5 @@ impl Game {
         if input.fire == Press::PRESSED {
             input.fire = Press::KEPT;
         }
-    }
-
-    pub fn resize_viewport(&mut self, newsize: [u32; 2]) {
-        let mut viewport = self.world.write_resource::<Viewport>();
-        *viewport = Viewport::new(newsize);
     }
 }

@@ -10,7 +10,11 @@ keywords = ["game"]
 
 [[bin]]
 name = "client"
-path = "src/main.rs"
+path = "src/client.rs"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
 
 [dependencies]
 env_logger = "0.4"
