@@ -5,8 +5,8 @@ use specs::{Entity, Component, System,
             Fetch, FetchMut, VecStorage, NullStorage, LazyUpdate};
 use vecmath::*;
 
+use game::Health;
 use input::{Input, Press};
-use super::Health;
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl};
 

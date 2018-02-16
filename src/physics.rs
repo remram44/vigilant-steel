@@ -9,9 +9,6 @@ use vecmath::*;
 
 use utils::IteratorExt;
 
-/// Global resource storing the player's health points.
-pub struct Health(pub i32);
-
 /// Position component, for entities that are somewhere in the world.
 #[derive(Debug)]
 pub struct Position {

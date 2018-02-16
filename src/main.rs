@@ -11,6 +11,7 @@ extern crate specs;
 extern crate vecmath;
 
 mod asteroid;
+mod game;
 mod input;
 mod physics;
 mod render;
@@ -21,24 +22,14 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
 use piston::input::*;
 use sdl2_window::Sdl2Window;
-use specs::{Dispatcher, DispatcherBuilder, World, LazyUpdate};
 
-use asteroid::{Asteroid, SysAsteroid};
+use game::Game;
 use input::{Input, Press};
-use physics::{DeltaTime, Position, Velocity, Collision, Collided,
-              LocalControl, Health,
-              SysCollision, SysSimu};
-use render::Viewport;
-use ship::{Ship, SysShip, Projectile, SysProjectile};
 
 /// The application context, passed through the `event_loop` module.
 struct App {
     gl: GlGraphics,
-    world: World,
-    dispatcher: Dispatcher<'static, 'static>,
-    /// Indicates that the game has been lost, input should no longer be
-    /// accepted.
-    game_over: bool,
+    game: Game,
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -69,39 +60,11 @@ fn main() {
     let gl = GlGraphics::new(OPENGL);
     info!("OpenGL initialized");
 
-    let mut world = World::new();
-    world.register::<Position>();
-    world.register::<Velocity>();
-    world.register::<Collision>();
-    world.register::<Collided>();
-    world.register::<LocalControl>();
-    world.register::<Ship>();
-    world.register::<Projectile>();
-    world.register::<Asteroid>();
-
-    let ship = Ship::create(&world.entities(),
-                            &world.read_resource::<LazyUpdate>());
-    world.write::<LocalControl>().insert(ship, LocalControl);
-
-    world.add_resource(DeltaTime(0.0));
-    world.add_resource(Input::new());
-    world.add_resource(Health(8));
-    world.add_resource(Viewport::new([width, height]));
-
-    let dispatcher = DispatcherBuilder::new()
-        .add(SysSimu, "simu", &[])
-        .add(SysCollision, "collision", &[])
-        .add(SysShip, "ship", &[])
-        .add(SysProjectile, "projectile", &[])
-        .add(SysAsteroid::new(), "asteroid", &[])
-        .build();
-
-    let app = App {
+    let mut app = App {
         gl: gl,
-        world: world,
-        dispatcher: dispatcher,
-        game_over: false,
+        game: Game::new(),
     };
+    app.game.resize_viewport([width, height]);
 
     // Use the event_loop module to handle SDL/Emscripten differences
     event_loop::run(window, handle_event, app);
@@ -111,14 +74,13 @@ fn main() {
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Window resize
     if let Some(newsize) = event.resize_args() {
-        let mut viewport = app.world.write_resource::<Viewport>();
-        *viewport = Viewport::new(newsize);
+        app.game.resize_viewport(newsize);
     }
 
     // Keyboard input
-    if !app.game_over {
+    if !app.game.game_over {
         if let Some(button) = event.button_args() {
-            let mut input = app.world.write_resource::<Input>();
+            let mut input = app.game.world.write_resource::<Input>();
             if let Some(scancode) = button.scancode {
                 if button.state == ButtonState::Press {
                     match scancode {
@@ -143,29 +105,13 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
 
     // Update
     if let Some(u) = event.update_args() {
-        {
-            let mut dt = app.world.write_resource::<DeltaTime>();
-            *dt = DeltaTime(u.dt);
-        }
-        app.dispatcher.dispatch(&mut app.world.res);
-        app.world.maintain();
-
-        if app.world.read_resource::<Health>().0 <= 0 {
-            app.game_over = true;
-            let mut input = app.world.write_resource::<Input>();
-            *input = Input::new();
-        }
-
-        let mut input = app.world.write_resource::<Input>();
-        if input.fire == Press::PRESSED {
-            input.fire = Press::KEPT;
-        }
+        app.game.update(u.dt);
     }
 
     // Draw
     if let Some(r) = event.render_args() {
-        let game_over = app.game_over;
-        let world = &mut app.world;
+        let game_over = app.game.game_over;
+        let world = &mut app.game.world;
         app.gl.draw(r.viewport(), |c, g| {
             render::render(c, g, world, game_over);
         });

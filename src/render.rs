@@ -8,8 +8,7 @@ use asteroid::Asteroid;
 use physics::Position;
 use ship::{Ship, Projectile};
 
-// FIXME
-use ::Health;
+use game::Health;
 
 const MAX_RATIO: f64 = 1.6;
 const VIEWPORT_SIZE: f64 = 800.0;
