@@ -1,4 +1,7 @@
+//! General utility functions.
+
 pub trait IteratorExt<T>: Iterator<Item=T> {
+    /// Computes the minimum and maximum of the sequence simultaneously.
     fn minmax(self) -> Option<(T, T)>;
 }
 

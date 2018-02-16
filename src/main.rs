@@ -1,3 +1,5 @@
+//! Entrypoint, eventloop, and rendering.
+
 extern crate env_logger;
 extern crate graphics;
 #[macro_use] extern crate log;
@@ -30,12 +32,16 @@ use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               SysCollision, SysSimu};
 use ship::{Ship, SysShip, Projectile, SysProjectile};
 
+/// Global resource storing the player's health points.
 pub struct Health(i32);
 
+/// The application context, passed through the `event_loop` module.
 struct App {
     gl: GlGraphics,
     world: World,
     dispatcher: Dispatcher<'static, 'static>,
+    /// Indicates that the game has been lost, input should no longer be
+    /// accepted.
     game_over: bool,
 }
 
@@ -44,6 +50,7 @@ const OPENGL: OpenGL = OpenGL::V3_2;
 #[cfg(target_os = "emscripten")]
 const OPENGL: OpenGL = OpenGL::V2_1;
 
+/// Entrypoint. Sets up SDL and the event loop.
 fn main() {
     env_logger::init().unwrap();
     info!("Starting up");
@@ -98,9 +105,13 @@ fn main() {
         game_over: false,
     };
 
+    // Use the event_loop module to handle SDL/Emscripten differences
     event_loop::run(window, handle_event, app);
 }
 
+/// Draws a line connecting points in sequence, then last to first.
+///
+/// This is similar to `graphics::polygon()` but only draws the outline.
 fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
                      points: &[Vector2<f64>], tr: Matrix2d, g: &mut G)
     where G: graphics::Graphics
@@ -122,6 +133,7 @@ fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
                    tr, g);
 }
 
+/// Handles a Piston event fed from the `event_loop` module.
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Keyboard input
     if !app.game_over {
@@ -319,6 +331,7 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
     }
 }
 
+/// Event loop, factored out for SDL and Emscripten support.
 #[cfg(not(target_os = "emscripten"))]
 mod event_loop {
     use piston::event_loop::{EventSettings, Events};
@@ -339,6 +352,7 @@ mod event_loop {
     }
 }
 
+/// Event loop, factored out for SDL and Emscripten support.
 #[cfg(target_os = "emscripten")]
 mod event_loop {
     extern crate emscripten_sys;

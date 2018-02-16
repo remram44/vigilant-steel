@@ -1,3 +1,5 @@
+//! Ships and projectiles.
+
 use specs::{Entity, Component, System, World,
             Entities, ReadStorage, WriteStorage, Join,
             Fetch, FetchMut, VecStorage, NullStorage, LazyUpdate};
@@ -8,7 +10,10 @@ use super::Health;
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
               LocalControl};
 
-// A ship
+/// A ship.
+///
+/// A ship has thrusters allowing it to rotate and move forward, and can fire
+/// projectiles.
 pub struct Ship {
     thrust: [f64; 2],
     fire: bool,
@@ -54,7 +59,10 @@ impl Component for Ship {
     type Storage = VecStorage<Self>;
 }
 
-// Ship physics and keyboard control
+/// Ship physics and keyboard control.
+///
+/// This computes the ship's state from the keyboard if `LocalControl`, updates
+/// the ship's speed, and fires projectiles.
 pub struct SysShip;
 
 impl<'a> System<'a> for SysShip {
@@ -147,7 +155,10 @@ impl<'a> System<'a> for SysShip {
     }
 }
 
-// A projectile
+/// A projectile.
+///
+/// This is a simple segment that goes in a straight line, and gets removed
+/// when it hits something or exits the screen.
 #[derive(Default)]
 pub struct Projectile;
 
@@ -155,7 +166,7 @@ impl Component for Projectile {
     type Storage = NullStorage<Self>;
 }
 
-// Deletes projectiles when they fall off
+/// Deletes projectiles when they fall off.
 pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {

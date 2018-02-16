@@ -1,3 +1,5 @@
+//! Asteroid objects, floating around for the user to collide with or shoot.
+
 use std::f64::consts::PI;
 
 use rand::{self, Rng};
@@ -7,7 +9,7 @@ use specs::{Component, System,
 
 use physics::{DeltaTime, Position, Velocity, Collision, Collided};
 
-// An asteroid
+/// An asteroid
 #[derive(Default)]
 pub struct Asteroid;
 
@@ -15,7 +17,10 @@ impl Component for Asteroid {
     type Storage = NullStorage<Self>;
 }
 
-// Asteroid spawning and removing
+/// Asteroid spawning and removing.
+///
+/// Asteroids are spawned after a delay when not enough exist, and removed on
+/// collision or when outside the screen.
 pub struct SysAsteroid {
     spawn_delay: Option<f64>,
 }

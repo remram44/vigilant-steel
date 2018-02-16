@@ -1,3 +1,5 @@
+//! Common components and behaviors for entities.
+
 use std::f64::consts::PI;
 
 use specs::{Entity, Component, System,
@@ -7,7 +9,7 @@ use vecmath::*;
 
 use utils::IteratorExt;
 
-// Position component, for entities that are in the world
+/// Position component, for entities that are somewhere in the world.
 #[derive(Debug)]
 pub struct Position {
     pub pos: [f64; 2],
@@ -18,7 +20,7 @@ impl Component for Position {
     type Storage = VecStorage<Self>;
 }
 
-// Velocity component, for entities that move
+/// Velocity component, for entities that move.
 #[derive(Debug)]
 pub struct Velocity {
     pub vel: [f64; 2],
@@ -29,7 +31,10 @@ impl Component for Velocity {
     type Storage = VecStorage<Self>;
 }
 
-// Collision shapes; currently only axes-oriented rectangle
+/// Collision shapes; currently only axes-oriented rectangle.
+///
+/// Entities with Collision components will be checked for collisions, and a
+/// Collided component will be added to them when it happens.
 pub struct Collision {
     pub bounding_box: [f64; 2],
 }
@@ -38,7 +43,7 @@ impl Component for Collision {
     type Storage = VecStorage<Self>;
 }
 
-// Collision information: this flags an entity has having collided
+/// Collision information: this flags an entity has having collided.
 pub struct Collided {
     pub entities: Vec<Entity>,
 }
@@ -47,7 +52,7 @@ impl Component for Collided {
     type Storage = HashMapStorage<Self>;
 }
 
-// Marks that this entity is controlled by the local player
+/// Marks that this entity is controlled by the local player.
 #[derive(Default)]
 pub struct LocalControl;
 
@@ -55,10 +60,10 @@ impl Component for LocalControl {
     type Storage = NullStorage<Self>;
 }
 
-// Delta resource, stores the simulation step
+/// Delta resource, stores the simulation step.
 pub struct DeltaTime(pub f64);
 
-// Simulation system, updates positions from velocities
+/// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
 impl<'a> System<'a> for SysSimu {
@@ -76,9 +81,13 @@ impl<'a> System<'a> for SysSimu {
     }
 }
 
-// Collision response
+/// Collision detection and response.
 pub struct SysCollision;
 
+/// Checks for collisions between non-axis-oriented rectangles.
+///
+/// Uses SAT to check if two rectangles collide.
+// TODO: replace with better method
 fn check_sat_collision(
     s_pos: &Position, s_col: &Collision,
     o_pos: &Position, o_col: &Collision,
