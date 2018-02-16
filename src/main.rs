@@ -47,7 +47,7 @@ fn main() {
 
     // Create an SDL2 window.
     let window: Sdl2Window = WindowSettings::new(
-            "vigilant-engine",
+            "Vigilant Steel",
             [width, height],
         )
         .opengl(OPENGL)

@@ -1,9 +1,9 @@
 [package]
-name = "vigilant-engine"
+name = "vigilant-steel"
 version = "0.1.0"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
 license = "BSD-3-Clause"
-repository = "https://github.com/remram44/vigilant-engine"
+repository = "https://gitlab.com/remram44/vigilant-steel"
 description = "Space game with Piston"
 readme = "README.md"
 keywords = ["game"]
