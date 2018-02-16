@@ -221,24 +221,17 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     if let Some(r) = event.render_args() {
         let world = &mut app.world;
         let viewport = world.read_resource::<Viewport>();
-        let scale = viewport.scale;
         let pos = world.read::<Position>();
         let ship = world.read::<Ship>();
         let projectile = world.read::<Projectile>();
         let asteroid = world.read::<Asteroid>();
         app.gl.draw(r.viewport(), |c, g| {
-            let (width, height) = if let Some(v) = c.viewport {
-                (v.rect[2], v.rect[3])
-            } else {
-                warn!("Got Context with no attached Viewport");
-                return;
-            };
-
             graphics::clear([0.0, 0.0, 0.1, 1.0], g);
 
             let tr = c.transform
-                .trans(width as f64 / 2.0, height as f64 / 2.0)
-                .scale(scale, -scale);
+                .trans(viewport.width as f64 / 2.0,
+                       viewport.height as f64 / 2.0)
+                .scale(viewport.scale, -viewport.scale);
 
             for (pos, ship) in (&pos, &ship).join() {
                 let ship_tr = tr
@@ -296,7 +289,7 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
             graphics::polygon(
                 [0.0, 0.0, 1.0, 1.0],
                 &poly[0..(2 + health.max(0) as usize)],
-                tr.trans(-350.0, 250.0).scale(50.0, 50.0), g);
+                c.transform.trans(50.0, 50.0).scale(50.0, 50.0), g);
         });
     }
     true
