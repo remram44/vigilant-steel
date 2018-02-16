@@ -1,4 +1,13 @@
-//! Global game code, not specific to a renderer or window system.
+#[macro_use] extern crate log;
+extern crate rand;
+extern crate specs;
+extern crate vecmath;
+
+pub mod asteroid;
+pub mod input;
+pub mod physics;
+pub mod ship;
+pub mod utils;
 
 use specs::{Dispatcher, DispatcherBuilder, World, LazyUpdate};
 

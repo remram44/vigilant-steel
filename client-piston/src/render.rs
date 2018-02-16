@@ -4,11 +4,10 @@ use graphics::{self, Context, Transformed};
 use graphics::math::Matrix2d;
 use specs::{World, Join};
 
-use asteroid::Asteroid;
-use physics::Position;
-use ship::{Ship, Projectile};
-
 use game::Health;
+use game::asteroid::Asteroid;
+use game::physics::Position;
+use game::ship::{Ship, Projectile};
 
 const MAX_RATIO: f64 = 1.6;
 const VIEWPORT_SIZE: f64 = 800.0;

@@ -1,8 +1,6 @@
-[workspace]
-members = ["client-piston", "server"]
-
 [package]
-name = "game"
+workspace = ".."
+name = "server"
 version = "0.1.0"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
 license = "BSD-3-Clause"
@@ -11,8 +9,12 @@ description = "Space game with Piston"
 readme = "README.md"
 keywords = ["game"]
 
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
 [dependencies]
+game = { path = ".." }
+
+env_logger = "0.4"
 log = "0.3"
-rand = "0.3"
-specs = "0.10"
-vecmath = "0.3"

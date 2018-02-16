@@ -1,17 +1,8 @@
 //! Entrypoint and eventloop for server.
 
 extern crate env_logger;
+extern crate game;
 #[macro_use] extern crate log;
-extern crate rand;
-extern crate specs;
-extern crate vecmath;
-
-mod asteroid;
-mod game;
-mod input;
-mod physics;
-mod ship;
-mod utils;
 
 use std::time::{Duration, SystemTime};
 

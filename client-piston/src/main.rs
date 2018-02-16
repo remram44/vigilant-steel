@@ -1,22 +1,15 @@
 //! Entrypoint and eventloop for SDL client.
 
 extern crate env_logger;
+extern crate game;
 extern crate graphics;
 #[macro_use] extern crate log;
 extern crate opengl_graphics;
 extern crate piston;
-extern crate rand;
 extern crate sdl2_window;
 extern crate specs;
-extern crate vecmath;
 
-mod asteroid;
-mod game;
-mod input;
-mod physics;
 mod render;
-mod ship;
-mod utils;
 
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
@@ -24,7 +17,8 @@ use piston::input::*;
 use sdl2_window::Sdl2Window;
 
 use game::Game;
-use input::{Input, Press};
+use game::input::{Input, Press};
+
 use render::Viewport;
 
 /// The application context, passed through the `event_loop` module.
@@ -48,7 +42,7 @@ fn main() {
 
     // Create an SDL2 window.
     let window: Sdl2Window = WindowSettings::new(
-            "Vigilant Steel",
+            "vigilant-engine",
             [width, height],
         )
         .opengl(OPENGL)
