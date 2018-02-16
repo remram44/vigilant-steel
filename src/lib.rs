@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate rand;
 extern crate specs;
 extern crate vecmath;
@@ -9,13 +10,12 @@ pub mod physics;
 pub mod ship;
 pub mod utils;
 
-use specs::{Dispatcher, DispatcherBuilder, World, LazyUpdate};
-
 use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
-use physics::{DeltaTime, Position, Velocity, Collision, Collided,
-              LocalControl, SysCollision, SysSimu};
-use ship::{Ship, SysShip, Projectile, SysProjectile};
+use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
+              SysCollision, SysSimu, Velocity};
+use ship::{Projectile, Ship, SysProjectile, SysShip};
+use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 
 /// Global resource storing the player's health points.
 pub struct Health(pub i32);
@@ -41,8 +41,10 @@ impl Game {
         world.register::<Projectile>();
         world.register::<Asteroid>();
 
-        let ship = Ship::create(&world.entities(),
-                                &world.read_resource::<LazyUpdate>());
+        let ship = Ship::create(
+            &world.entities(),
+            &world.read_resource::<LazyUpdate>(),
+        );
         world.write::<LocalControl>().insert(ship, LocalControl);
 
         world.add_resource(DeltaTime(0.0));

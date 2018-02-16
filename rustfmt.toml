@@ -1,0 +1,5 @@
+max_width = 79
+format_strings = true
+wrap_comments = true
+reorder_imports = true
+reorder_modules = true

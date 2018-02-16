@@ -3,7 +3,8 @@
 extern crate env_logger;
 extern crate game;
 extern crate graphics;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate opengl_graphics;
 extern crate piston;
 extern crate sdl2_window;
@@ -11,15 +12,13 @@ extern crate specs;
 
 mod render;
 
-use opengl_graphics::{GlGraphics, OpenGL};
-use piston::window::WindowSettings;
-use piston::input::*;
-use sdl2_window::Sdl2Window;
-
 use game::Game;
 use game::input::{Input, Press};
-
+use opengl_graphics::{GlGraphics, OpenGL};
+use piston::input::*;
+use piston::window::WindowSettings;
 use render::Viewport;
+use sdl2_window::Sdl2Window;
 
 /// The application context, passed through the `event_loop` module.
 struct App {
@@ -41,15 +40,13 @@ fn main() {
     let height = 600;
 
     // Create an SDL2 window.
-    let window: Sdl2Window = WindowSettings::new(
-            "vigilant-engine",
-            [width, height],
-        )
-        .opengl(OPENGL)
-        .srgb(false)
-        .exit_on_esc(true)
-        .build()
-        .expect("Couldn't create an OpenGL window");
+    let window: Sdl2Window =
+        WindowSettings::new("vigilant-engine", [width, height])
+            .opengl(OPENGL)
+            .srgb(false)
+            .exit_on_esc(true)
+            .build()
+            .expect("Couldn't create an OpenGL window");
     info!("Window created");
 
     let gl = GlGraphics::new(OPENGL);
@@ -66,7 +63,11 @@ fn main() {
 }
 
 /// Handles a Piston event fed from the `event_loop` module.
-fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
+fn handle_event(
+    _window: &mut Sdl2Window,
+    event: Event,
+    app: &mut App,
+) -> bool {
     // Window resize
     if let Some(newsize) = event.resize_args() {
         let mut viewport = app.game.world.write_resource::<Viewport>();
@@ -81,9 +82,9 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
                 if button.state == ButtonState::Press {
                     match scancode {
                         4 => input.movement[0] = -1.0,
-                        7 => input.movement[0] =  1.0,
+                        7 => input.movement[0] = 1.0,
                         22 => input.movement[1] = -1.0,
-                        26 => input.movement[1] =  1.0,
+                        26 => input.movement[1] = 1.0,
                         44 => input.fire = Press::PRESSED,
                         _ => {}
                     }
@@ -141,7 +142,7 @@ mod event_loop {
 mod event_loop {
     extern crate emscripten_sys;
 
-    use piston::input::{Event, Loop, AfterRenderArgs, RenderArgs, UpdateArgs};
+    use piston::input::{AfterRenderArgs, Event, Loop, RenderArgs, UpdateArgs};
     use piston::window::Window;
     use sdl2_window::Sdl2Window;
     use std::mem;
@@ -154,9 +155,11 @@ mod event_loop {
         arg: T,
     }
 
-    pub fn run<T>(window: Sdl2Window,
-                  handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
-                  arg: T) {
+    pub fn run<T>(
+        window: Sdl2Window,
+        handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
+        arg: T,
+    ) {
         unsafe {
             let mut events = Box::new(EventLoop {
                 last_updated: emscripten_sys::emscripten_get_now() as f64,
@@ -165,7 +168,12 @@ mod event_loop {
                 arg: arg,
             });
             let events_ptr = &mut *events as *mut EventLoop<_> as *mut c_void;
-            emscripten_sys::emscripten_set_main_loop_arg(Some(main_loop_c::<T>), events_ptr, 0, 1);
+            emscripten_sys::emscripten_set_main_loop_arg(
+                Some(main_loop_c::<T>),
+                events_ptr,
+                0,
+                1,
+            );
             mem::forget(events);
         }
     }

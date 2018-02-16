@@ -1,13 +1,10 @@
 //! Asteroid objects, floating around for the user to collide with or shoot.
 
-use std::f64::consts::PI;
-
+use physics::{Collided, Collision, DeltaTime, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, System,
-            Entities, ReadStorage, Join,
-            Fetch, NullStorage, LazyUpdate};
-
-use physics::{DeltaTime, Position, Velocity, Collision, Collided};
+use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
+            ReadStorage, System};
+use std::f64::consts::PI;
 
 /// An asteroid
 #[derive(Default)]
@@ -32,17 +29,18 @@ impl SysAsteroid {
 }
 
 impl<'a> System<'a> for SysAsteroid {
-    type SystemData = (Fetch<'a, DeltaTime>,
-                       Fetch<'a, LazyUpdate>,
-                       Entities<'a>,
-                       ReadStorage<'a, Collided>,
-                       ReadStorage<'a, Position>,
-                       ReadStorage<'a, Asteroid>);
+    type SystemData = (
+        Fetch<'a, DeltaTime>,
+        Fetch<'a, LazyUpdate>,
+        Entities<'a>,
+        ReadStorage<'a, Collided>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Asteroid>,
+    );
 
     fn run(
         &mut self,
-        (dt, lazy, entities, collided,
-         pos, asteroid): Self::SystemData
+        (dt, lazy, entities, collided, pos, asteroid): Self::SystemData,
     ) {
         let dt = dt.0;
 
@@ -52,8 +50,8 @@ impl<'a> System<'a> for SysAsteroid {
             count += 1;
 
             let pos = pos.pos;
-            if pos[0] < -500.0 || pos[0] > 500.0 ||
-                pos[1] < -500.0 || pos[1] > 500.0
+            if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
+                || pos[1] > 500.0
             {
                 info!("Deleting asteroid");
                 entities.delete(entity).unwrap();
@@ -79,10 +77,10 @@ impl<'a> System<'a> for SysAsteroid {
                 info!("Spawning asteroid now");
                 let mut rng = rand::thread_rng();
                 let &(xpos, ypos) = rng.choose(&[
-                    (-1.0,  0.0), // left
-                    ( 1.0,  0.0), // right
-                    ( 0.0, -1.0), // bottom
-                    ( 0.0,  1.0), // top
+                    (-1.0, 0.0), // left
+                    (1.0, 0.0),  // right
+                    (0.0, -1.0), // bottom
+                    (0.0, 1.0),  // top
                 ]).unwrap();
                 let entity = entities.create();
                 lazy.insert(
@@ -105,8 +103,12 @@ impl<'a> System<'a> for SysAsteroid {
                         rot: rng.gen_range(-2.0, 2.0),
                     },
                 );
-                lazy.insert(entity,
-                            Collision { bounding_box: [40.0, 40.0] });
+                lazy.insert(
+                    entity,
+                    Collision {
+                        bounding_box: [40.0, 40.0],
+                    },
+                );
                 lazy.insert(entity, Asteroid);
                 None
             } else {

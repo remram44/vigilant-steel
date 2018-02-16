@@ -2,15 +2,14 @@
 
 extern crate env_logger;
 extern crate game;
-#[macro_use] extern crate log;
-
-use std::time::{Duration, SystemTime};
+#[macro_use]
+extern crate log;
 
 use game::Game;
+use std::time::{Duration, SystemTime};
 
 fn to_secs(dt: Duration) -> f64 {
-    dt.as_secs() as f64 +
-    dt.subsec_nanos() as f64 * 0.000_000_001
+    dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 0.000_000_001
 }
 
 /// Entrypoint for server.
@@ -36,8 +35,10 @@ fn main() {
                     warn!("Clock jumped forward by {} seconds!", dt);
                 }
             }
-            Err(e) => warn!("Clock jumped backward by {} seconds!",
-                            to_secs(e.duration())),
+            Err(e) => warn!(
+                "Clock jumped backward by {} seconds!",
+                to_secs(e.duration())
+            ),
         }
     }
 }

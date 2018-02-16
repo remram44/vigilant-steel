@@ -1,14 +1,12 @@
 //! Ships and projectiles.
 
-use specs::{Entity, Component, System,
-            Entities, ReadStorage, WriteStorage, Join,
-            Fetch, FetchMut, VecStorage, NullStorage, LazyUpdate};
-use vecmath::*;
-
 use super::Health;
 use input::{Input, Press};
-use physics::{DeltaTime, Position, Velocity, Collision, Collided,
-              LocalControl};
+use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
+              Velocity};
+use specs::{Component, Entities, Entity, Fetch, FetchMut, Join, LazyUpdate,
+            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
+use vecmath::*;
 
 /// A ship.
 ///
@@ -33,9 +31,26 @@ impl Ship {
 
     pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
         let entity = entities.create();
-        lazy.insert(entity, Position { pos: [0.0, 0.0], rot: 0.0 });
-        lazy.insert(entity, Velocity { vel: [0.0, 0.0], rot: 0.0 });
-        lazy.insert(entity, Collision { bounding_box: [10.0, 8.0] });
+        lazy.insert(
+            entity,
+            Position {
+                pos: [0.0, 0.0],
+                rot: 0.0,
+            },
+        );
+        lazy.insert(
+            entity,
+            Velocity {
+                vel: [0.0, 0.0],
+                rot: 0.0,
+            },
+        );
+        lazy.insert(
+            entity,
+            Collision {
+                bounding_box: [10.0, 8.0],
+            },
+        );
         lazy.insert(entity, Ship::new([1.0, 0.0, 0.0]));
         entity
     }
@@ -52,21 +67,33 @@ impl Component for Ship {
 pub struct SysShip;
 
 impl<'a> System<'a> for SysShip {
-    type SystemData = (Fetch<'a, DeltaTime>,
-                       Fetch<'a, LazyUpdate>,
-                       Fetch<'a, Input>,
-                       FetchMut<'a, Health>,
-                       Entities<'a>,
-                       ReadStorage<'a, Position>,
-                       WriteStorage<'a, Velocity>,
-                       ReadStorage<'a, Collided>,
-                       WriteStorage<'a, Ship>,
-                       ReadStorage<'a, LocalControl>);
+    type SystemData = (
+        Fetch<'a, DeltaTime>,
+        Fetch<'a, LazyUpdate>,
+        Fetch<'a, Input>,
+        FetchMut<'a, Health>,
+        Entities<'a>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, Collided>,
+        WriteStorage<'a, Ship>,
+        ReadStorage<'a, LocalControl>,
+    );
 
     fn run(
         &mut self,
-        (dt, lazy, input, mut health, entities,
-         pos, mut vel, collided, mut ship, local): Self::SystemData
+        (
+            dt,
+            lazy,
+            input,
+            mut health,
+            entities,
+            pos,
+            mut vel,
+            collided,
+            mut ship,
+            local,
+        ): Self::SystemData,
     ) {
         let dt = dt.0;
 
@@ -77,8 +104,8 @@ impl<'a> System<'a> for SysShip {
 
         // Prevent leaving the screen
         for (pos, vel, _) in (&pos, &mut vel, &ship).join() {
-            if pos.pos[0] < -400.0 || pos.pos[0] > 400.0 ||
-                pos.pos[1] < -300.0 || pos.pos[1] > 300.0
+            if pos.pos[0] < -400.0 || pos.pos[0] > 400.0 || pos.pos[1] < -300.0
+                || pos.pos[1] > 300.0
             {
                 health.0 -= 1;
                 vel.vel = vec2_sub([0.0, 0.0], pos.pos);
@@ -106,22 +133,27 @@ impl<'a> System<'a> for SysShip {
             // Update velocity
             let (s, c) = pos.rot.sin_cos();
             let thrust = [c, s];
-            vel.vel = vec2_add(vel.vel,
-                               vec2_scale(thrust, ship.thrust[1] * 0.5 * dt));
+            vel.vel = vec2_add(
+                vel.vel,
+                vec2_scale(thrust, ship.thrust[1] * 0.5 * dt),
+            );
 
             // Apply friction
-            vel.vel = vec2_add(vel.vel,
-                               vec2_scale(vel.vel,
-                                          -0.8 * dt * vec2_len(vel.vel)));
+            vel.vel = vec2_add(
+                vel.vel,
+                vec2_scale(vel.vel, -0.8 * dt * vec2_len(vel.vel)),
+            );
 
             // Fire
             if ship.fire && ship.reload <= 0.0 {
                 ship.reload = 0.7;
 
-                Projectile::create(&entities, &lazy,
-                                   vec2_add(pos.pos, [17.0 * c,
-                                                      17.0 * s]),
-                                   pos.rot);
+                Projectile::create(
+                    &entities,
+                    &lazy,
+                    vec2_add(pos.pos, [17.0 * c, 17.0 * s]),
+                    pos.rot,
+                );
             } else if ship.reload > 0.0 {
                 ship.reload -= dt;
             }
@@ -138,23 +170,27 @@ pub struct Projectile;
 
 impl Projectile {
     pub fn create(
-        entities: &Entities, lazy: &Fetch<LazyUpdate>, pos: [f64; 2], rot: f64,
+        entities: &Entities,
+        lazy: &Fetch<LazyUpdate>,
+        pos: [f64; 2],
+        rot: f64,
     ) -> Entity {
         let entity = entities.create();
         let (s, c) = rot.sin_cos();
-        lazy.insert(entity,
-                    Position {
-                        pos: pos,
-                        rot: rot,
-                    });
-        lazy.insert(entity,
-                    Velocity {
-                        vel: [3.0 * c,
-                              3.0 * s],
-                        rot: 0.0,
-                    });
-        lazy.insert(entity,
-                    Collision { bounding_box: [8.0, 1.0] });
+        lazy.insert(entity, Position { pos: pos, rot: rot });
+        lazy.insert(
+            entity,
+            Velocity {
+                vel: [3.0 * c, 3.0 * s],
+                rot: 0.0,
+            },
+        );
+        lazy.insert(
+            entity,
+            Collision {
+                bounding_box: [8.0, 1.0],
+            },
+        );
         lazy.insert(entity, Projectile);
         entity
     }
@@ -168,14 +204,16 @@ impl Component for Projectile {
 pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {
-    type SystemData = (Entities<'a>,
-                       ReadStorage<'a, Collided>,
-                       ReadStorage<'a, Position>,
-                       ReadStorage<'a, Projectile>);
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Collided>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Projectile>,
+    );
 
     fn run(
         &mut self,
-        (entities, collided, pos, projectile): Self::SystemData
+        (entities, collided, pos, projectile): Self::SystemData,
     ) {
         // Remove projectiles gone from the screen or hit
         for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
@@ -185,8 +223,8 @@ impl<'a> System<'a> for SysProjectile {
             }
 
             let pos = pos.pos;
-            if pos[0] < -500.0 || pos[0] > 500.0 ||
-                pos[1] < -500.0 || pos[1] > 500.0
+            if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
+                || pos[1] > 500.0
             {
                 entities.delete(entity).unwrap();
             }

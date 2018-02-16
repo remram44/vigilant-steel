@@ -1,12 +1,14 @@
 //! General utility functions.
 
-pub trait IteratorExt<T>: Iterator<Item=T> {
+pub trait IteratorExt<T>: Iterator<Item = T> {
     /// Computes the minimum and maximum of the sequence simultaneously.
     fn minmax(self) -> Option<(T, T)>;
 }
 
-impl<T: Clone + PartialOrd + Sized, I: Iterator<Item=T> + Sized>
-    IteratorExt<T> for I
+impl<
+    T: Clone + PartialOrd + Sized,
+    I: Iterator<Item = T> + Sized,
+> IteratorExt<T> for I
 {
     fn minmax(mut self) -> Option<(T, T)> {
         let min = |a, b| if a <= b { a } else { b };
@@ -22,15 +24,15 @@ impl<T: Clone + PartialOrd + Sized, I: Iterator<Item=T> + Sized>
                 Some(e) => e,
             };
             let second = match self.next() {
-                None => return Some(
-                    if first < l {
+                None => {
+                    return Some(if first < l {
                         (first, h)
                     } else if h < first {
                         (l, first)
                     } else {
                         (l, h)
-                    }
-                ),
+                    })
+                }
                 Some(e) => e,
             };
             if first < second {

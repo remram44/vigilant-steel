@@ -1,13 +1,10 @@
 //! Common components and behaviors for entities.
 
+use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
+            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
-
-use specs::{Entity, Component, System,
-            Entities, ReadStorage, WriteStorage, Join,
-            Fetch, HashMapStorage, NullStorage, VecStorage};
-use vecmath::*;
-
 use utils::IteratorExt;
+use vecmath::*;
 
 /// Position component, for entities that are somewhere in the world.
 #[derive(Debug)]
@@ -67,9 +64,11 @@ pub struct DeltaTime(pub f64);
 pub struct SysSimu;
 
 impl<'a> System<'a> for SysSimu {
-    type SystemData = (Fetch<'a, DeltaTime>,
-                       WriteStorage<'a, Position>,
-                       ReadStorage<'a, Velocity>);
+    type SystemData = (
+        Fetch<'a, DeltaTime>,
+        WriteStorage<'a, Position>,
+        ReadStorage<'a, Velocity>,
+    );
 
     fn run(&mut self, (dt, mut pos, vel): Self::SystemData) {
         let dt = dt.0;
@@ -89,36 +88,55 @@ pub struct SysCollision;
 /// Uses SAT to check if two rectangles collide.
 // TODO: replace with better method
 fn check_sat_collision(
-    s_pos: &Position, s_col: &Collision,
-    o_pos: &Position, o_col: &Collision,
+    s_pos: &Position,
+    s_col: &Collision,
+    o_pos: &Position,
+    o_col: &Collision,
     dir: [f64; 2],
 ) -> bool {
     // This is called for each normal of each rectangle
     // It checks whether there is collision of the shape projected along it
-    let sides = &[(-1.0, -1.0), (-1.0, 1.0),
-                  (1.0, 1.0), (1.0, -1.0)];
+    let sides = &[(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)];
     // Project S rectangle
     let (s, c) = s_pos.rot.sin_cos();
-    let s_proj = sides.iter().map(|&(xs, ys)| {
-        // Compute corner coordinates
-        let corner = vec2_add(s_pos.pos, [s_col.bounding_box[0] * xs * c +
-                                          s_col.bounding_box[1] * ys * (-s),
-                                          s_col.bounding_box[0] * xs * s +
-                                          s_col.bounding_box[1] * ys * c]);
-        // Dot product with dir vector gives the distance along that vector
-        vec2_dot(corner, dir) as f64
-    }).minmax().unwrap();
+    let s_proj = sides
+        .iter()
+        .map(|&(xs, ys)| {
+            // Compute corner coordinates
+            let corner = vec2_add(
+                s_pos.pos,
+                [
+                    s_col.bounding_box[0] * xs * c
+                        + s_col.bounding_box[1] * ys * (-s),
+                    s_col.bounding_box[0] * xs * s
+                        + s_col.bounding_box[1] * ys * c,
+                ],
+            );
+            // Dot product with dir vector gives the distance along that vector
+            vec2_dot(corner, dir) as f64
+        })
+        .minmax()
+        .unwrap();
     // Project O rectangle
     let (s, c) = o_pos.rot.sin_cos();
-    let o_proj = sides.iter().map(|&(xs, ys)| {
-        // Compute corner coordinates
-        let corner = vec2_add(o_pos.pos, [o_col.bounding_box[0] * xs * c +
-                                          o_col.bounding_box[1] * ys * (-s),
-                                          o_col.bounding_box[0] * xs * s +
-                                          o_col.bounding_box[1] * ys * c]);
-        // Dot product with dir vector gives the distance along that vector
-        vec2_dot(corner, dir) as f64
-    }).minmax().unwrap();
+    let o_proj = sides
+        .iter()
+        .map(|&(xs, ys)| {
+            // Compute corner coordinates
+            let corner = vec2_add(
+                o_pos.pos,
+                [
+                    o_col.bounding_box[0] * xs * c
+                        + o_col.bounding_box[1] * ys * (-s),
+                    o_col.bounding_box[0] * xs * s
+                        + o_col.bounding_box[1] * ys * c,
+                ],
+            );
+            // Dot product with dir vector gives the distance along that vector
+            vec2_dot(corner, dir) as f64
+        })
+        .minmax()
+        .unwrap();
 
     s_proj.0 < o_proj.1 && o_proj.0 < s_proj.1
 }
@@ -127,9 +145,10 @@ fn check_sat_collision(
 ///
 /// Finds the time of collision between a moving square and a fixed point.
 /// The square is assumed to be aligned, centered on (0, 0) and of size 1.
-fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64>)
-    -> Option<f64>
-{
+fn square_point_collision(
+    mut square_move: Vector2<f64>,
+    mut target: Vector2<f64>,
+) -> Option<f64> {
     // Rotate so direction is positive
     if square_move[0] < 0.0 {
         if square_move[1] < 0.0 {
@@ -145,11 +164,11 @@ fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64
     }
 
     // Find collision with top
-    let top = segment_point_collision([-0.5, 0.5], [0.5, 0.5],
-                                      square_move, target);
+    let top =
+        segment_point_collision([-0.5, 0.5], [0.5, 0.5], square_move, target);
     // Find collision with right
-    let right = segment_point_collision([0.5, 0.5], [0.5, -0.5],
-                                        square_move, target);
+    let right =
+        segment_point_collision([0.5, 0.5], [0.5, -0.5], square_move, target);
     match (top, right) {
         (Some(t), Some(r)) => Some(t.min(r)),
         (None, r) => r,
@@ -159,12 +178,14 @@ fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64
 
 /// Sliding line segment/fixed point collision
 ///
-/// Finds the time of collision between a moving line segment and a fixed point.
-/// Assumes that the segment has length 1.
-fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
-                           seg_move: Vector2<f64>, target: Vector2<f64>)
-    -> Option<f64>
-{
+/// Finds the time of collision between a moving line segment and a fixed
+/// point. Assumes that the segment has length 1.
+fn segment_point_collision(
+    seg_a: Vector2<f64>,
+    seg_b: Vector2<f64>,
+    seg_move: Vector2<f64>,
+    target: Vector2<f64>,
+) -> Option<f64> {
     let segdir = vec2_sub(seg_b, seg_a);
     let perdir = [segdir[1], -segdir[0]];
 
@@ -179,10 +200,12 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
     }
 
     // We know when we hit the line, now find out if we hit the segment
-    let line_pos = vec2_dot(segdir, vec2_sub(
-        target,
-        vec2_add(seg_a, vec2_scale(seg_move, t))));
-    if 0.0 <= line_pos && line_pos <= 1.0 { // 1.0 == vec2_square_len(segdir)
+    let line_pos = vec2_dot(
+        segdir,
+        vec2_sub(target, vec2_add(seg_a, vec2_scale(seg_move, t))),
+    );
+    if 0.0 <= line_pos && line_pos <= 1.0 {
+        // 1.0 == vec2_square_len(segdir)
         Some(t)
     } else {
         None
@@ -190,38 +213,59 @@ fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
 }
 
 impl<'a> System<'a> for SysCollision {
-    type SystemData = (Entities<'a>,
-                       WriteStorage<'a, Position>,
-                       ReadStorage<'a, Collision>,
-                       WriteStorage<'a, Collided>);
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Position>,
+        ReadStorage<'a, Collision>,
+        WriteStorage<'a, Collided>,
+    );
 
     fn run(
         &mut self,
-        (entities, pos, collision, mut collided): Self::SystemData)
-    {
+        (entities, pos, collision, mut collided): Self::SystemData,
+    ) {
         collided.clear();
         for (s_e, s_pos, s_col) in (&*entities, &pos, &collision).join() {
             for (o_e, o_pos, o_col) in (&*entities, &pos, &collision).join() {
-                if s_e == o_e { continue; }
+                if s_e == o_e {
+                    continue;
+                }
                 // Detect collisions using SAT
                 let (s_s, s_c) = s_pos.rot.sin_cos();
-                if check_sat_collision(s_pos, s_col, o_pos, o_col,
-                                       [s_c, s_s]) &&
-                    check_sat_collision(s_pos, s_col, o_pos, o_col,
-                                        [-s_s, s_c])
-                {
+                if check_sat_collision(s_pos, s_col, o_pos, o_col, [s_c, s_s])
+                    && check_sat_collision(
+                        s_pos,
+                        s_col,
+                        o_pos,
+                        o_col,
+                        [-s_s, s_c],
+                    ) {
                     let (o_s, o_c) = o_pos.rot.sin_cos();
-                    if check_sat_collision(s_pos, s_col, o_pos, o_col,
-                                           [o_c, o_s]) &&
-                        check_sat_collision(s_pos, s_col, o_pos, o_col,
-                                            [-o_s, o_c])
-                    {
+                    if check_sat_collision(
+                        s_pos,
+                        s_col,
+                        o_pos,
+                        o_col,
+                        [o_c, o_s],
+                    )
+                        && check_sat_collision(
+                            s_pos,
+                            s_col,
+                            o_pos,
+                            o_col,
+                            [-o_s, o_c],
+                        ) {
                         // Collision!
                         if let Some(col) = collided.get_mut(s_e) {
                             col.entities.push(o_e);
                             continue;
                         }
-                        collided.insert(s_e, Collided { entities: vec![o_e] });
+                        collided.insert(
+                            s_e,
+                            Collided {
+                                entities: vec![o_e],
+                            },
+                        );
                     }
                 }
             }
