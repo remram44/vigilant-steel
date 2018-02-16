@@ -1,6 +1,6 @@
 //! Ships and projectiles.
 
-use specs::{Entity, Component, System, World,
+use specs::{Entity, Component, System,
             Entities, ReadStorage, WriteStorage, Join,
             Fetch, FetchMut, VecStorage, NullStorage, LazyUpdate};
 use vecmath::*;
@@ -31,27 +31,13 @@ impl Ship {
         }
     }
 
-    pub fn create(
-        entities: Entities,
-        mut pos: WriteStorage<Position>, mut vel: WriteStorage<Velocity>,
-        mut collision: WriteStorage<Collision>, mut ship: WriteStorage<Ship>,
-    ) -> Entity
-    {
+    pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
         let entity = entities.create();
-        pos.insert(entity, Position { pos: [0.0, 0.0], rot: 0.0 });
-        vel.insert(entity, Velocity { vel: [0.0, 0.0], rot: 0.0 });
-        collision.insert(entity, Collision { bounding_box: [10.0, 8.0] });
-        ship.insert(entity, Ship::new([1.0, 0.0, 0.0]));
+        lazy.insert(entity, Position { pos: [0.0, 0.0], rot: 0.0 });
+        lazy.insert(entity, Velocity { vel: [0.0, 0.0], rot: 0.0 });
+        lazy.insert(entity, Collision { bounding_box: [10.0, 8.0] });
+        lazy.insert(entity, Ship::new([1.0, 0.0, 0.0]));
         entity
-    }
-
-    pub fn create_in_world(world: &mut World) -> Entity {
-        Ship::create(
-            world.entities(),
-            world.write::<Position>(),
-            world.write::<Velocity>(),
-            world.write::<Collision>(),
-            world.write::<Ship>())
     }
 }
 
@@ -113,8 +99,8 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        // Apply thrust
         for (pos, mut vel, mut ship) in (&pos, &mut vel, &mut ship).join() {
+            // Apply thrust
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
@@ -132,22 +118,10 @@ impl<'a> System<'a> for SysShip {
             if ship.fire && ship.reload <= 0.0 {
                 ship.reload = 0.7;
 
-                let entity = entities.create();
-                lazy.insert(entity,
-                            Position {
-                                pos: vec2_add(pos.pos, [17.0 * c,
-                                                        17.0 * s]),
-                                rot: pos.rot,
-                            });
-                lazy.insert(entity,
-                            Velocity {
-                                vel: [3.0 * c,
-                                      3.0 * s],
-                                rot: 0.0,
-                            });
-                lazy.insert(entity,
-                            Collision { bounding_box: [8.0, 1.0] });
-                lazy.insert(entity, Projectile);
+                Projectile::create(&entities, &lazy,
+                                   vec2_add(pos.pos, [17.0 * c,
+                                                      17.0 * s]),
+                                   pos.rot);
             } else if ship.reload > 0.0 {
                 ship.reload -= dt;
             }
@@ -161,6 +135,30 @@ impl<'a> System<'a> for SysShip {
 /// when it hits something or exits the screen.
 #[derive(Default)]
 pub struct Projectile;
+
+impl Projectile {
+    pub fn create(
+        entities: &Entities, lazy: &Fetch<LazyUpdate>, pos: [f64; 2], rot: f64,
+    ) -> Entity {
+        let entity = entities.create();
+        let (s, c) = rot.sin_cos();
+        lazy.insert(entity,
+                    Position {
+                        pos: pos,
+                        rot: rot,
+                    });
+        lazy.insert(entity,
+                    Velocity {
+                        vel: [3.0 * c,
+                              3.0 * s],
+                        rot: 0.0,
+                    });
+        lazy.insert(entity,
+                    Collision { bounding_box: [8.0, 1.0] });
+        lazy.insert(entity, Projectile);
+        entity
+    }
+}
 
 impl Component for Projectile {
     type Storage = NullStorage<Self>;

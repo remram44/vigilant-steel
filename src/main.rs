@@ -22,7 +22,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
 use piston::input::*;
 use sdl2_window::Sdl2Window;
-use specs::{Dispatcher, DispatcherBuilder, World, Join};
+use specs::{Dispatcher, DispatcherBuilder, World, Join, LazyUpdate};
 use vecmath::*;
 
 use asteroid::{Asteroid, SysAsteroid};
@@ -83,7 +83,8 @@ fn main() {
     world.register::<Projectile>();
     world.register::<Asteroid>();
 
-    let ship = Ship::create_in_world(&mut world);
+    let ship = Ship::create(&world.entities(),
+                            &world.read_resource::<LazyUpdate>());
     world.write::<LocalControl>().insert(ship, LocalControl);
 
     world.add_resource(DeltaTime(0.0));
