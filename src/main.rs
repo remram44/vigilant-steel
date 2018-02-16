@@ -45,6 +45,33 @@ struct App {
     game_over: bool,
 }
 
+const MAX_RATIO: f64 = 1.6;
+const VIEWPORT_SIZE: f64 = 800.0;
+
+struct Viewport {
+    pub width: u32,
+    pub height: u32,
+    pub scale: f64,
+}
+
+impl Viewport {
+    fn new(size: [u32; 2]) -> Viewport {
+        let (width, height) = (size[0] as f64, size[1] as f64);
+        let maxsize = if width >= height {
+            width.max(height * MAX_RATIO)
+        } else {
+            height.max(width * MAX_RATIO)
+        };
+        warn!("Window is {}x{}, computed scale = {}",
+                 size[0], size[1], VIEWPORT_SIZE / maxsize);
+        Viewport {
+            width: size[0],
+            height: size[1],
+            scale: maxsize / VIEWPORT_SIZE,
+        }
+    }
+}
+
 #[cfg(not(target_os = "emscripten"))]
 const OPENGL: OpenGL = OpenGL::V3_2;
 #[cfg(target_os = "emscripten")]
@@ -90,6 +117,7 @@ fn main() {
     world.add_resource(DeltaTime(0.0));
     world.add_resource(Input::new());
     world.add_resource(Health(8));
+    world.add_resource(Viewport::new([width, height]));
 
     let dispatcher = DispatcherBuilder::new()
         .add(SysSimu, "simu", &[])
@@ -136,6 +164,12 @@ fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
 
 /// Handles a Piston event fed from the `event_loop` module.
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
+    // Window resize
+    if let Some(newsize) = event.resize_args() {
+        let mut viewport = app.world.write_resource::<Viewport>();
+        *viewport = Viewport::new(newsize);
+    }
+
     // Keyboard input
     if !app.game_over {
         if let Some(button) = event.button_args() {
@@ -186,6 +220,8 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Draw
     if let Some(r) = event.render_args() {
         let world = &mut app.world;
+        let viewport = world.read_resource::<Viewport>();
+        let scale = viewport.scale;
         let pos = world.read::<Position>();
         let ship = world.read::<Ship>();
         let projectile = world.read::<Projectile>();
@@ -202,7 +238,7 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
 
             let tr = c.transform
                 .trans(width as f64 / 2.0, height as f64 / 2.0)
-                .scale(1.0, -1.0);
+                .scale(scale, -scale);
 
             for (pos, ship) in (&pos, &ship).join() {
                 let ship_tr = tr
