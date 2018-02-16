@@ -13,27 +13,23 @@ extern crate vecmath;
 mod asteroid;
 mod input;
 mod physics;
+mod render;
 mod ship;
 mod utils;
 
-use graphics::Transformed;
-use graphics::math::Matrix2d;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::window::WindowSettings;
 use piston::input::*;
 use sdl2_window::Sdl2Window;
-use specs::{Dispatcher, DispatcherBuilder, World, Join, LazyUpdate};
-use vecmath::*;
+use specs::{Dispatcher, DispatcherBuilder, World, LazyUpdate};
 
 use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
 use physics::{DeltaTime, Position, Velocity, Collision, Collided,
-              LocalControl,
+              LocalControl, Health,
               SysCollision, SysSimu};
+use render::Viewport;
 use ship::{Ship, SysShip, Projectile, SysProjectile};
-
-/// Global resource storing the player's health points.
-pub struct Health(i32);
 
 /// The application context, passed through the `event_loop` module.
 struct App {
@@ -43,33 +39,6 @@ struct App {
     /// Indicates that the game has been lost, input should no longer be
     /// accepted.
     game_over: bool,
-}
-
-const MAX_RATIO: f64 = 1.6;
-const VIEWPORT_SIZE: f64 = 800.0;
-
-struct Viewport {
-    pub width: u32,
-    pub height: u32,
-    pub scale: f64,
-}
-
-impl Viewport {
-    fn new(size: [u32; 2]) -> Viewport {
-        let (width, height) = (size[0] as f64, size[1] as f64);
-        let maxsize = if width >= height {
-            width.max(height * MAX_RATIO)
-        } else {
-            height.max(width * MAX_RATIO)
-        };
-        warn!("Window is {}x{}, computed scale = {}",
-                 size[0], size[1], VIEWPORT_SIZE / maxsize);
-        Viewport {
-            width: size[0],
-            height: size[1],
-            scale: maxsize / VIEWPORT_SIZE,
-        }
-    }
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -138,30 +107,6 @@ fn main() {
     event_loop::run(window, handle_event, app);
 }
 
-/// Draws a line connecting points in sequence, then last to first.
-///
-/// This is similar to `graphics::polygon()` but only draws the outline.
-fn draw_line_loop<G>(color: [f32; 4], radius: graphics::types::Radius,
-                     points: &[Vector2<f64>], tr: Matrix2d, g: &mut G)
-    where G: graphics::Graphics
-{
-    let mut points = points.iter();
-    let first = match points.next() {
-        Some(p) => p,
-        None => return,
-    };
-    let mut previous = first;
-    for point in points {
-        graphics::line(color, radius,
-                       [previous[0], previous[1], point[0], point[1]],
-                       tr, g);
-        previous = point;
-    }
-    graphics::line(color, radius,
-                   [previous[0], previous[1], first[0], first[1]],
-                   tr, g);
-}
-
 /// Handles a Piston event fed from the `event_loop` module.
 fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
     // Window resize
@@ -219,146 +164,13 @@ fn handle_event(_window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
 
     // Draw
     if let Some(r) = event.render_args() {
+        let game_over = app.game_over;
         let world = &mut app.world;
-        let viewport = world.read_resource::<Viewport>();
-        let pos = world.read::<Position>();
-        let ship = world.read::<Ship>();
-        let projectile = world.read::<Projectile>();
-        let asteroid = world.read::<Asteroid>();
         app.gl.draw(r.viewport(), |c, g| {
-            graphics::clear([0.0, 0.0, 0.1, 1.0], g);
-
-            let tr = c.transform
-                .trans(viewport.width as f64 / 2.0,
-                       viewport.height as f64 / 2.0)
-                .scale(viewport.scale, -viewport.scale);
-
-            for (pos, ship) in (&pos, &ship).join() {
-                let ship_tr = tr
-                    .trans(pos.pos[0], pos.pos[1])
-                    .rot_rad(pos.rot);
-                let mut color = [0.0, 0.0, 0.0, 1.0];
-                color[0..3].copy_from_slice(&ship.color);
-                draw_line_loop(
-                    color, 1.0,
-                    &[
-                        [-10.0, -8.0],
-                        [10.0, 0.0],
-                        [-10.0, 8.0],
-                    ],
-                    ship_tr, g);
-            }
-
-            for (pos, _) in (&pos, &asteroid).join() {
-                let asteroid_tr = tr
-                    .trans(pos.pos[0], pos.pos[1])
-                    .rot_rad(pos.rot);
-                draw_line_loop(
-                    [1.0, 1.0, 1.0, 1.0], 1.0,
-                    &[
-                        [-38.0, -26.0],
-                        [0.0, -46.0],
-                        [38.0, -26.0],
-                        [38.0, 26.0],
-                        [0.0, 46.0],
-                        [-38.0, 26.0],
-                        [-38.0, -26.0],
-                        [38.0, -26.0],
-                        [-38.0, 26.0],
-                        [38.0, 26.0],
-                    ],
-                    asteroid_tr, g);
-            }
-
-            for (pos, _) in (&pos, &projectile).join() {
-                let projectile_tr = tr
-                    .trans(pos.pos[0], pos.pos[1])
-                    .rot_rad(pos.rot);
-                graphics::line(
-                    [0.0, 1.0, 0.0, 1.0], 2.0,
-                    [-8.0, 0.0, 8.0, 0.0],
-                    projectile_tr, g);
-            }
-
-            let health = world.read_resource::<Health>().0;
-            let poly = &[
-                [0.0, 0.0], [0.0, 1.0],
-                [0.707, 0.707], [1.0, 0.0], [0.707, -0.707], [0.0, -1.0],
-                [-0.707, -0.707], [-1.0, 0.0], [-0.707, 0.707], [0.0, 1.0],
-            ];
-            graphics::polygon(
-                [0.0, 0.0, 1.0, 1.0],
-                &poly[0..(2 + health.max(0) as usize)],
-                c.transform.trans(50.0, 50.0).scale(50.0, 50.0), g);
+            render::render(c, g, world, game_over);
         });
     }
     true
-}
-
-/// Sliding square/fixed point collision
-///
-/// Finds the time of collision between a moving square and a fixed point.
-/// The square is assumed to be aligned, centered on (0, 0) and of size 1.
-fn square_point_collision(mut square_move: Vector2<f64>, mut target: Vector2<f64>)
-    -> Option<f64>
-{
-    // Rotate so direction is positive
-    if square_move[0] < 0.0 {
-        if square_move[1] < 0.0 {
-            square_move = [-square_move[0], -square_move[1]];
-            target = [-target[0], -target[1]];
-        } else {
-            square_move = [square_move[1], -square_move[0]];
-            target = [target[1], -target[0]];
-        }
-    } else if square_move[1] < 0.0 {
-        square_move = [-square_move[1], square_move[0]];
-        target = [-target[1], target[0]];
-    }
-
-    // Find collision with top
-    let top = segment_point_collision([-0.5, 0.5], [0.5, 0.5],
-                                      square_move, target);
-    // Find collision with right
-    let right = segment_point_collision([0.5, 0.5], [0.5, -0.5],
-                                        square_move, target);
-    match (top, right) {
-        (Some(t), Some(r)) => Some(t.min(r)),
-        (None, r) => r,
-        (t, None) => t,
-    }
-}
-
-/// Sliding line segment/fixed point collision
-///
-/// Finds the time of collision between a moving line segment and a fixed point.
-/// Assumes that the segment has length 1.
-fn segment_point_collision(seg_a: Vector2<f64>, seg_b: Vector2<f64>,
-                           seg_move: Vector2<f64>, target: Vector2<f64>)
-    -> Option<f64>
-{
-    let segdir = vec2_sub(seg_b, seg_a);
-    let perdir = [segdir[1], -segdir[0]];
-
-    // Distance to collision
-    let dist = vec2_dot(perdir, vec2_sub(target, seg_a));
-    // Speed of travel along perpendicular to segment/
-    let proj = vec2_dot(perdir, seg_move);
-    // Time of collision with line
-    let t = dist / proj;
-    if t < 0.0 {
-        return None;
-    }
-
-    // We know when we hit the line, now find out if we hit the segment
-    let line_pos = vec2_dot(segdir, vec2_sub(
-        target,
-        vec2_add(seg_a, vec2_scale(seg_move, t))));
-    if 0.0 <= line_pos && line_pos <= 1.0 { // 1.0 == vec2_square_len(segdir)
-        Some(t)
-    } else {
-        None
-    }
 }
 
 /// Event loop, factored out for SDL and Emscripten support.
