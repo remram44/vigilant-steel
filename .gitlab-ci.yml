@@ -8,7 +8,7 @@ build_game:
   script:
     - cargo build
     - cargo test
-    - EMMAKEN_CFLAGS='-s USE_SDL=2' cargo build --release --target=asmjs-unknown-emscripten
+    - (cd client-piston && EMMAKEN_CFLAGS='-s USE_SDL=2' cargo build --release --target=asmjs-unknown-emscripten --no-default-features)
     - mkdir output &&
       cp target/asmjs-unknown-emscripten/release/client.js output/client.js &&
       sed 's/"target\/asmjs-unknown-emscripten\/release\/client.js"/"client.js?'$(git rev-parse HEAD)'"/' <index.html >output/index.html
