@@ -12,43 +12,6 @@ const MAX_MESSAGES_PER_FRAME: u16 = 5;
 
 type ORDER = byteorder::BigEndian;
 
-/// This describes the role of the local machine in the game.
-///
-/// This is available as a specs Resource and can be used to decide what to
-/// simulate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Role {
-    Standalone,
-    Server,
-    Client,
-}
-
-impl Role {
-    /// Whether the local machine is authoritative over the world.
-    ///
-    /// If this is false, the local machine should delegate important decisions
-    /// to the server, and only interpolate the game state.
-    pub fn authoritative(&self) -> bool {
-        match self {
-            &Role::Standalone => true,
-            &Role::Server => true,
-            &Role::Client => false,
-        }
-    }
-
-    /// Whether the local machine is showing the world graphically.
-    ///
-    /// If this is false, there is no point bothering about animations or
-    /// particles that don't affect the game, since no one will see them.
-    pub fn graphical(&self) -> bool {
-        match self {
-            &Role::Standalone => true,
-            &Role::Server => false,
-            &Role::Client => true,
-        }
-    }
-}
-
 /// The message exchanged by server and clients.
 enum Message {
     /// Message sent by a client to introduce itself.
@@ -123,8 +86,10 @@ impl Message {
                     info!("Invalid EntityUpdate length");
                     None
                 } else {
-                    Some(Message::EntityUpdate(rdr.read_u64::<ORDER>().unwrap(),
-                        msg[16..].into()))
+                    Some(Message::EntityUpdate(
+                        rdr.read_u64::<ORDER>().unwrap(),
+                        msg[16..].into(),
+                    ))
                 }
             }
             b"er" => {
@@ -132,7 +97,9 @@ impl Message {
                     info!("Invalid EntityRemove length");
                     None
                 } else {
-                    Some(Message::EntityRemove(rdr.read_u64::<ORDER>().unwrap()))
+                    Some(Message::EntityRemove(
+                        rdr.read_u64::<ORDER>().unwrap(),
+                    ))
                 }
             }
             _ => None,
@@ -154,11 +121,11 @@ impl Message {
             &Message::Ping(bytes) => {
                 msg.extend_from_slice(b"pi");
                 msg.extend_from_slice(&bytes);
-            },
+            }
             &Message::Pong(bytes) => {
                 msg.extend_from_slice(b"po");
                 msg.extend_from_slice(&bytes);
-            },
+            }
             &Message::EntityUpdate(id, ref bytes) => {
                 msg.extend_from_slice(b"eu");
                 msg.write_u64::<ORDER>(id).unwrap();
@@ -243,7 +210,6 @@ impl SysNetServer {
     fn send(&self, msg: Message, addr: &SocketAddr) -> io::Result<usize> {
         self.socket.send_to(&msg.bytes(), addr)
     }
-
 }
 
 impl<'a> System<'a> for SysNetServer {
@@ -271,12 +237,16 @@ impl<'a> System<'a> for SysNetServer {
 
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
-                    Message::ClientHello => unimplemented!(),
-                    Message::Ping(bytes) => chk(self.send(Message::Pong(bytes), &src)),
+                    Message::ClientHello => {
+                        warn!("Got ClientHello from {}", src);
+                        unimplemented!();
+                    }
+                    Message::Ping(bytes) => {
+                        chk(self.send(Message::Pong(bytes), &src))
+                    }
                     Message::Pong(bytes) => unimplemented!(),
                     Message::EntityUpdate(id, bytes) => unimplemented!(),
-                    Message::ServerHello(_, _)
-                    | Message::EntityRemove(_) => {
+                    Message::ServerHello(_, _) | Message::EntityRemove(_) => {
                         info!("Invalid message from {}", src)
                     }
                 }
@@ -347,7 +317,9 @@ impl<'a> System<'a> for SysNetClient {
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
                     Message::ServerHello(id, secret) => unimplemented!(),
-                    Message::Ping(bytes) => chk(self.send(Message::Pong(bytes))),
+                    Message::Ping(bytes) => {
+                        chk(self.send(Message::Pong(bytes)))
+                    }
                     Message::Pong(bytes) => unimplemented!(),
                     Message::EntityUpdate(id, bytes) => unimplemented!(),
                     Message::EntityRemove(id) => unimplemented!(),

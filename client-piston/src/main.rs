@@ -68,7 +68,7 @@ fn main() {
         gl: gl,
         glyph_cache: glyph_cache,
         fps_counter: FpsCounter::new(),
-        game: Game::new(),
+        game: Game::new_client("127.0.0.1:34244".parse().unwrap()),
     };
     app.game.world.add_resource(Viewport::new([width, height]));
 
