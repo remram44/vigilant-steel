@@ -1,5 +1,7 @@
 //! General utility functions.
 
+use std::time::SystemTime;
+
 pub trait IteratorExt<T>: Iterator<Item = T> {
     /// Computes the minimum and maximum of the sequence simultaneously.
     fn minmax(self) -> Option<(T, T)>;
@@ -44,6 +46,49 @@ impl<
             }
         }
         Some((l, h))
+    }
+}
+
+pub struct FpsCounter {
+    value: f64,
+    last_report: SystemTime,
+    frames_since_report: u32,
+}
+
+impl FpsCounter {
+    pub fn new() -> FpsCounter {
+        FpsCounter {
+            value: 0.0,
+            last_report: SystemTime::now(),
+            frames_since_report: 0,
+        }
+    }
+
+    pub fn rendered(&mut self) -> bool {
+        let now = SystemTime::now();
+        let dt = match now.duration_since(self.last_report) {
+            Ok(d) => d,
+            Err(_) => {
+                self.frames_since_report = 0;
+                self.last_report = now;
+                return false;
+            }
+        };
+        if dt.as_secs() >= 1 {
+            let duration =
+                dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 0.000_000_001;
+            self.value = self.frames_since_report as f64 / duration;
+            self.frames_since_report = 0;
+            self.last_report = now;
+            true
+        } else {
+            self.frames_since_report += 1;
+            false
+        }
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
     }
 }
 

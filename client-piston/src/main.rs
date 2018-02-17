@@ -14,6 +14,7 @@ mod render;
 
 use game::Game;
 use game::input::{Input, Press};
+use game::utils::FpsCounter;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::input::*;
 use piston::window::WindowSettings;
@@ -25,6 +26,7 @@ const MAX_TIME_STEP: f64 = 0.040;
 /// The application context, passed through the `event_loop` module.
 struct App {
     gl: GlGraphics,
+    fps_counter: FpsCounter,
     game: Game,
 }
 
@@ -56,6 +58,7 @@ fn main() {
 
     let mut app = App {
         gl: gl,
+        fps_counter: FpsCounter::new(),
         game: Game::new(),
     };
     app.game.world.add_resource(Viewport::new([width, height]));
@@ -128,6 +131,9 @@ fn handle_event(
         app.gl.draw(r.viewport(), |c, g| {
             render::render(c, g, world, game_over);
         });
+        if app.fps_counter.rendered() {
+            info!("fps = {}", app.fps_counter.value());
+        }
     }
     true
 }
