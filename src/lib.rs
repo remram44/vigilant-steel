@@ -1,3 +1,4 @@
+extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate rand;
@@ -6,6 +7,8 @@ extern crate vecmath;
 
 pub mod asteroid;
 pub mod input;
+#[cfg(not(target_os = "emscripten"))]
+pub mod net;
 pub mod physics;
 pub mod ship;
 pub mod utils;
