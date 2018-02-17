@@ -20,6 +20,8 @@ use piston::window::WindowSettings;
 use render::Viewport;
 use sdl2_window::Sdl2Window;
 
+const MAX_TIME_STEP: f64 = 0.040;
+
 /// The application context, passed through the `event_loop` module.
 struct App {
     gl: GlGraphics,
@@ -102,7 +104,21 @@ fn handle_event(
 
     // Update
     if let Some(u) = event.update_args() {
-        app.game.update(u.dt);
+        let mut dt = u.dt;
+        if dt > 0.5 {
+            warn!("Clock jumped forward by {} seconds!", dt);
+            dt = 5.0 * MAX_TIME_STEP;
+        }
+
+        while dt > 0.0 {
+            if dt > MAX_TIME_STEP {
+                app.game.update(MAX_TIME_STEP);
+                dt -= MAX_TIME_STEP;
+            } else {
+                app.game.update(dt);
+                break;
+            }
+        }
     }
 
     // Draw
