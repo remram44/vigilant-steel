@@ -2,11 +2,12 @@
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use physics::Position;
-use specs::{Component, HashMapStorage, NullStorage, ReadStorage, System,
-            VecStorage, WriteStorage};
+use ship::Ship;
+use specs::{Component, Entities, Fetch, HashMapStorage, LazyUpdate,
+            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::io::{self, Cursor};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_MESSAGES_PER_FRAME: u16 = 5;
 
@@ -22,9 +23,9 @@ enum Message {
     /// to control.
     ServerHello(u64, u64),
     /// Ping request, other side should send bytes back as Pong.
-    Ping([u8; 12]),
+    Ping(u32),
     /// Pong reply, with the bytes from the Ping request.
-    Pong([u8; 12]),
+    Pong(u32),
     /// Entity update, from either side.
     ///
     /// The server sends full entity updates that the client applies. The
@@ -62,22 +63,20 @@ impl Message {
                 }
             }
             b"pi" => {
-                if msg.len() != 20 {
+                if msg.len() != 12 {
                     info!("Invalid Ping length");
                     None
                 } else {
-                    let mut buf = [0; 12];
-                    buf.clone_from_slice(&msg[8..]);
+                    let buf = rdr.read_u32::<ORDER>().unwrap();
                     Some(Message::Ping(buf))
                 }
             }
             b"po" => {
-                if msg.len() != 20 {
+                if msg.len() != 12 {
                     info!("Invalid Pong length");
                     None
                 } else {
-                    let mut buf = [0; 12];
-                    buf.clone_from_slice(&msg[8..]);
+                    let buf = rdr.read_u32::<ORDER>().unwrap();
                     Some(Message::Pong(buf))
                 }
             }
@@ -118,13 +117,13 @@ impl Message {
                 msg.write_u64::<ORDER>(secret).unwrap();
                 assert_eq!(msg.len(), 8 + 8 + 8);
             }
-            &Message::Ping(bytes) => {
+            &Message::Ping(buf) => {
                 msg.extend_from_slice(b"pi");
-                msg.extend_from_slice(&bytes);
+                msg.write_u32::<ORDER>(buf).unwrap();
             }
-            &Message::Pong(bytes) => {
+            &Message::Pong(buf) => {
                 msg.extend_from_slice(b"po");
-                msg.extend_from_slice(&bytes);
+                msg.write_u32::<ORDER>(buf).unwrap();
             }
             &Message::EntityUpdate(id, ref bytes) => {
                 msg.extend_from_slice(b"eu");
@@ -180,7 +179,7 @@ impl Component for Dirty {
 /// Multiple entities can be controlled by the same client, and that's fine.
 pub struct ConnectedClient {
     address: SocketAddr,
-    secret: u64,
+    client_id: u64,
     ping: f64,
     last_ping: SystemTime,
     quota: u32,
@@ -196,6 +195,7 @@ impl Component for ConnectedClient {
 pub struct SysNetServer {
     socket: UdpSocket,
     frame: u32,
+    next_client: u64,
 }
 
 impl SysNetServer {
@@ -212,6 +212,7 @@ impl SysNetServer {
         SysNetServer {
             socket: socket,
             frame: 0,
+            next_client: 1,
         }
     }
 
@@ -222,16 +223,13 @@ impl SysNetServer {
 }
 
 impl<'a> System<'a> for SysNetServer {
-    type SystemData = (
-        ReadStorage<'a, Position>,
-        WriteStorage<'a, Replicated>,
-        WriteStorage<'a, ConnectedClient>,
-    );
+    type SystemData = (Fetch<'a, LazyUpdate>, Entities<'a>);
 
-    fn run(&mut self, (_position, _replicated, _client): Self::SystemData) {
+    fn run(&mut self, (lazy, entities): Self::SystemData) {
         self.frame += 1;
 
         // Receive messages
+        let mut messages = Vec::new();
         let mut buffer = [0; 1024];
         loop {
             let (len, src) = match self.socket.recv_from(&mut buffer) {
@@ -248,13 +246,43 @@ impl<'a> System<'a> for SysNetServer {
                 match msg {
                     Message::ClientHello => {
                         warn!("Got ClientHello from {}", src);
-                        unimplemented!();
+
+                        // Create a ship for the new player
+                        let newship = Ship::create(&entities, &lazy);
+                        let client_id = self.next_client;
+                        self.next_client += 1;
+                        let now = SystemTime::now();
+                        lazy.insert(
+                            newship,
+                            ConnectedClient {
+                                address: src,
+                                client_id: client_id,
+                                ping: 0.0,
+                                last_ping: now,
+                                quota: 0,
+                            },
+                        );
+
+                        // Compute replicated ID and send ServerHello
+                        let ship_id = (newship.gen().id() as u64) << 32
+                            | newship.id() as u64;
+                        chk(self.send(
+                            Message::ServerHello(client_id, ship_id),
+                            &src,
+                        ));
+
+                        // Send initial Ping message
+                        let d = now.duration_since(UNIX_EPOCH).unwrap();
+                        let d = (d.as_secs() as u32).wrapping_shl(10)
+                            | d.subsec_nanos().wrapping_shr(22);
+                        chk(self.send(Message::Ping(d), &src));
                     }
-                    Message::Ping(bytes) => {
-                        chk(self.send(Message::Pong(bytes), &src))
+                    Message::Ping(buf) => {
+                        chk(self.send(Message::Pong(buf), &src))
                     }
-                    Message::Pong(_bytes) => unimplemented!(),
-                    Message::EntityUpdate(_id, _bytes) => unimplemented!(),
+                    Message::Pong(_) | Message::EntityUpdate(_, _) => {
+                        messages.push(msg)
+                    }
                     Message::ServerHello(_, _) | Message::EntityRemove(_) => {
                         info!("Invalid message from {}", src)
                     }
@@ -264,6 +292,10 @@ impl<'a> System<'a> for SysNetServer {
                 continue;
             }
         }
+
+        // TODO: Go over ConnectedClient, update with messages
+
+        // TODO: Go over Replicated+(Dirty), send messages
     }
 }
 
@@ -305,6 +337,7 @@ impl<'a> System<'a> for SysNetClient {
 
     fn run(&mut self, _: Self::SystemData) {
         // Receive messages
+        let mut messages = Vec::new();
         let mut buffer = [0; 1024];
         loop {
             let (len, src) = match self.socket.recv_from(&mut buffer) {
@@ -323,18 +356,20 @@ impl<'a> System<'a> for SysNetClient {
 
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
-                    Message::ServerHello(_id, _secret) => unimplemented!(),
-                    Message::Ping(bytes) => {
-                        chk(self.send(Message::Pong(bytes)))
-                    }
-                    Message::Pong(_bytes) => unimplemented!(),
-                    Message::EntityUpdate(_id, _bytes) => unimplemented!(),
-                    Message::EntityRemove(_id) => unimplemented!(),
+                    Message::ServerHello(client_id, ship_id) => {}
+                    Message::Ping(buf) => chk(self.send(Message::Pong(buf))),
+                    Message::Pong(_)
+                    | Message::EntityUpdate(_, _)
+                    | Message::EntityRemove(_) => messages.push(msg),
                     Message::ClientHello => warn!("Invalid message"),
                 }
             } else {
                 warn!("Invalid message");
             }
         }
+
+        // TODO: Go over Replicated, update with messages
+
+        // TODO: Go over Dirty, send messages
     }
 }
