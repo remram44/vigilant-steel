@@ -1,9 +1,9 @@
 //! Network code.
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
-use physics::Position;
+use physics::{Position, Velocity};
 use ship::Ship;
-use specs::{Component, Entities, Fetch, HashMapStorage, LazyUpdate,
+use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::io::{self, Cursor};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -105,9 +105,8 @@ impl Message {
         }
     }
 
-    /// Turn a message into bytes.
-    fn bytes(&self) -> Vec<u8> {
-        let mut msg: Vec<u8> = Vec::with_capacity(20);
+    /// Write a message into a vector of bytes.
+    fn to_bytes(&self, msg: &mut Vec<u8>) {
         msg.extend_from_slice(b"SPAC\x00\x01");
         match self {
             &Message::ClientHello => msg.extend_from_slice(b"hc"),
@@ -135,6 +134,12 @@ impl Message {
                 msg.write_u64::<ORDER>(id).unwrap();
             }
         }
+    }
+
+    /// Turn a message into bytes.
+    fn bytes(&self) -> Vec<u8> {
+        let mut msg: Vec<u8> = Vec::with_capacity(20);
+        self.to_bytes(&mut msg);
         msg
     }
 }
@@ -223,9 +228,30 @@ impl SysNetServer {
 }
 
 impl<'a> System<'a> for SysNetServer {
-    type SystemData = (Fetch<'a, LazyUpdate>, Entities<'a>);
+    type SystemData = (
+        Fetch<'a, LazyUpdate>,
+        Entities<'a>,
+        ReadStorage<'a, ConnectedClient>,
+        WriteStorage<'a, Replicated>,
+        WriteStorage<'a, Dirty>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Velocity>,
+        WriteStorage<'a, Ship>,
+    );
 
-    fn run(&mut self, (lazy, entities): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            lazy,
+            entities,
+            client,
+            replicated,
+            mut dirty,
+            position,
+            velocity,
+            mut ship,
+        ): Self::SystemData,
+    ) {
         self.frame += 1;
 
         // Receive messages
@@ -241,8 +267,13 @@ impl<'a> System<'a> for SysNetServer {
                     break;
                 }
             };
+            if len < 8 + 8 {
+                info!("Invalid message from {}", src);
+                continue;
+            }
+            let client_id = (&buffer[0..]).read_u64::<ORDER>().unwrap();
 
-            if let Some(msg) = Message::parse(&buffer[..len]) {
+            if let Some(msg) = Message::parse(&buffer[8..len]) {
                 match msg {
                     Message::ClientHello => {
                         warn!("Got ClientHello from {}", src);
@@ -281,7 +312,7 @@ impl<'a> System<'a> for SysNetServer {
                         chk(self.send(Message::Pong(buf), &src))
                     }
                     Message::Pong(_) | Message::EntityUpdate(_, _) => {
-                        messages.push(msg)
+                        messages.push((client_id, msg))
                     }
                     Message::ServerHello(_, _) | Message::EntityRemove(_) => {
                         info!("Invalid message from {}", src)
@@ -293,9 +324,29 @@ impl<'a> System<'a> for SysNetServer {
             }
         }
 
-        // TODO: Go over ConnectedClient, update with messages
+        if messages.is_empty() {
+            return;
+        }
+
+        // Handle messages
+        for (ship, client) in (&mut ship, &client).join() {
+            for &(ref client_id, ref msg) in messages.iter() {
+                if client_id == &client.client_id {
+                    // TODO: Update entity from message
+                    ship.want_thrust[1] = 1.0;
+                }
+            }
+        }
 
         // TODO: Go over Replicated+(Dirty), send messages
+        for (ent, ship, pos, vel) in
+            (&*entities, &ship, &position, &velocity).join()
+        {
+            // Send an update if dirty, or if it hasn't been updated in a while
+            if dirty.get(ent).is_some() {}
+        }
+
+        dirty.clear();
     }
 }
 
@@ -305,6 +356,7 @@ impl<'a> System<'a> for SysNetServer {
 pub struct SysNetClient {
     socket: UdpSocket,
     server_address: SocketAddr,
+    client_id: u64,
 }
 
 impl SysNetClient {
@@ -321,6 +373,7 @@ impl SysNetClient {
         let client = SysNetClient {
             socket: socket,
             server_address: address,
+            client_id: 0,
         };
         client.send(Message::ClientHello).unwrap();
         client
@@ -328,14 +381,34 @@ impl SysNetClient {
 
     /// Sends a message
     fn send(&self, msg: Message) -> io::Result<usize> {
-        self.socket.send_to(&msg.bytes(), &self.server_address)
+        let mut bytes = Vec::new();
+        bytes.write_u64::<ORDER>(self.client_id).unwrap();
+        msg.to_bytes(&mut bytes);
+        self.socket.send_to(&bytes, &self.server_address)
     }
 }
 
 impl<'a> System<'a> for SysNetClient {
-    type SystemData = ();
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Replicated>,
+        WriteStorage<'a, Dirty>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Ship>,
+    );
 
-    fn run(&mut self, _: Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            replicated,
+            mut dirty,
+            mut position,
+            mut velocity,
+            mut ship,
+        ): Self::SystemData,
+    ) {
         // Receive messages
         let mut messages = Vec::new();
         let mut buffer = [0; 1024];
@@ -369,7 +442,20 @@ impl<'a> System<'a> for SysNetClient {
         }
 
         // TODO: Go over Replicated, update with messages
+        for (ent, repli) in (&*entities, &replicated).join() {
+            for msg in messages.iter() {
+                // TODO: Update entity from message
+                if let Some(ship) = ship.get_mut(ent) {
+                    ship.thrust[1] = 1.0;
+                }
+            }
+        }
 
         // TODO: Go over Dirty, send messages
+        for (ship, _) in (&ship, &dirty).join() {
+            // TODO: Send message
+        }
+
+        dirty.clear();
     }
 }

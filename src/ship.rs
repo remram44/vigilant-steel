@@ -15,9 +15,9 @@ use vecmath::*;
 /// A ship has thrusters allowing it to rotate and move forward, and can fire
 /// projectiles.
 pub struct Ship {
-    want_fire: bool,
-    want_thrust: [f64; 2],
-    thrust: [f64; 2],
+    pub want_fire: bool,
+    pub want_thrust: [f64; 2],
+    pub thrust: [f64; 2],
     reload: f64,
     pub color: [f32; 3],
     pub health: i32,
