@@ -6,10 +6,8 @@
 extern crate log;
 extern crate termcolor;
 
+use log::{set_logger, Log, LogLevel, LogMetadata, LogRecord, SetLoggerError};
 use std::io::Write;
-
-use log::{Log, LogLevel, LogMetadata, LogRecord,
-          SetLoggerError, set_logger};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// The logger that writes to stderr.
@@ -45,7 +43,9 @@ impl Log for StderrLogger {
                 LogLevel::Debug => Color::Cyan,
                 LogLevel::Trace => Color::Blue,
             };
-            stderr.set_color(ColorSpec::new().set_fg(Some(color))).unwrap();
+            stderr
+                .set_color(ColorSpec::new().set_fg(Some(color)))
+                .unwrap();
             writeln!(stderr, "{} - {}", record.target(), record.args())
                 .unwrap();
             stderr.reset().unwrap();
