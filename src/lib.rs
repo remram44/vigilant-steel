@@ -18,7 +18,7 @@ use input::{Input, Press};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
+use specs::{Dispatcher, DispatcherBuilder, Join, LazyUpdate, World};
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
 
@@ -90,32 +90,26 @@ impl Game {
         world.register::<Ship>();
         world.register::<Projectile>();
         world.register::<Asteroid>();
-
-        if role.networked() {
-            #[cfg(feature = "network")]
-            fn add_network_components(world: &mut World, role: Role) {
-                world.register::<net::Replicated>();
-                world.register::<net::Dirty>();
-                world.register::<net::ConnectedClient>();
-            }
-            #[cfg(not(feature = "network"))]
-            fn add_network_components(_world: &mut World, _role: Role) {
-                panic!("Role is {:?} but networking is not compiled in");
-            }
-
-            add_network_components(&mut world, role);
+        #[cfg(feature = "network")]
+        {
+            world.register::<net::Replicated>();
+            world.register::<net::Dirty>();
+            world.register::<net::ConnectedClient>();
         }
 
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());
         world.add_resource(role);
 
-        let dispatcher = DispatcherBuilder::new()
-            .add(SysSimu, "simu", &[])
-            .add(SysCollision, "collision", &[])
-            .add(SysShip, "ship", &[])
-            .add(SysProjectile, "projectile", &[])
-            .add(SysAsteroid::new(), "asteroid", &[]);
+        let mut dispatcher =
+            DispatcherBuilder::new().add(SysSimu, "simu", &[]);
+        if role.authoritative() {
+            dispatcher = dispatcher
+                .add(SysCollision, "collision", &[])
+                .add(SysAsteroid::new(), "asteroid", &[])
+                .add(SysProjectile, "projectile", &[]);
+        }
+        dispatcher = dispatcher.add(SysShip, "ship", &[]);
 
         (world, dispatcher)
     }
@@ -138,7 +132,7 @@ impl Game {
 
     #[cfg(feature = "network")]
     pub fn new_server(port: u16) -> Game {
-        let (mut world, mut dispatcher) = Self::new_common(Role::Server);
+        let (world, mut dispatcher) = Self::new_common(Role::Server);
 
         dispatcher =
             dispatcher.add(net::SysNetServer::new(port), "netserver", &[]);

@@ -64,11 +64,38 @@ fn main() {
         TextureSettings::new(),
     ).unwrap();
 
+    let game = {
+        let mut args = std::env::args();
+        args.next().unwrap();
+        match args.next() {
+            Some(a) => {
+                if args.next().is_some() {
+                    eprintln!("Too many arguments!");
+                    std::process::exit(1);
+                }
+                #[cfg(not(feature = "network"))]
+                panic!("Want to connect but networking is not compiled in");
+                #[cfg(feature = "network")]
+                {
+                    let addr = match a.parse() {
+                        Ok(a) => a,
+                        Err(_) => {
+                            eprintln!("Invalid address");
+                            std::process::exit(1);
+                        }
+                    };
+                    Game::new_client(addr)
+                }
+            }
+            None => Game::new_standalone(),
+        }
+    };
+
     let mut app = App {
         gl: gl,
         glyph_cache: glyph_cache,
         fps_counter: FpsCounter::new(),
-        game: Game::new_client("127.0.0.1:34244".parse().unwrap()),
+        game: game,
     };
     app.game.world.add_resource(Viewport::new([width, height]));
 

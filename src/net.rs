@@ -2,8 +2,8 @@
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use physics::Position;
-use specs::{Component, HashMapStorage, Join, NullStorage, ReadStorage,
-            System, VecStorage, WriteStorage};
+use specs::{Component, HashMapStorage, NullStorage, ReadStorage, System,
+            VecStorage, WriteStorage};
 use std::io::{self, Cursor};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
@@ -154,6 +154,15 @@ pub struct Replicated {
     last_send: u32,
 }
 
+impl Replicated {
+    pub fn new() -> Replicated {
+        Replicated {
+            id: 0,
+            last_send: 0,
+        }
+    }
+}
+
 impl Component for Replicated {
     type Storage = VecStorage<Self>;
 }
@@ -219,7 +228,7 @@ impl<'a> System<'a> for SysNetServer {
         WriteStorage<'a, ConnectedClient>,
     );
 
-    fn run(&mut self, (position, replicated, client): Self::SystemData) {
+    fn run(&mut self, (_position, _replicated, _client): Self::SystemData) {
         self.frame += 1;
 
         // Receive messages
@@ -244,8 +253,8 @@ impl<'a> System<'a> for SysNetServer {
                     Message::Ping(bytes) => {
                         chk(self.send(Message::Pong(bytes), &src))
                     }
-                    Message::Pong(bytes) => unimplemented!(),
-                    Message::EntityUpdate(id, bytes) => unimplemented!(),
+                    Message::Pong(_bytes) => unimplemented!(),
+                    Message::EntityUpdate(_id, _bytes) => unimplemented!(),
                     Message::ServerHello(_, _) | Message::EntityRemove(_) => {
                         info!("Invalid message from {}", src)
                     }
@@ -255,8 +264,6 @@ impl<'a> System<'a> for SysNetServer {
                 continue;
             }
         }
-
-        for (pos, repli, cl) in (&position, &replicated, &client).join() {}
     }
 }
 
@@ -316,13 +323,13 @@ impl<'a> System<'a> for SysNetClient {
 
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
-                    Message::ServerHello(id, secret) => unimplemented!(),
+                    Message::ServerHello(_id, _secret) => unimplemented!(),
                     Message::Ping(bytes) => {
                         chk(self.send(Message::Pong(bytes)))
                     }
-                    Message::Pong(bytes) => unimplemented!(),
-                    Message::EntityUpdate(id, bytes) => unimplemented!(),
-                    Message::EntityRemove(id) => unimplemented!(),
+                    Message::Pong(_bytes) => unimplemented!(),
+                    Message::EntityUpdate(_id, _bytes) => unimplemented!(),
+                    Message::EntityRemove(_id) => unimplemented!(),
                     Message::ClientHello => warn!("Invalid message"),
                 }
             } else {

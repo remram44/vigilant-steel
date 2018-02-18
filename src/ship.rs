@@ -1,6 +1,9 @@
 //! Ships and projectiles.
 
+use Role;
 use input::{Input, Press};
+#[cfg(feature = "network")]
+use net;
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               Velocity};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
@@ -12,8 +15,9 @@ use vecmath::*;
 /// A ship has thrusters allowing it to rotate and move forward, and can fire
 /// projectiles.
 pub struct Ship {
+    want_fire: bool,
+    want_thrust: [f64; 2],
     thrust: [f64; 2],
-    fire: bool,
     reload: f64,
     pub color: [f32; 3],
     pub health: i32,
@@ -22,8 +26,9 @@ pub struct Ship {
 impl Ship {
     pub fn new(color: [f32; 3]) -> Ship {
         Ship {
+            want_fire: false,
+            want_thrust: [0.0, 0.0],
             thrust: [0.0, 0.0],
-            fire: false,
             reload: 0.0,
             color: color,
             health: 8,
@@ -53,6 +58,11 @@ impl Ship {
             },
         );
         lazy.insert(entity, Ship::new([1.0, 0.0, 0.0]));
+        #[cfg(feature = "network")]
+        {
+            lazy.insert(entity, net::Replicated::new());
+            lazy.insert(entity, net::Dirty);
+        }
         entity
     }
 }
@@ -70,6 +80,7 @@ pub struct SysShip;
 impl<'a> System<'a> for SysShip {
     type SystemData = (
         Fetch<'a, DeltaTime>,
+        Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
         Entities<'a>,
@@ -84,6 +95,7 @@ impl<'a> System<'a> for SysShip {
         &mut self,
         (
             dt,
+            role,
             lazy,
             input,
             entities,
@@ -93,37 +105,52 @@ impl<'a> System<'a> for SysShip {
             mut ship,
             local,
         ): Self::SystemData,
-){
+    ) {
         let dt = dt.0;
 
-        // Handle collisions
-        for (col, mut ship, _) in (&collided, &mut ship, &local).join() {
-            for _ in &col.entities {
-                ship.health -= 1;
+        if role.authoritative() {
+            // Handle collisions
+            for (col, mut ship, _) in (&collided, &mut ship, &local).join() {
+                for _ in &col.entities {
+                    ship.health -= 1;
+                }
             }
-        }
 
-        // Prevent leaving the screen
-        for (pos, vel, mut ship) in (&pos, &mut vel, &mut ship).join() {
-            if pos.pos[0] < -400.0 || pos.pos[0] > 400.0 || pos.pos[1] < -300.0
-                || pos.pos[1] > 300.0
+            // Prevent leaving the screen
+            for (ent, pos, vel, mut ship) in
+                (&*entities, &pos, &mut vel, &mut ship).join()
             {
-                ship.health -= 1;
-                vel.vel = vec2_sub([0.0, 0.0], pos.pos);
-                vel.vel = vec2_scale(vel.vel, 3.0 * vec2_inv_len(vel.vel));
+                if pos.pos[0] < -400.0 || pos.pos[0] > 400.0
+                    || pos.pos[1] < -300.0
+                    || pos.pos[1] > 300.0
+                {
+                    ship.health -= 1;
+                    vel.vel = vec2_sub([0.0, 0.0], pos.pos);
+                    vel.vel = vec2_scale(vel.vel, 3.0 * vec2_inv_len(vel.vel));
+                    #[cfg(feature = "network")]
+                    lazy.insert(ent, net::Dirty);
+                }
             }
         }
 
-        // Control ship thrusters from input
-        for (mut ship, _) in (&mut ship, &local).join() {
-            ship.thrust[0] = -input.movement[0];
-            if input.movement[1] >= 0.0 {
-                ship.thrust[1] = input.movement[1];
-            }
+        // Control ship thrusters from local input
+        for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
+            ship.want_thrust[0] = -input.movement[0];
+            ship.want_thrust[1] = input.movement[1];
             match input.fire {
-                Press::UP => ship.fire = false,
-                Press::PRESSED => ship.fire = true,
+                Press::UP => ship.want_fire = false,
+                Press::PRESSED => ship.want_fire = true,
                 _ => {}
+            }
+            #[cfg(feature = "network")]
+            lazy.insert(ent, net::Dirty);
+        }
+
+        // Control ships from input
+        if role.authoritative() {
+            for mut ship in (&mut ship).join() {
+                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(-1.0);
+                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(0.0)
             }
         }
 
@@ -154,17 +181,19 @@ impl<'a> System<'a> for SysShip {
             );
 
             // Fire
-            if ship.fire && ship.reload <= 0.0 {
-                ship.reload = 0.7;
+            if role.authoritative() {
+                if ship.want_fire && ship.reload <= 0.0 {
+                    ship.reload = 0.7;
 
-                Projectile::create(
-                    &entities,
-                    &lazy,
-                    vec2_add(pos.pos, [17.0 * c, 17.0 * s]),
-                    pos.rot,
-                );
-            } else if ship.reload > 0.0 {
-                ship.reload -= dt;
+                    Projectile::create(
+                        &entities,
+                        &lazy,
+                        vec2_add(pos.pos, [17.0 * c, 17.0 * s]),
+                        pos.rot,
+                    );
+                } else if ship.reload > 0.0 {
+                    ship.reload -= dt;
+                }
             }
         }
     }
@@ -201,6 +230,11 @@ impl Projectile {
             },
         );
         lazy.insert(entity, Projectile);
+        #[cfg(feature = "network")]
+        {
+            lazy.insert(entity, net::Replicated::new());
+            lazy.insert(entity, net::Dirty);
+        }
         entity
     }
 }
@@ -214,6 +248,7 @@ pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
+        Fetch<'a, Role>,
         Entities<'a>,
         ReadStorage<'a, Collided>,
         ReadStorage<'a, Position>,
@@ -222,8 +257,10 @@ impl<'a> System<'a> for SysProjectile {
 
     fn run(
         &mut self,
-        (entities, collided, pos, projectile): Self::SystemData,
+        (role, entities, collided, pos, projectile): Self::SystemData,
     ) {
+        assert!(role.authoritative());
+
         // Remove projectiles gone from the screen or hit
         for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
             if let Some(_) = collided.get(entity) {

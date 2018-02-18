@@ -1,7 +1,11 @@
 //! Common components and behaviors for entities.
 
+use Role;
+#[cfg(feature = "network")]
+use net;
 use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
-            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
+            LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
+            WriteStorage};
 use std::f64::consts::PI;
 use utils::IteratorExt;
 use vecmath::*;
@@ -145,6 +149,7 @@ fn check_sat_collision(
 ///
 /// Finds the time of collision between a moving square and a fixed point.
 /// The square is assumed to be aligned, centered on (0, 0) and of size 1.
+#[allow(dead_code)]
 fn square_point_collision(
     mut square_move: Vector2<f64>,
     mut target: Vector2<f64>,
@@ -180,6 +185,7 @@ fn square_point_collision(
 ///
 /// Finds the time of collision between a moving line segment and a fixed
 /// point. Assumes that the segment has length 1.
+#[allow(dead_code)]
 fn segment_point_collision(
     seg_a: Vector2<f64>,
     seg_b: Vector2<f64>,
@@ -214,6 +220,8 @@ fn segment_point_collision(
 
 impl<'a> System<'a> for SysCollision {
     type SystemData = (
+        Fetch<'a, Role>,
+        Fetch<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Collision>,
@@ -222,8 +230,10 @@ impl<'a> System<'a> for SysCollision {
 
     fn run(
         &mut self,
-        (entities, pos, collision, mut collided): Self::SystemData,
+        (role, lazy, entities, pos, collision, mut collided): Self::SystemData,
     ) {
+        assert!(role.authoritative());
+
         collided.clear();
         for (s_e, s_pos, s_col) in (&*entities, &pos, &collision).join() {
             for (o_e, o_pos, o_col) in (&*entities, &pos, &collision).join() {
@@ -266,6 +276,8 @@ impl<'a> System<'a> for SysCollision {
                                 entities: vec![o_e],
                             },
                         );
+                        #[cfg(feature = "network")]
+                        lazy.insert(s_e, net::Dirty);
                     }
                 }
             }
