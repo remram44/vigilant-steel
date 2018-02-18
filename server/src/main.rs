@@ -1,11 +1,12 @@
 //! Entrypoint and eventloop for server.
 
-extern crate env_logger;
+extern crate color_logger;
 extern crate game;
 #[macro_use]
 extern crate log;
 
 use game::Game;
+use log::LogLevel;
 use std::time::{Duration, SystemTime};
 
 const TIME_STEP: f64 = 0.080;
@@ -16,7 +17,7 @@ fn to_secs(dt: Duration) -> f64 {
 
 /// Entrypoint for server.
 fn main() {
-    env_logger::init().unwrap();
+    color_logger::init(LogLevel::Info).unwrap();
     info!("Starting up");
 
     let mut game = Game::new();

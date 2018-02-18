@@ -1,6 +1,6 @@
 //! Entrypoint and eventloop for SDL client.
 
-extern crate env_logger;
+extern crate color_logger;
 extern crate game;
 extern crate graphics;
 #[macro_use]
@@ -15,6 +15,7 @@ mod render;
 use game::Game;
 use game::input::{Input, Press};
 use game::utils::FpsCounter;
+use log::LogLevel;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::input::*;
 use piston::window::WindowSettings;
@@ -37,7 +38,7 @@ const OPENGL: OpenGL = OpenGL::V2_1;
 
 /// Entrypoint. Sets up SDL and the event loop.
 fn main() {
-    env_logger::init().unwrap();
+    color_logger::init(LogLevel::Info).unwrap();
     info!("Starting up");
 
     let width = 800;

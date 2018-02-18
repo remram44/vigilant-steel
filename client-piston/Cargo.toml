@@ -15,8 +15,8 @@ path = "src/main.rs"
 
 [dependencies]
 game = { path = ".." }
+color-logger = { path = "../color-logger" }
 
-env_logger = "0.4"
 log = "0.3"
 specs = "0.10"
 

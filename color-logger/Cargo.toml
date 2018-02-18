@@ -1,0 +1,9 @@
+[package]
+workspace = ".."
+name = "color-logger"
+version = "0.1.0"
+authors = ["Remi Rampin <remirampin@gmail.com>"]
+
+[dependencies]
+log = "0.3"
+termcolor = "0.3"
