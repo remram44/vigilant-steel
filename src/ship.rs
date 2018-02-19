@@ -263,7 +263,7 @@ impl<'a> System<'a> for SysProjectile {
 
         // Remove projectiles gone from the screen or hit
         for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
-            if let Some(_) = collided.get(entity) {
+            if collided.get(entity).is_some() {
                 entities.delete(entity).unwrap();
                 continue;
             }

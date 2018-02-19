@@ -39,10 +39,10 @@ impl Role {
     /// If this is false, the local machine should delegate important decisions
     /// to the server, and only interpolate the game state.
     pub fn authoritative(&self) -> bool {
-        match self {
-            &Role::Standalone => true,
-            &Role::Server => true,
-            &Role::Client => false,
+        match *self {
+            Role::Standalone => true,
+            Role::Server => true,
+            Role::Client => false,
         }
     }
 
@@ -51,10 +51,10 @@ impl Role {
     /// If this is false, there is no point bothering about animations or
     /// particles that don't affect the game, since no one will see them.
     pub fn graphical(&self) -> bool {
-        match self {
-            &Role::Standalone => true,
-            &Role::Server => false,
-            &Role::Client => true,
+        match *self {
+            Role::Standalone => true,
+            Role::Server => false,
+            Role::Client => true,
         }
     }
 
@@ -62,10 +62,10 @@ impl Role {
     ///
     /// If this is false, there is no need for any networking.
     pub fn networked(&self) -> bool {
-        match self {
-            &Role::Standalone => false,
-            &Role::Server => true,
-            &Role::Client => true,
+        match *self {
+            Role::Standalone => false,
+            Role::Server => true,
+            Role::Client => true,
         }
     }
 }
@@ -165,7 +165,7 @@ impl Game {
             let mut r_dt = self.world.write_resource::<DeltaTime>();
             *r_dt = DeltaTime(dt);
         }
-        self.dispatcher.dispatch(&mut self.world.res);
+        self.dispatcher.dispatch(&self.world.res);
         self.world.maintain();
 
         if !self.game_over
