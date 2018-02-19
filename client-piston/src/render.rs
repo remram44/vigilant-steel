@@ -3,9 +3,11 @@
 use game::asteroid::Asteroid;
 use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
-use graphics::{self, Context, Transformed};
+use graphics::{self, Context, Graphics, Transformed};
+use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use specs::{Join, World};
+use std::fmt::Debug;
 
 const MAX_RATIO: f64 = 1.6;
 const VIEWPORT_SIZE: f64 = 800.0;
@@ -75,13 +77,16 @@ fn draw_line_loop<G>(
     );
 }
 
-pub fn render<G>(
+pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
+    glyph_cache: &mut C,
     world: &mut World,
     game_over: bool,
 ) where
     G: graphics::Graphics,
+    E: Debug,
+    C: CharacterCache<Texture = <G as Graphics>::Texture, Error = E> + Sized,
 {
     let viewport = world.read_resource::<Viewport>();
     let pos = world.read::<Position>();
@@ -142,7 +147,16 @@ pub fn render<G>(
         );
     }
 
-    if !game_over {
+    if game_over {
+        graphics::text(
+            [1.0, 0.0, 0.0, 1.0],
+            24,
+            "Game Over!",
+            glyph_cache,
+            tr.trans(-200.0, 0.0).scale(3.0, -3.0),
+            gl,
+        ).unwrap();
+    } else {
         let local = world.read::<LocalControl>();
         let ship = world.read::<Ship>();
         let (_, ship) = (&local, &ship).join().next().unwrap();

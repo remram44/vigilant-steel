@@ -16,7 +16,7 @@ use game::Game;
 use game::input::{Input, Press};
 use game::utils::FpsCounter;
 use log::LogLevel;
-use opengl_graphics::{GlGraphics, OpenGL};
+use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
 use piston::input::*;
 use piston::window::WindowSettings;
 use render::Viewport;
@@ -129,8 +129,13 @@ fn handle_event(
     if let Some(r) = event.render_args() {
         let game_over = app.game.game_over;
         let world = &mut app.game.world;
+        let mut glyph_cache = GlyphCache::new(
+            "assets/FiraSans-Regular.ttf",
+            (),
+            TextureSettings::new(),
+        ).unwrap();
         app.gl.draw(r.viewport(), |c, g| {
-            render::render(c, g, world, game_over);
+            render::render(c, g, &mut glyph_cache, world, game_over);
         });
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
