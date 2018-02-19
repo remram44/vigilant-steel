@@ -1,8 +1,7 @@
 //! Rendering code, using Piston.
 
-use game::Health;
 use game::asteroid::Asteroid;
-use game::physics::Position;
+use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Transformed};
 use graphics::math::Matrix2d;
@@ -143,23 +142,28 @@ pub fn render<G>(
         );
     }
 
-    let health = world.read_resource::<Health>().0;
-    let poly = &[
-        [0.0, 0.0],
-        [0.0, 1.0],
-        [0.707, 0.707],
-        [1.0, 0.0],
-        [0.707, -0.707],
-        [0.0, -1.0],
-        [-0.707, -0.707],
-        [-1.0, 0.0],
-        [-0.707, 0.707],
-        [0.0, 1.0],
-    ];
-    graphics::polygon(
-        [0.0, 0.0, 1.0, 1.0],
-        &poly[0..(2 + health.max(0) as usize)],
-        context.transform.trans(50.0, 50.0).scale(50.0, 50.0),
-        gl,
-    );
+    if !game_over {
+        let local = world.read::<LocalControl>();
+        let ship = world.read::<Ship>();
+        let (_, ship) = (&local, &ship).join().next().unwrap();
+        let health = ship.health;
+        let poly = &[
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [0.707, 0.707],
+            [1.0, 0.0],
+            [0.707, -0.707],
+            [0.0, -1.0],
+            [-0.707, -0.707],
+            [-1.0, 0.0],
+            [-0.707, 0.707],
+            [0.0, 1.0],
+        ];
+        graphics::polygon(
+            [0.0, 0.0, 1.0, 1.0],
+            &poly[0..(2 + health.max(0) as usize)],
+            context.transform.trans(50.0, 50.0).scale(50.0, 50.0),
+            gl,
+        );
+    }
 }

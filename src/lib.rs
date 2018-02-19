@@ -15,10 +15,7 @@ use input::{Input, Press};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
-
-/// Global resource storing the player's health points.
-pub struct Health(pub i32);
+use specs::{Dispatcher, DispatcherBuilder, Join, LazyUpdate, World};
 
 /// The game structure, containing globals not specific to frontend.
 pub struct Game {
@@ -49,7 +46,6 @@ impl Game {
 
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());
-        world.add_resource(Health(8));
 
         let dispatcher = DispatcherBuilder::new()
             .add(SysSimu, "simu", &[])
@@ -76,7 +72,10 @@ impl Game {
         self.dispatcher.dispatch(&mut self.world.res);
         self.world.maintain();
 
-        if self.world.read_resource::<Health>().0 <= 0 {
+        if !self.game_over
+            && self.world.read::<LocalControl>().join().next().is_none()
+        {
+            warn!("GAME OVER");
             self.game_over = true;
             let mut input = self.world.write_resource::<Input>();
             *input = Input::new();

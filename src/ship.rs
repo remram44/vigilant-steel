@@ -1,10 +1,9 @@
 //! Ships and projectiles.
 
-use super::Health;
 use input::{Input, Press};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               Velocity};
-use specs::{Component, Entities, Entity, Fetch, FetchMut, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
 
@@ -17,6 +16,7 @@ pub struct Ship {
     fire: bool,
     reload: f64,
     pub color: [f32; 3],
+    pub health: i32,
 }
 
 impl Ship {
@@ -26,6 +26,7 @@ impl Ship {
             fire: false,
             reload: 0.0,
             color: color,
+            health: 8,
         }
     }
 
@@ -71,7 +72,6 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, DeltaTime>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
-        FetchMut<'a, Health>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -86,7 +86,6 @@ impl<'a> System<'a> for SysShip {
             dt,
             lazy,
             input,
-            mut health,
             entities,
             pos,
             mut vel,
@@ -94,20 +93,22 @@ impl<'a> System<'a> for SysShip {
             mut ship,
             local,
         ): Self::SystemData,
-    ) {
+){
         let dt = dt.0;
 
         // Handle collisions
-        for _ in (&collided, &ship, &local).join() {
-            health.0 -= 1;
+        for (col, mut ship, _) in (&collided, &mut ship, &local).join() {
+            for _ in &col.entities {
+                ship.health -= 1;
+            }
         }
 
         // Prevent leaving the screen
-        for (pos, vel, _) in (&pos, &mut vel, &ship).join() {
+        for (pos, vel, mut ship) in (&pos, &mut vel, &mut ship).join() {
             if pos.pos[0] < -400.0 || pos.pos[0] > 400.0 || pos.pos[1] < -300.0
                 || pos.pos[1] > 300.0
             {
-                health.0 -= 1;
+                ship.health -= 1;
                 vel.vel = vec2_sub([0.0, 0.0], pos.pos);
                 vel.vel = vec2_scale(vel.vel, 3.0 * vec2_inv_len(vel.vel));
             }
@@ -126,7 +127,15 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        for (pos, mut vel, mut ship) in (&pos, &mut vel, &mut ship).join() {
+        for (ent, pos, mut vel, mut ship) in
+            (&*entities, &pos, &mut vel, &mut ship).join()
+        {
+            // Death
+            if ship.health <= 0 {
+                entities.delete(ent).unwrap();
+                continue;
+            }
+
             // Apply thrust
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
