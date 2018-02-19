@@ -59,6 +59,8 @@ impl Game {
             .add(SysAsteroid::new(), "asteroid", &[])
             .build();
 
+        world.maintain();
+
         Game {
             world: world,
             dispatcher: dispatcher,
