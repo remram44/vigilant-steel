@@ -102,8 +102,12 @@ pub fn render<G, C, E>(
 
     for (pos, ship) in (&pos, &ship).join() {
         let ship_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        let mut color = [0.0, 0.0, 0.0, 1.0];
-        color[0..3].copy_from_slice(&ship.color);
+        let mut color = [
+            ship.color[0] as f32 / 256.0,
+            ship.color[1] as f32 / 256.0,
+            ship.color[2] as f32 / 256.0,
+            1.0,
+        ];
         draw_line_loop(
             color,
             1.0,

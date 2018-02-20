@@ -2,12 +2,12 @@
 
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
-use physics::{Position, Velocity};
+use physics::{Collision, Position, Velocity};
 use ship::Ship;
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Cursor};
+use std::io::{self, Cursor, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -21,6 +21,23 @@ fn time_decode(b: u32) -> Duration {
     let secs = (b as u64).wrapping_shr(10);
     let nanos = b.wrapping_shl(22);
     Duration::new(secs, nanos)
+}
+
+fn write_float<W: io::Write>(mut writer: W, v: f64) {
+    let v = v as f32;
+    assert_eq!(
+        writer
+            .write(&unsafe { ::std::mem::transmute::<f32, [u8; 4]>(v) })
+            .unwrap(),
+        4
+    );
+}
+
+fn read_float<R: io::Read>(mut reader: R) -> f64 {
+    let mut v = [0u8; 4];
+    assert_eq!(reader.read(&mut v).unwrap(), 4);
+    let v = unsafe { ::std::mem::transmute::<[u8; 4], f32>(v) };
+    v as f64
 }
 
 /// The message exchanged by server and clients.
@@ -252,7 +269,7 @@ impl SysNetServer {
     }
 
     /// Sends a message.
-    fn send(&self, msg: Message, addr: &SocketAddr) -> io::Result<usize> {
+    fn send(&self, msg: &Message, addr: &SocketAddr) -> io::Result<usize> {
         self.socket.send_to(&msg.bytes(), addr)
     }
 }
@@ -325,7 +342,7 @@ impl<'a> System<'a> for SysNetServer {
                         );
 
                         // Send ServerHello
-                        chk(self.send(Message::ServerHello(client_id), &src));
+                        chk(self.send(&Message::ServerHello(client_id), &src));
 
                         // Create a ship for the new player
                         let newship = Ship::create(&entities, &lazy);
@@ -338,7 +355,7 @@ impl<'a> System<'a> for SysNetServer {
                         let ship_id = (newship.gen().id() as u64) << 32
                             | newship.id() as u64;
                         chk(self.send(
-                            Message::StartEntityControl(ship_id),
+                            &Message::StartEntityControl(ship_id),
                             &src,
                         ));
 
@@ -350,10 +367,10 @@ impl<'a> System<'a> for SysNetServer {
                         // Send initial Ping message
                         let d = now.duration_since(UNIX_EPOCH).unwrap();
                         let d = time_encode(d);
-                        chk(self.send(Message::Ping(d), &src));
+                        chk(self.send(&Message::Ping(d), &src));
                     }
                     Message::Ping(buf) => {
-                        chk(self.send(Message::Pong(buf), &src))
+                        chk(self.send(&Message::Pong(buf), &src))
                     }
                     Message::Pong(_) | Message::EntityUpdate(_, _) => {
                         messages.push((client_id, msg))
@@ -368,10 +385,6 @@ impl<'a> System<'a> for SysNetServer {
                 info!("Invalid message from {}", src);
                 continue;
             }
-        }
-
-        if messages.is_empty() {
-            return;
         }
 
         // Handle Pong from clients
@@ -410,8 +423,20 @@ impl<'a> System<'a> for SysNetServer {
                     if repli.id == id && client_id == &ctrl.client_id {
                         repli.last_update = self.frame;
 
-                        // TODO: Update entity from message data
-                        ship.want_thrust[1] = 1.0;
+                        // Update entity from message data
+                        if data.len() != 1 {
+                            info!("Invalid ship control update");
+                            continue;
+                        }
+                        let data = data[0];
+                        ship.want_fire = data & 0x01 == 0x01;
+                        ship.want_thrust[0] = match data & 0x06 {
+                            0x02 => 1.0,
+                            0x04 => -1.0,
+                            _ => 0.0,
+                        };
+                        ship.want_thrust[1] =
+                            if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
                     }
                 }
             }
@@ -428,9 +453,40 @@ impl<'a> System<'a> for SysNetServer {
                 continue;
             }
 
-            // TODO: Send entity update
-            if let Some(ship) = ship.get(ent) {}
-            if let Some(asteroid) = asteroid.get(ent) {}
+            // Send entity update
+            let mut data;
+            if let Some(ship) = ship.get(ent) {
+                info!("Sending update for ship {}", repli.id);
+                data = Vec::with_capacity(43);
+                write_float(&mut data, pos.pos[0]);
+                write_float(&mut data, pos.pos[1]);
+                write_float(&mut data, pos.rot);
+                write_float(&mut data, vel.vel[0]);
+                write_float(&mut data, vel.vel[1]);
+                write_float(&mut data, vel.rot);
+                write_float(&mut data, ship.thrust[0]);
+                write_float(&mut data, ship.thrust[1]);
+                write_float(&mut data, ship.reload);
+                assert_eq!(data.write(&ship.color).unwrap(), 3);
+                data.write_i32::<ORDER>(ship.health).unwrap();
+                assert_eq!(data.len(), 43);
+            } else if asteroid.get(ent).is_some() {
+                info!("Sending update for asteroid {}", repli.id);
+                data = Vec::with_capacity(24);
+                write_float(&mut data, pos.pos[0]);
+                write_float(&mut data, pos.pos[1]);
+                write_float(&mut data, pos.rot);
+                write_float(&mut data, vel.vel[0]);
+                write_float(&mut data, vel.vel[1]);
+                write_float(&mut data, vel.rot);
+                assert_eq!(data.len(), 24);
+            } else {
+                unreachable!();
+            }
+            let update = Message::EntityUpdate(repli.id, data).bytes();
+            for client in self.clients.values_mut() {
+                chk(self.socket.send_to(&update, &client.address));
+            }
 
             repli.last_update = self.frame;
         }
@@ -470,12 +526,12 @@ impl SysNetClient {
             ping: 0.0,
             controlled_entities: HashSet::new(),
         };
-        client.send(Message::ClientHello).unwrap();
+        client.send(&Message::ClientHello).unwrap();
         client
     }
 
     /// Sends a message
-    fn send(&self, msg: Message) -> io::Result<usize> {
+    fn send(&self, msg: &Message) -> io::Result<usize> {
         let mut bytes = Vec::new();
         bytes.write_u64::<ORDER>(self.client_id).unwrap();
         msg.to_bytes(&mut bytes);
@@ -486,24 +542,26 @@ impl SysNetClient {
 impl<'a> System<'a> for SysNetClient {
     type SystemData = (
         Entities<'a>,
+        Fetch<'a, LazyUpdate>,
         ReadStorage<'a, Replicated>,
         WriteStorage<'a, Dirty>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
-        WriteStorage<'a, Asteroid>,
+        ReadStorage<'a, Asteroid>,
     );
 
     fn run(
         &mut self,
         (
             entities,
+            lazy,
             replicated,
             mut dirty,
             mut position,
             mut velocity,
             mut ship,
-            mut asteroid,
+            asteroid,
         ): Self::SystemData,
     ) {
         // Receive messages
@@ -530,7 +588,7 @@ impl<'a> System<'a> for SysNetClient {
                         warn!("Got ServerHello, our ID is {}", client_id);
                         self.client_id = client_id;
                     }
-                    Message::Ping(buf) => chk(self.send(Message::Pong(buf))),
+                    Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
                     Message::Pong(d) => {
                         let d = time_decode(d);
                         let now = SystemTime::now();
@@ -554,21 +612,48 @@ impl<'a> System<'a> for SysNetClient {
             }
         }
 
-        if messages.is_empty() {
-            return;
-        }
-
         // Update entities from messages
-        for (ent, repli) in (&*entities, &replicated).join() {
+        for (ent, repli, mut pos, mut vel) in
+            (&*entities, &replicated, &mut position, &mut velocity).join()
+        {
             for &mut (ref msg, ref mut handled) in &mut messages {
                 if let Message::EntityUpdate(id, ref data) = *msg {
+                    if id != repli.id {
+                        continue;
+                    }
+
                     *handled = true;
 
-                    // TODO: Update entity from message
+                    // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        ship.thrust[1] = 1.0;
+                        info!("Applying update for ship {}", repli.id);
+                        assert_eq!(data.len(), 43);
+                        let mut data = Cursor::new(data);
+                        pos.pos[0] = read_float(&mut data);
+                        pos.pos[1] = read_float(&mut data);
+                        pos.rot = read_float(&mut data);
+                        vel.vel[0] = read_float(&mut data);
+                        vel.vel[1] = read_float(&mut data);
+                        vel.rot = read_float(&mut data);
+                        ship.thrust[0] = read_float(&mut data);
+                        ship.thrust[1] = read_float(&mut data);
+                        ship.reload = read_float(&mut data);
+                        assert_eq!(data.read(&mut ship.color).unwrap(), 3);
+                        ship.health = data.read_i32::<ORDER>().unwrap();
+                        assert_eq!(data.position(), 43);
                     }
-                    if let Some(asteroid) = asteroid.get_mut(ent) {}
+                    if asteroid.get(ent).is_some() {
+                        info!("Applying update for asteroid {}", repli.id);
+                        assert_eq!(data.len(), 24);
+                        let mut data = Cursor::new(data);
+                        pos.pos[0] = read_float(&mut data);
+                        pos.pos[1] = read_float(&mut data);
+                        pos.rot = read_float(&mut data);
+                        vel.vel[0] = read_float(&mut data);
+                        vel.vel[1] = read_float(&mut data);
+                        vel.rot = read_float(&mut data);
+                        assert_eq!(data.position(), 24);
+                    }
                 }
             }
         }
@@ -579,13 +664,99 @@ impl<'a> System<'a> for SysNetClient {
                 continue;
             }
             if let Message::EntityUpdate(id, ref data) = *msg {
-                // TODO: Create entity from message
+                if data.len() == 43 {
+                    info!("Creating ship {}", id);
+                    let mut data = Cursor::new(data);
+                    let pos = Position {
+                        pos: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    let vel = Velocity {
+                        vel: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    let ship = Ship {
+                        want_fire: false,
+                        want_thrust: [0.0, 0.0],
+                        thrust: [read_float(&mut data), read_float(&mut data)],
+                        reload: read_float(&mut data),
+                        color: {
+                            let mut buf = [0u8; 3];
+                            assert_eq!(data.read(&mut buf).unwrap(), 3);
+                            buf
+                        },
+                        health: data.read_i32::<ORDER>().unwrap(),
+                    };
+                    assert_eq!(data.position(), 43);
+
+                    let entity = entities.create();
+                    lazy.insert(entity, pos);
+                    lazy.insert(entity, vel);
+                    lazy.insert(
+                        entity,
+                        Collision {
+                            bounding_box: [10.0, 8.0],
+                        },
+                    );
+                    lazy.insert(entity, ship);
+                    lazy.insert(
+                        entity,
+                        Replicated {
+                            id: id,
+                            last_update: 0,
+                        },
+                    );
+                } else if data.len() == 24 {
+                    info!("Creating asteroid {}", id);
+                    let mut data = Cursor::new(data);
+                    let pos = Position {
+                        pos: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    let vel = Velocity {
+                        vel: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    assert_eq!(data.position(), 24);
+
+                    let entity = entities.create();
+                    lazy.insert(entity, pos);
+                    lazy.insert(entity, vel);
+                    lazy.insert(
+                        entity,
+                        Collision {
+                            bounding_box: [40.0, 40.0],
+                        },
+                    );
+                    lazy.insert(entity, Asteroid);
+                    lazy.insert(
+                        entity,
+                        Replicated {
+                            id: id,
+                            last_update: 0,
+                        },
+                    );
+                } else {
+                    unreachable!();
+                }
             }
         }
 
         // Go over Dirty, send messages
         for (ship, repli, _) in (&ship, &replicated, &dirty).join() {
-            // TODO: Send message
+            let mut data = 0;
+            if ship.want_fire {
+                data |= 0x01;
+            }
+            if ship.want_thrust[0] > 0.5 {
+                data |= 0x02;
+            } else if ship.want_thrust[0] < -0.5 {
+                data |= 0x04;
+            }
+            if ship.want_thrust[1] > 0.5 {
+                data |= 0x08;
+            }
+            chk(self.send(&Message::EntityUpdate(repli.id, vec![data])))
         }
 
         dirty.clear();

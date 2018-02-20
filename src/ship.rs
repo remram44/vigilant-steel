@@ -18,13 +18,13 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub thrust: [f64; 2],
-    reload: f64,
-    pub color: [f32; 3],
+    pub reload: f64,
+    pub color: [u8; 3],
     pub health: i32,
 }
 
 impl Ship {
-    pub fn new(color: [f32; 3]) -> Ship {
+    pub fn new(color: [u8; 3]) -> Ship {
         Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
@@ -57,7 +57,7 @@ impl Ship {
                 bounding_box: [10.0, 8.0],
             },
         );
-        lazy.insert(entity, Ship::new([1.0, 0.0, 0.0]));
+        lazy.insert(entity, Ship::new([255, 0, 0]));
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
