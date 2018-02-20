@@ -1,11 +1,12 @@
 //! Network code.
 
+use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use physics::{Position, Velocity};
 use ship::Ship;
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{self, Cursor};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -266,6 +267,7 @@ impl<'a> System<'a> for SysNetServer {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
+        ReadStorage<'a, Asteroid>,
     );
 
     fn run(
@@ -279,6 +281,7 @@ impl<'a> System<'a> for SysNetServer {
             position,
             velocity,
             mut ship,
+            asteroid,
         ): Self::SystemData,
     ) {
         self.frame = self.frame.wrapping_add(1);
@@ -371,6 +374,7 @@ impl<'a> System<'a> for SysNetServer {
             return;
         }
 
+        // Handle Pong from clients
         for client in self.clients.values_mut() {
             for &(ref client_id, ref msg) in &messages {
                 if client_id != &client.client_id {
@@ -388,6 +392,8 @@ impl<'a> System<'a> for SysNetServer {
                     }
                 }
             }
+
+            // TODO: Drop old clients
         }
 
         // Handle messages
@@ -412,8 +418,8 @@ impl<'a> System<'a> for SysNetServer {
         }
 
         // Go over entities, send updates
-        for (ent, ship, mut repli, pos, vel) in
-            (&*entities, &ship, &mut replicated, &position, &velocity).join()
+        for (ent, mut repli, pos, vel) in
+            (&*entities, &mut replicated, &position, &velocity).join()
         {
             // Send an update if dirty, or if it hasn't been updated in a while
             if dirty.get(ent).is_none()
@@ -423,6 +429,9 @@ impl<'a> System<'a> for SysNetServer {
             }
 
             // TODO: Send entity update
+            if let Some(ship) = ship.get(ent) {}
+            if let Some(asteroid) = asteroid.get(ent) {}
+
             repli.last_update = self.frame;
         }
 
@@ -439,6 +448,7 @@ pub struct SysNetClient {
     client_id: u64,
     last_pong: SystemTime,
     ping: f64,
+    controlled_entities: HashSet<u64>,
 }
 
 impl SysNetClient {
@@ -458,6 +468,7 @@ impl SysNetClient {
             client_id: 0,
             last_pong: SystemTime::now(),
             ping: 0.0,
+            controlled_entities: HashSet::new(),
         };
         client.send(Message::ClientHello).unwrap();
         client
@@ -480,6 +491,7 @@ impl<'a> System<'a> for SysNetClient {
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
+        WriteStorage<'a, Asteroid>,
     );
 
     fn run(
@@ -491,6 +503,7 @@ impl<'a> System<'a> for SysNetClient {
             mut position,
             mut velocity,
             mut ship,
+            mut asteroid,
         ): Self::SystemData,
     ) {
         // Receive messages
@@ -528,9 +541,12 @@ impl<'a> System<'a> for SysNetClient {
                                 + d.subsec_nanos() as f64 / 0.000_000_001;
                         }
                     }
-                    Message::StartEntityControl(_)
-                    | Message::EntityUpdate(_, _)
-                    | Message::EntityRemove(_) => messages.push(msg),
+                    Message::StartEntityControl(id) => {
+                        self.controlled_entities.insert(id);
+                    }
+                    Message::EntityUpdate(_, _) | Message::EntityRemove(_) => {
+                        messages.push((msg, false))
+                    }
                     Message::ClientHello => warn!("Invalid message"),
                 }
             } else {
@@ -538,13 +554,32 @@ impl<'a> System<'a> for SysNetClient {
             }
         }
 
+        if messages.is_empty() {
+            return;
+        }
+
         // Update entities from messages
         for (ent, repli) in (&*entities, &replicated).join() {
-            for msg in &messages {
-                // TODO: Update entity from message
-                if let Some(ship) = ship.get_mut(ent) {
-                    ship.thrust[1] = 1.0;
+            for &mut (ref msg, ref mut handled) in &mut messages {
+                if let Message::EntityUpdate(id, ref data) = *msg {
+                    *handled = true;
+
+                    // TODO: Update entity from message
+                    if let Some(ship) = ship.get_mut(ent) {
+                        ship.thrust[1] = 1.0;
+                    }
+                    if let Some(asteroid) = asteroid.get_mut(ent) {}
                 }
+            }
+        }
+
+        // Create new entities
+        for &(ref msg, handled) in &messages {
+            if handled {
+                continue;
+            }
+            if let Message::EntityUpdate(id, ref data) = *msg {
+                // TODO: Create entity from message
             }
         }
 
