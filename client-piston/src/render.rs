@@ -80,9 +80,8 @@ fn draw_line_loop<G>(
 pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
-    glyph_cache: &mut C,
+    _glyph_cache: &mut C,
     world: &mut World,
-    game_over: bool,
 ) where
     G: graphics::Graphics,
     E: Debug,
@@ -147,19 +146,9 @@ pub fn render<G, C, E>(
         );
     }
 
-    if game_over {
-        graphics::text(
-            [1.0, 0.0, 0.0, 1.0],
-            24,
-            "Game Over!",
-            glyph_cache,
-            tr.trans(-200.0, 0.0).scale(3.0, -3.0),
-            gl,
-        ).unwrap();
-    } else {
-        let local = world.read::<LocalControl>();
-        let ship = world.read::<Ship>();
-        let (_, ship) = (&local, &ship).join().next().unwrap();
+    let local = world.read::<LocalControl>();
+    let ship = world.read::<Ship>();
+    if let Some((_, ship)) = (&local, &ship).join().next() {
         let health = ship.health;
         let poly = &[
             [0.0, 0.0],

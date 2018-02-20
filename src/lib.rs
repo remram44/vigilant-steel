@@ -18,7 +18,7 @@ use input::{Input, Press};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, Join, LazyUpdate, World};
+use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
 
@@ -74,9 +74,6 @@ impl Role {
 pub struct Game {
     pub world: World,
     pub dispatcher: Dispatcher<'static, 'static>,
-    /// Indicates that the game has been lost, input should no longer be
-    /// accepted.
-    pub game_over: bool,
 }
 
 impl Game {
@@ -94,7 +91,7 @@ impl Game {
         {
             world.register::<net::Replicated>();
             world.register::<net::Dirty>();
-            world.register::<net::ConnectedClient>();
+            world.register::<net::ClientControlled>();
         }
 
         world.add_resource(DeltaTime(0.0));
@@ -126,7 +123,6 @@ impl Game {
         Game {
             world: world,
             dispatcher: dispatcher.build(),
-            game_over: false,
         }
     }
 
@@ -140,7 +136,6 @@ impl Game {
         Game {
             world: world,
             dispatcher: dispatcher.build(),
-            game_over: false,
         }
     }
 
@@ -156,7 +151,6 @@ impl Game {
         Game {
             world: world,
             dispatcher: dispatcher.build(),
-            game_over: false,
         }
     }
 
@@ -167,15 +161,6 @@ impl Game {
         }
         self.dispatcher.dispatch(&self.world.res);
         self.world.maintain();
-
-        if !self.game_over
-            && self.world.read::<LocalControl>().join().next().is_none()
-        {
-            warn!("GAME OVER");
-            self.game_over = true;
-            let mut input = self.world.write_resource::<Input>();
-            *input = Input::new();
-        }
 
         let mut input = self.world.write_resource::<Input>();
         if input.fire == Press::PRESSED {
