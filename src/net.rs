@@ -3,7 +3,7 @@
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use physics::{Collision, LocalControl, Position, Velocity};
-use ship::Ship;
+use ship::{Projectile, Ship};
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
@@ -285,6 +285,7 @@ impl<'a> System<'a> for SysNetServer {
         ReadStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
         ReadStorage<'a, Asteroid>,
+        ReadStorage<'a, Projectile>,
     );
 
     fn run(
@@ -299,6 +300,7 @@ impl<'a> System<'a> for SysNetServer {
             velocity,
             mut ship,
             asteroid,
+            projectile,
         ): Self::SystemData,
     ) {
         self.frame = self.frame.wrapping_add(1);
@@ -452,8 +454,19 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.vel[1]);
                 write_float(&mut data, vel.rot);
                 assert_eq!(data.len(), 24);
+            } else if projectile.get(ent).is_some() {
+                info!("Sending update for projectile {}", repli.id);
+                data = Vec::with_capacity(25);
+                write_float(&mut data, pos.pos[0]);
+                write_float(&mut data, pos.pos[1]);
+                write_float(&mut data, pos.rot);
+                write_float(&mut data, vel.vel[0]);
+                write_float(&mut data, vel.vel[1]);
+                write_float(&mut data, vel.rot);
+                assert_eq!(data.write(&[0u8]).unwrap(), 1); // FIXME
+                assert_eq!(data.len(), 25);
             } else {
-                unreachable!();
+                panic!("Need to send update for unknown entity!");
             }
             let update = Message::EntityUpdate(repli.id, data).bytes();
             for client in self.clients.values_mut() {
@@ -547,6 +560,7 @@ impl<'a> System<'a> for SysNetClient {
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
         ReadStorage<'a, Asteroid>,
+        ReadStorage<'a, Projectile>,
     );
 
     fn run(
@@ -560,6 +574,7 @@ impl<'a> System<'a> for SysNetClient {
             mut velocity,
             mut ship,
             asteroid,
+            projectile,
         ): Self::SystemData,
     ) {
         // Receive messages
@@ -639,8 +654,7 @@ impl<'a> System<'a> for SysNetClient {
                         assert_eq!(data.read(&mut ship.color).unwrap(), 3);
                         ship.health = data.read_i32::<ORDER>().unwrap();
                         assert_eq!(data.position(), 43);
-                    }
-                    if asteroid.get(ent).is_some() {
+                    } else if asteroid.get(ent).is_some() {
                         info!("Applying update for asteroid {}", repli.id);
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
@@ -651,6 +665,19 @@ impl<'a> System<'a> for SysNetClient {
                         vel.vel[1] = read_float(&mut data);
                         vel.rot = read_float(&mut data);
                         assert_eq!(data.position(), 24);
+                    } else if projectile.get(ent).is_some() {
+                        info!("Applying update for projectile {}", repli.id);
+                        assert_eq!(data.len(), 25);
+                        let mut data = Cursor::new(data);
+                        pos.pos[0] = read_float(&mut data);
+                        pos.pos[1] = read_float(&mut data);
+                        pos.rot = read_float(&mut data);
+                        vel.vel[0] = read_float(&mut data);
+                        vel.vel[1] = read_float(&mut data);
+                        vel.rot = read_float(&mut data);
+                        assert_eq!(data.position(), 24);
+                    } else {
+                        panic!("Got update for unknown entity!");
                     }
                 }
             }
@@ -740,8 +767,38 @@ impl<'a> System<'a> for SysNetClient {
                             last_update: 0,
                         },
                     );
+                } else if data.len() == 25 {
+                    info!("Creating projectile {}", id);
+                    let mut data = Cursor::new(data);
+                    let pos = Position {
+                        pos: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    let vel = Velocity {
+                        vel: [read_float(&mut data), read_float(&mut data)],
+                        rot: read_float(&mut data),
+                    };
+                    assert_eq!(data.position(), 24);
+
+                    let entity = entities.create();
+                    lazy.insert(entity, pos);
+                    lazy.insert(entity, vel);
+                    lazy.insert(
+                        entity,
+                        Collision {
+                            bounding_box: [8.0, 1.0],
+                        },
+                    );
+                    lazy.insert(entity, Projectile);
+                    lazy.insert(
+                        entity,
+                        Replicated {
+                            id: id,
+                            last_update: 0,
+                        },
+                    );
                 } else {
-                    unreachable!();
+                    panic!("Need to create unknown entity!");
                 }
             }
         }
