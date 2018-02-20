@@ -10,7 +10,8 @@ build_game:
     - cargo test
     - (cd client-piston && EMMAKEN_CFLAGS='-s USE_SDL=2' cargo build --release --target=asmjs-unknown-emscripten --no-default-features)
     - mkdir output &&
-      cp target/asmjs-unknown-emscripten/release/client.js output/client.js &&
+      cp target/asmjs-unknown-emscripten/release/client.js output/ &&
+      cp target/asmjs-unknown-emscripten/release/deps/client-*.data output/ &&
       sed 's/"target\/asmjs-unknown-emscripten\/release\/client.js"/"client.js?'$(git rev-parse HEAD)'"/' <index.html >output/index.html
   artifacts:
     paths:
@@ -26,7 +27,7 @@ pages:
   stage: deploy
   script:
     - mkdir public
-    - cp output/index.html output/client.js public/
+    - cp output/* public/
   artifacts:
     paths:
       - public
