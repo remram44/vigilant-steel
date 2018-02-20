@@ -7,6 +7,7 @@ extern crate log;
 
 use game::Game;
 use log::LogLevel;
+use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
 const TIME_STEP: f64 = 0.080;
@@ -40,6 +41,13 @@ fn main() {
                 while timer > TIME_STEP {
                     game.update(TIME_STEP);
                     timer -= TIME_STEP;
+                }
+
+                if TIME_STEP - timer > 0.001 {
+                    sleep(Duration::new(
+                        0,
+                        ((TIME_STEP - timer) * 1_000_000_000.0) as u32,
+                    ));
                 }
             }
             Err(e) => {
