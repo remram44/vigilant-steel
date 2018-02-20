@@ -2,7 +2,7 @@
 
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
-use physics::{Collision, Position, Velocity};
+use physics::{Collision, LocalControl, Position, Velocity};
 use ship::Ship;
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -704,6 +704,12 @@ impl<'a> System<'a> for SysNetClient {
                             last_update: 0,
                         },
                     );
+
+                    // Maybe we control this?
+                    if self.controlled_entities.contains(&id) {
+                        warn!("Created locally-controlled ship {}", id);
+                        lazy.insert(entity, LocalControl);
+                    }
                 } else if data.len() == 24 {
                     info!("Creating asteroid {}", id);
                     let mut data = Cursor::new(data);
