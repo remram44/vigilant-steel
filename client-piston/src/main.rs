@@ -27,6 +27,7 @@ const MAX_TIME_STEP: f64 = 0.040;
 /// The application context, passed through the `event_loop` module.
 struct App {
     gl: GlGraphics,
+    glyph_cache: GlyphCache<'static>,
     fps_counter: FpsCounter,
     game: Game,
 }
@@ -57,8 +58,15 @@ fn main() {
     let gl = GlGraphics::new(OPENGL);
     info!("OpenGL initialized");
 
+    let glyph_cache = GlyphCache::new(
+        "assets/FiraSans-Regular.ttf",
+        (),
+        TextureSettings::new(),
+    ).unwrap();
+
     let mut app = App {
         gl: gl,
+        glyph_cache: glyph_cache,
         fps_counter: FpsCounter::new(),
         game: Game::new(),
     };
@@ -129,13 +137,9 @@ fn handle_event(
     if let Some(r) = event.render_args() {
         let game_over = app.game.game_over;
         let world = &mut app.game.world;
-        let mut glyph_cache = GlyphCache::new(
-            "assets/FiraSans-Regular.ttf",
-            (),
-            TextureSettings::new(),
-        ).unwrap();
+        let glyph_cache = &mut app.glyph_cache;
         app.gl.draw(r.viewport(), |c, g| {
-            render::render(c, g, &mut glyph_cache, world, game_over);
+            render::render(c, g, glyph_cache, world, game_over);
         });
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
