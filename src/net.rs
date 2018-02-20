@@ -409,43 +409,15 @@ impl<'a> System<'a> for SysNetServer {
             // TODO: Drop old clients
         }
 
-        // Handle messages
-        for (ent, ship, repli, ctrl) in
-            (&*entities, &mut ship, &mut replicated, &ctrl).join()
+        // Go over entities, send updates
+        for (ent, mut repli, pos, vel) in
+            (&*entities, &mut replicated, &position, &velocity).join()
         {
             // Assign replicated object ID
             if repli.id == 0 {
                 repli.id = (ent.gen().id() as u64) << 32 | ent.id() as u64;
             }
 
-            for &(ref client_id, ref msg) in &messages {
-                if let Message::EntityUpdate(id, ref data) = *msg {
-                    if repli.id == id && client_id == &ctrl.client_id {
-                        repli.last_update = self.frame;
-
-                        // Update entity from message data
-                        if data.len() != 1 {
-                            info!("Invalid ship control update");
-                            continue;
-                        }
-                        let data = data[0];
-                        ship.want_fire = data & 0x01 == 0x01;
-                        ship.want_thrust[0] = match data & 0x06 {
-                            0x02 => 1.0,
-                            0x04 => -1.0,
-                            _ => 0.0,
-                        };
-                        ship.want_thrust[1] =
-                            if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
-                    }
-                }
-            }
-        }
-
-        // Go over entities, send updates
-        for (ent, mut repli, pos, vel) in
-            (&*entities, &mut replicated, &position, &velocity).join()
-        {
             // Send an update if dirty, or if it hasn't been updated in a while
             if dirty.get(ent).is_none()
                 && self.frame.wrapping_sub(repli.last_update) < 200
@@ -492,6 +464,32 @@ impl<'a> System<'a> for SysNetServer {
         }
 
         dirty.clear();
+
+        // Handle messages
+        for (ship, repli, ctrl) in (&mut ship, &mut replicated, &ctrl).join() {
+            for &(ref client_id, ref msg) in &messages {
+                if let Message::EntityUpdate(id, ref data) = *msg {
+                    if repli.id == id && client_id == &ctrl.client_id {
+                        repli.last_update = self.frame;
+
+                        // Update entity from message data
+                        if data.len() != 1 {
+                            info!("Invalid ship control update");
+                            continue;
+                        }
+                        let data = data[0];
+                        ship.want_fire = data & 0x01 == 0x01;
+                        ship.want_thrust[0] = match data & 0x06 {
+                            0x02 => 1.0,
+                            0x04 => -1.0,
+                            _ => 0.0,
+                        };
+                        ship.want_thrust[1] =
+                            if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
+                    }
+                }
+            }
+        }
     }
 }
 
