@@ -14,7 +14,9 @@ name = "server"
 path = "src/main.rs"
 
 [dependencies]
-game = { path = ".." }
-
 color-logger = { path = "../color-logger" }
 log = "0.3"
+
+[dependencies.game]
+path = ".."
+features = ["network"]

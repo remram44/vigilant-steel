@@ -34,5 +34,6 @@ sdl2 = "0.30"
 emscripten-sys = "0.3"
 
 [features]
-default = ["sdl2/use_mac_framework"]
+default = ["sdl2/use_mac_framework", "network"]
 use_sdl2_mac_framework = ["sdl2/use_mac_framework"]
+network = ["game/network"]

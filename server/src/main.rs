@@ -20,7 +20,7 @@ fn main() {
     color_logger::init(LogLevel::Info).unwrap();
     info!("Starting up");
 
-    let mut game = Game::new();
+    let mut game = Game::new_server(34244);
 
     let mut previous = SystemTime::now();
     let mut timer = 0.0;

@@ -12,7 +12,11 @@ readme = "README.md"
 keywords = ["game"]
 
 [dependencies]
+byteorder = "1"
 log = "0.3"
 rand = "0.3"
 specs = "0.10"
 vecmath = "0.3"
+
+[features]
+network = []

@@ -1,5 +1,8 @@
 //! Asteroid objects, floating around for the user to collide with or shoot.
 
+use Role;
+#[cfg(feature = "network")]
+use net;
 use physics::{Collided, Collision, DeltaTime, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
@@ -31,6 +34,7 @@ impl SysAsteroid {
 impl<'a> System<'a> for SysAsteroid {
     type SystemData = (
         Fetch<'a, DeltaTime>,
+        Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Collided>,
@@ -40,8 +44,10 @@ impl<'a> System<'a> for SysAsteroid {
 
     fn run(
         &mut self,
-        (dt, lazy, entities, collided, pos, asteroid): Self::SystemData,
+        (dt, role, lazy, entities, collided, pos, asteroid): Self::SystemData,
     ) {
+        assert!(role.authoritative());
+
         let dt = dt.0;
 
         // Remove asteroids gone from the screen or hit
@@ -60,7 +66,7 @@ impl<'a> System<'a> for SysAsteroid {
 
             // Get collision info
             if let Some(col) = collided.get(entity) {
-                for ent in col.entities.iter() {
+                for ent in &col.entities {
                     // If collision is not with an asteroid
                     if asteroid.get(*ent).is_none() {
                         // Remove this entity
@@ -110,6 +116,11 @@ impl<'a> System<'a> for SysAsteroid {
                     },
                 );
                 lazy.insert(entity, Asteroid);
+                #[cfg(feature = "network")]
+                {
+                    lazy.insert(entity, net::Replicated::new());
+                    lazy.insert(entity, net::Dirty);
+                }
                 None
             } else {
                 Some(d - dt)

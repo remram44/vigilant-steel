@@ -64,11 +64,38 @@ fn main() {
         TextureSettings::new(),
     ).unwrap();
 
+    let game = {
+        let mut args = std::env::args();
+        args.next().unwrap();
+        match args.next() {
+            Some(a) => {
+                if args.next().is_some() {
+                    eprintln!("Too many arguments!");
+                    std::process::exit(1);
+                }
+                #[cfg(not(feature = "network"))]
+                panic!("Want to connect but networking is not compiled in");
+                #[cfg(feature = "network")]
+                {
+                    let addr = match a.parse() {
+                        Ok(a) => a,
+                        Err(_) => {
+                            eprintln!("Invalid address");
+                            std::process::exit(1);
+                        }
+                    };
+                    Game::new_client(addr)
+                }
+            }
+            None => Game::new_standalone(),
+        }
+    };
+
     let mut app = App {
         gl: gl,
         glyph_cache: glyph_cache,
         fps_counter: FpsCounter::new(),
-        game: Game::new(),
+        game: game,
     };
     app.game.world.add_resource(Viewport::new([width, height]));
 
@@ -89,26 +116,24 @@ fn handle_event(
     }
 
     // Keyboard input
-    if !app.game.game_over {
-        if let Some(button) = event.button_args() {
-            let mut input = app.game.world.write_resource::<Input>();
-            if let Some(scancode) = button.scancode {
-                if button.state == ButtonState::Press {
-                    match scancode {
-                        4 => input.movement[0] = -1.0,
-                        7 => input.movement[0] = 1.0,
-                        22 => input.movement[1] = -1.0,
-                        26 => input.movement[1] = 1.0,
-                        44 => input.fire = Press::PRESSED,
-                        _ => {}
-                    }
-                } else {
-                    match scancode {
-                        4 | 7 => input.movement[0] = 0.0,
-                        22 | 26 => input.movement[1] = 0.0,
-                        44 => input.fire = Press::UP,
-                        _ => {}
-                    }
+    if let Some(button) = event.button_args() {
+        let mut input = app.game.world.write_resource::<Input>();
+        if let Some(scancode) = button.scancode {
+            if button.state == ButtonState::Press {
+                match scancode {
+                    4 => input.movement[0] = -1.0,
+                    7 => input.movement[0] = 1.0,
+                    22 => input.movement[1] = -1.0,
+                    26 => input.movement[1] = 1.0,
+                    44 => input.fire = Press::PRESSED,
+                    _ => {}
+                }
+            } else {
+                match scancode {
+                    4 | 7 => input.movement[0] = 0.0,
+                    22 | 26 => input.movement[1] = 0.0,
+                    44 => input.fire = Press::UP,
+                    _ => {}
                 }
             }
         }
@@ -135,11 +160,10 @@ fn handle_event(
 
     // Draw
     if let Some(r) = event.render_args() {
-        let game_over = app.game.game_over;
         let world = &mut app.game.world;
         let glyph_cache = &mut app.glyph_cache;
         app.gl.draw(r.viewport(), |c, g| {
-            render::render(c, g, glyph_cache, world, game_over);
+            render::render(c, g, glyph_cache, world);
         });
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
