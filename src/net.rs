@@ -479,7 +479,9 @@ impl<'a> System<'a> for SysNetServer {
         dirty.clear();
 
         // Handle messages
-        for (ship, repli, ctrl) in (&mut ship, &mut replicated, &ctrl).join() {
+        for (ent, ship, repli, ctrl) in
+            (&*entities, &mut ship, &mut replicated, &ctrl).join()
+        {
             for &(ref client_id, ref msg) in &messages {
                 if let Message::EntityUpdate(id, ref data) = *msg {
                     if repli.id == id && client_id == &ctrl.client_id {
@@ -499,6 +501,8 @@ impl<'a> System<'a> for SysNetServer {
                         };
                         ship.want_thrust[1] =
                             if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
+
+                        lazy.insert(ent, Dirty);
                     }
                 }
             }
