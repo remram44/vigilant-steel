@@ -59,7 +59,6 @@ impl<'a> System<'a> for SysAsteroid {
             if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
                 || pos[1] > 500.0
             {
-                info!("Deleting asteroid");
                 entities.delete(entity).unwrap();
                 continue;
             }
@@ -80,7 +79,6 @@ impl<'a> System<'a> for SysAsteroid {
 
         self.spawn_delay = if let Some(d) = self.spawn_delay.take() {
             if d <= 0.0 {
-                info!("Spawning asteroid now");
                 let mut rng = rand::thread_rng();
                 let &(xpos, ypos) = rng.choose(&[
                     (-1.0, 0.0), // left
@@ -126,9 +124,7 @@ impl<'a> System<'a> for SysAsteroid {
                 Some(d - dt)
             }
         } else if count < 30 {
-            info!("Currently {} asteroids", count);
             let delay = 2.0 - 0.2 * (20 - count) as f64;
-            info!("Spawning asteroid in {} seconds", delay);
             Some(delay)
         } else {
             None

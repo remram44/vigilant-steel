@@ -430,7 +430,6 @@ impl<'a> System<'a> for SysNetServer {
             // Send entity update
             let mut data;
             if let Some(ship) = ship.get(ent) {
-                info!("Sending update for ship {}", repli.id);
                 data = Vec::with_capacity(43);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -445,7 +444,6 @@ impl<'a> System<'a> for SysNetServer {
                 data.write_i32::<ORDER>(ship.health).unwrap();
                 assert_eq!(data.len(), 43);
             } else if asteroid.get(ent).is_some() {
-                info!("Sending update for asteroid {}", repli.id);
                 data = Vec::with_capacity(24);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -455,7 +453,6 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.rot);
                 assert_eq!(data.len(), 24);
             } else if projectile.get(ent).is_some() {
-                info!("Sending update for projectile {}", repli.id);
                 data = Vec::with_capacity(25);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -643,7 +640,6 @@ impl<'a> System<'a> for SysNetClient {
 
                     // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        info!("Applying update for ship {}", repli.id);
                         assert_eq!(data.len(), 43);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
@@ -659,7 +655,6 @@ impl<'a> System<'a> for SysNetClient {
                         ship.health = data.read_i32::<ORDER>().unwrap();
                         assert_eq!(data.position(), 43);
                     } else if asteroid.get(ent).is_some() {
-                        info!("Applying update for asteroid {}", repli.id);
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
@@ -670,7 +665,6 @@ impl<'a> System<'a> for SysNetClient {
                         vel.rot = read_float(&mut data);
                         assert_eq!(data.position(), 24);
                     } else if projectile.get(ent).is_some() {
-                        info!("Applying update for projectile {}", repli.id);
                         assert_eq!(data.len(), 25);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
@@ -694,7 +688,6 @@ impl<'a> System<'a> for SysNetClient {
             }
             if let Message::EntityUpdate(id, ref data) = *msg {
                 if data.len() == 43 {
-                    info!("Creating ship {}", id);
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
@@ -742,7 +735,6 @@ impl<'a> System<'a> for SysNetClient {
                         lazy.insert(entity, LocalControl);
                     }
                 } else if data.len() == 24 {
-                    info!("Creating asteroid {}", id);
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
@@ -772,7 +764,6 @@ impl<'a> System<'a> for SysNetClient {
                         },
                     );
                 } else if data.len() == 25 {
-                    info!("Creating projectile {}", id);
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
