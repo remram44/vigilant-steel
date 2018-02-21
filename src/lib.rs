@@ -91,6 +91,7 @@ impl Game {
         {
             world.register::<net::Replicated>();
             world.register::<net::Dirty>();
+            world.register::<net::Delete>();
             world.register::<net::ClientControlled>();
         }
 

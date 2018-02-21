@@ -3,7 +3,8 @@
 use Role;
 #[cfg(feature = "network")]
 use net;
-use physics::{Collided, Collision, DeltaTime, Position, Velocity};
+use physics::{delete_entity, Collided, Collision, DeltaTime, Position,
+              Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
@@ -59,7 +60,7 @@ impl<'a> System<'a> for SysAsteroid {
             if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
                 || pos[1] > 500.0
             {
-                entities.delete(entity).unwrap();
+                delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
 
@@ -70,7 +71,7 @@ impl<'a> System<'a> for SysAsteroid {
                     if asteroid.get(*ent).is_none() {
                         // Remove this entity
                         info!("Deleting hit asteroid");
-                        entities.delete(entity).unwrap();
+                        delete_entity(*role, &entities, &lazy, entity);
                         break;
                     }
                 }

@@ -4,8 +4,8 @@ use Role;
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
-use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
-              Velocity};
+use physics::{delete_entity, Collided, Collision, DeltaTime, LocalControl,
+              Position, Velocity};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
@@ -164,7 +164,7 @@ impl<'a> System<'a> for SysShip {
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
-                entities.delete(ent).unwrap();
+                delete_entity(*role, &entities, &lazy, ent);
                 continue;
             }
 
@@ -254,6 +254,7 @@ pub struct SysProjectile;
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
         Fetch<'a, Role>,
+        Fetch<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Collided>,
         ReadStorage<'a, Position>,
@@ -262,14 +263,14 @@ impl<'a> System<'a> for SysProjectile {
 
     fn run(
         &mut self,
-        (role, entities, collided, pos, projectile): Self::SystemData,
+        (role, lazy, entities, collided, pos, projectile): Self::SystemData,
     ) {
         assert!(role.authoritative());
 
         // Remove projectiles gone from the screen or hit
         for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
             if collided.get(entity).is_some() {
-                entities.delete(entity).unwrap();
+                delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
 
@@ -277,7 +278,7 @@ impl<'a> System<'a> for SysProjectile {
             if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
                 || pos[1] > 500.0
             {
-                entities.delete(entity).unwrap();
+                delete_entity(*role, &entities, &lazy, entity);
             }
         }
     }

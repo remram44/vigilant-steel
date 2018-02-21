@@ -61,8 +61,8 @@ enum Message {
     /// The server sends full entity updates that the client applies. The
     /// client sends update to the controls, preceded by its secret.
     EntityUpdate(u64, Vec<u8>),
-    /// Entity removed, from server.
-    EntityRemove(u64),
+    /// Entity deleted, from server.
+    EntityDelete(u64),
 }
 
 impl Message {
@@ -132,10 +132,10 @@ impl Message {
             }
             b"er" => {
                 if msg.len() != 16 {
-                    info!("Invalid EntityRemove length");
+                    info!("Invalid EntityDelete length");
                     None
                 } else {
-                    Some(Message::EntityRemove(
+                    Some(Message::EntityDelete(
                         rdr.read_u64::<ORDER>().unwrap(),
                     ))
                 }
@@ -171,7 +171,7 @@ impl Message {
                 msg.write_u64::<ORDER>(id).unwrap();
                 msg.extend_from_slice(bytes);
             }
-            Message::EntityRemove(id) => {
+            Message::EntityDelete(id) => {
                 msg.extend_from_slice(b"er");
                 msg.write_u64::<ORDER>(id).unwrap();
             }
@@ -211,6 +211,14 @@ impl Replicated {
 
 impl Component for Replicated {
     type Storage = VecStorage<Self>;
+}
+
+/// Mark an entity to be deleted everywhere.
+#[derive(Default)]
+pub struct Delete;
+
+impl Component for Delete {
+    type Storage = NullStorage<Self>;
 }
 
 /// Flag that marks an entity as dirty, eg needs to be sent to clients.
@@ -281,6 +289,7 @@ impl<'a> System<'a> for SysNetServer {
         ReadStorage<'a, ClientControlled>,
         WriteStorage<'a, Replicated>,
         WriteStorage<'a, Dirty>,
+        ReadStorage<'a, Delete>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
@@ -296,6 +305,7 @@ impl<'a> System<'a> for SysNetServer {
             ctrl,
             mut replicated,
             mut dirty,
+            delete,
             position,
             velocity,
             mut ship,
@@ -379,7 +389,7 @@ impl<'a> System<'a> for SysNetServer {
                     }
                     Message::ServerHello(_)
                     | Message::StartEntityControl(_)
-                    | Message::EntityRemove(_) => {
+                    | Message::EntityDelete(_) => {
                         info!("Invalid message from {}", src)
                     }
                 }
@@ -412,12 +422,20 @@ impl<'a> System<'a> for SysNetServer {
         }
 
         // Go over entities, send updates
-        for (ent, mut repli, pos, vel) in
-            (&*entities, &mut replicated, &position, &velocity).join()
-        {
+        for (ent, mut repli) in (&*entities, &mut replicated).join() {
             // Assign replicated object ID
             if repli.id == 0 {
                 repli.id = (ent.gen().id() as u64) << 32 | ent.id() as u64;
+            }
+
+            // Deleted?
+            if delete.get(ent).is_some() {
+                let message = Message::EntityDelete(repli.id).bytes();
+                for client in self.clients.values_mut() {
+                    chk(self.socket.send_to(&message, &client.address));
+                }
+                entities.delete(ent).unwrap();
+                continue;
             }
 
             // Send an update if dirty, or if it hasn't been updated in a while
@@ -430,6 +448,8 @@ impl<'a> System<'a> for SysNetServer {
             // Send entity update
             let mut data;
             if let Some(ship) = ship.get(ent) {
+                let pos = position.get(ent).unwrap();
+                let vel = velocity.get(ent).unwrap();
                 data = Vec::with_capacity(43);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -444,6 +464,8 @@ impl<'a> System<'a> for SysNetServer {
                 data.write_i32::<ORDER>(ship.health).unwrap();
                 assert_eq!(data.len(), 43);
             } else if asteroid.get(ent).is_some() {
+                let pos = position.get(ent).unwrap();
+                let vel = velocity.get(ent).unwrap();
                 data = Vec::with_capacity(24);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -453,6 +475,8 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.rot);
                 assert_eq!(data.len(), 24);
             } else if projectile.get(ent).is_some() {
+                let pos = position.get(ent).unwrap();
+                let vel = velocity.get(ent).unwrap();
                 data = Vec::with_capacity(25);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
@@ -616,7 +640,7 @@ impl<'a> System<'a> for SysNetClient {
                     Message::StartEntityControl(id) => {
                         self.controlled_entities.insert(id);
                     }
-                    Message::EntityUpdate(_, _) | Message::EntityRemove(_) => {
+                    Message::EntityUpdate(_, _) | Message::EntityDelete(_) => {
                         messages.push((msg, false))
                     }
                     Message::ClientHello => warn!("Invalid message"),
@@ -677,6 +701,13 @@ impl<'a> System<'a> for SysNetClient {
                     } else {
                         panic!("Got update for unknown entity!");
                     }
+                } else if let Message::EntityDelete(id) = *msg {
+                    if id != repli.id {
+                        continue;
+                    }
+
+                    // Delete entity
+                    entities.delete(ent).unwrap();
                 }
             }
         }
