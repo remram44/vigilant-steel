@@ -163,7 +163,7 @@ impl<'a> System<'a> for SysShip {
             (&*entities, &pos, &mut vel, &mut ship).join()
         {
             // Death
-            if ship.health <= 0 {
+            if role.authoritative() && ship.health <= 0 {
                 entities.delete(ent).unwrap();
                 continue;
             }
