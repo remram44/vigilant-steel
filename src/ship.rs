@@ -110,8 +110,8 @@ impl<'a> System<'a> for SysShip {
 
         if role.authoritative() {
             // Handle collisions
-            for (ent, col, mut ship, _) in
-                (&*entities, &collided, &mut ship, &local).join()
+            for (ent, col, mut ship) in
+                (&*entities, &collided, &mut ship).join()
             {
                 if !col.entities.is_empty() {
                     ship.health -= col.entities.len() as i32;
