@@ -54,7 +54,7 @@ impl Ship {
         lazy.insert(
             entity,
             Collision {
-                bounding_box: [10.0, 8.0],
+                bounding_box: [1.0, 0.8],
             },
         );
         lazy.insert(entity, Ship::new([255, 0, 0]));
@@ -125,13 +125,13 @@ impl<'a> System<'a> for SysShip {
             for (ent, pos, vel, mut ship) in
                 (&*entities, &pos, &mut vel, &mut ship).join()
             {
-                if pos.pos[0] < -400.0 || pos.pos[0] > 400.0
-                    || pos.pos[1] < -300.0
-                    || pos.pos[1] > 300.0
+                if pos.pos[0] < -35.0 || pos.pos[0] > 35.0
+                    || pos.pos[1] < -35.0
+                    || pos.pos[1] > 35.0
                 {
                     ship.health -= 1;
                     vel.vel = vec2_sub([0.0, 0.0], pos.pos);
-                    vel.vel = vec2_scale(vel.vel, 3.0 * vec2_inv_len(vel.vel));
+                    vel.vel = vec2_scale(vel.vel, 0.3 * vec2_inv_len(vel.vel));
                     #[cfg(feature = "network")]
                     lazy.insert(ent, net::Dirty);
                 }
@@ -176,13 +176,13 @@ impl<'a> System<'a> for SysShip {
             let thrust = [c, s];
             vel.vel = vec2_add(
                 vel.vel,
-                vec2_scale(thrust, ship.thrust[1] * 0.5 * dt),
+                vec2_scale(thrust, ship.thrust[1] * 0.05 * dt),
             );
 
             // Apply friction
             vel.vel = vec2_add(
                 vel.vel,
-                vec2_scale(vel.vel, -0.8 * dt * vec2_len(vel.vel)),
+                vec2_scale(vel.vel, -8.0 * dt * vec2_len(vel.vel)),
             );
 
             // Fire
@@ -193,7 +193,7 @@ impl<'a> System<'a> for SysShip {
                     Projectile::create(
                         &entities,
                         &lazy,
-                        vec2_add(pos.pos, [17.0 * c, 17.0 * s]),
+                        vec2_add(pos.pos, [1.7 * c, 1.7 * s]),
                         pos.rot,
                     );
                 } else if ship.reload > 0.0 {
@@ -224,14 +224,14 @@ impl Projectile {
         lazy.insert(
             entity,
             Velocity {
-                vel: [3.0 * c, 3.0 * s],
+                vel: [0.3 * c, 0.3 * s],
                 rot: 0.0,
             },
         );
         lazy.insert(
             entity,
             Collision {
-                bounding_box: [8.0, 1.0],
+                bounding_box: [0.8, 0.1],
             },
         );
         lazy.insert(entity, Projectile);
@@ -275,8 +275,8 @@ impl<'a> System<'a> for SysProjectile {
             }
 
             let pos = pos.pos;
-            if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
-                || pos[1] > 500.0
+            if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
+                || pos[1] > 50.0
             {
                 delete_entity(*role, &entities, &lazy, entity);
             }

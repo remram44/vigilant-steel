@@ -10,7 +10,7 @@ use specs::{Join, World};
 use std::fmt::Debug;
 
 const MAX_RATIO: f64 = 1.6;
-const VIEWPORT_SIZE: f64 = 800.0;
+const VIEWPORT_SIZE: f64 = 80.0;
 
 pub struct Viewport {
     pub width: u32,
@@ -110,8 +110,8 @@ pub fn render<G, C, E>(
         ];
         draw_line_loop(
             color,
-            1.0,
-            &[[-10.0, -8.0], [10.0, 0.0], [-10.0, 8.0]],
+            0.1,
+            &[[-1.0, -0.8], [1.0, 0.0], [-1.0, 0.8]],
             ship_tr,
             gl,
         );
@@ -121,18 +121,18 @@ pub fn render<G, C, E>(
         let asteroid_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         draw_line_loop(
             [1.0, 1.0, 1.0, 1.0],
-            1.0,
+            0.1,
             &[
-                [-38.0, -26.0],
-                [0.0, -46.0],
-                [38.0, -26.0],
-                [38.0, 26.0],
-                [0.0, 46.0],
-                [-38.0, 26.0],
-                [-38.0, -26.0],
-                [38.0, -26.0],
-                [-38.0, 26.0],
-                [38.0, 26.0],
+                [-3.8, -2.6],
+                [0.0, -4.6],
+                [3.8, -2.6],
+                [3.8, 2.6],
+                [0.0, 4.6],
+                [-3.8, 2.6],
+                [-3.8, -2.6],
+                [3.8, -2.6],
+                [-3.8, 2.6],
+                [3.8, 2.6],
             ],
             asteroid_tr,
             gl,
@@ -143,8 +143,8 @@ pub fn render<G, C, E>(
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         graphics::line(
             [0.0, 1.0, 0.0, 1.0],
-            2.0,
-            [-8.0, 0.0, 8.0, 0.0],
+            0.2,
+            [-0.8, 0.0, 0.8, 0.0],
             projectile_tr,
             gl,
         );

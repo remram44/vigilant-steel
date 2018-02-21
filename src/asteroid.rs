@@ -57,8 +57,8 @@ impl<'a> System<'a> for SysAsteroid {
             count += 1;
 
             let pos = pos.pos;
-            if pos[0] < -500.0 || pos[0] > 500.0 || pos[1] < -500.0
-                || pos[1] > 500.0
+            if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
+                || pos[1] > 50.0
             {
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
@@ -92,8 +92,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Position {
                         pos: [
-                            xpos * 450.0 + ypos * rng.gen_range(-350.0, 350.0),
-                            ypos * 450.0 + xpos * rng.gen_range(-350.0, 350.0),
+                            xpos * 45.0 + ypos * rng.gen_range(-35.0, 35.0),
+                            ypos * 45.0 + xpos * rng.gen_range(-35.0, 35.0),
                         ],
                         rot: rng.gen_range(0.0, 2.0 * PI),
                     },
@@ -102,8 +102,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Velocity {
                         vel: [
-                            rng.gen_range(-0.2, 0.2) - xpos * 0.5,
-                            rng.gen_range(-0.2, 0.2) - ypos * 0.5,
+                            rng.gen_range(-0.02, 0.02) - xpos * 0.05,
+                            rng.gen_range(-0.02, 0.02) - ypos * 0.05,
                         ],
                         rot: rng.gen_range(-2.0, 2.0),
                     },
@@ -111,7 +111,7 @@ impl<'a> System<'a> for SysAsteroid {
                 lazy.insert(
                     entity,
                     Collision {
-                        bounding_box: [40.0, 40.0],
+                        bounding_box: [4.0, 4.0],
                     },
                 );
                 lazy.insert(entity, Asteroid);
