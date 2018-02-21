@@ -142,12 +142,10 @@ impl Game {
 
     #[cfg(feature = "network")]
     pub fn new_client(address: SocketAddr) -> Game {
-        let (mut world, mut dispatcher) = Self::new_common(Role::Client);
+        let (world, mut dispatcher) = Self::new_common(Role::Client);
 
         dispatcher =
             dispatcher.add(net::SysNetClient::new(address), "netclient", &[]);
-
-        world.maintain();
 
         Game {
             world: world,
