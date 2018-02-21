@@ -80,7 +80,7 @@ fn draw_line_loop<G>(
 pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
-    _glyph_cache: &mut C,
+    glyph_cache: &mut C,
     world: &mut World,
 ) where
     G: graphics::Graphics,
@@ -172,5 +172,21 @@ pub fn render<G, C, E>(
             context.transform.trans(50.0, 50.0).scale(50.0, 50.0),
             gl,
         );
+        graphics::text(
+            [1.0, 0.0, 0.0, 1.0],
+            32,
+            &format!("{}", health),
+            glyph_cache,
+            context.transform.trans(45.0, 55.0).scale(0.8, 0.8),
+            gl,
+        ).unwrap();
+        graphics::text(
+            [0.3, 0.3, 1.0, 1.0],
+            20,
+            "Health",
+            glyph_cache,
+            context.transform.trans(27.0, 115.0).scale(0.8, 0.8),
+            gl,
+        ).unwrap();
     }
 }
