@@ -2,12 +2,21 @@
 
 extern crate color_logger;
 extern crate game;
+#[cfg(feature = "graphics-gfx")]
+extern crate gfx;
+#[cfg(feature = "graphics-gfx")]
+extern crate gfx_device_gl;
+#[cfg(feature = "graphics-gfx")]
+extern crate gfx_graphics;
 extern crate graphics;
 #[macro_use]
 extern crate log;
+#[cfg(feature = "graphics-gl")]
 extern crate opengl_graphics;
 extern crate piston;
 extern crate sdl2_window;
+#[cfg(feature = "graphics-gfx")]
+extern crate shader_version;
 extern crate specs;
 
 mod render;
@@ -15,19 +24,52 @@ mod render;
 use game::Game;
 use game::input::{Input, Press};
 use game::utils::FpsCounter;
+#[cfg(feature = "graphics-gfx")]
+use gfx::Device;
+#[cfg(feature = "graphics-gfx")]
+use gfx::format::{DepthStencil, Formatted, Srgba8};
+#[cfg(feature = "graphics-gfx")]
+use gfx::memory::Typed;
+#[cfg(feature = "graphics-gfx")]
+use gfx_graphics::{Gfx2d, GlyphCache, TextureSettings};
 use log::LogLevel;
+#[cfg(feature = "graphics-gl")]
 use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
 use piston::input::*;
-use piston::window::WindowSettings;
+use piston::window::{OpenGLWindow, Window, WindowSettings};
 use render::Viewport;
 use sdl2_window::Sdl2Window;
+#[cfg(feature = "graphics-gfx")]
+use shader_version::OpenGL;
 
 const MAX_TIME_STEP: f64 = 0.040;
 
 /// The application context, passed through the `event_loop` module.
+#[cfg(feature = "graphics-gl")]
 struct App {
-    gl: GlGraphics,
+    g2d: GlGraphics,
     glyph_cache: GlyphCache<'static>,
+    fps_counter: FpsCounter,
+    game: Game,
+}
+
+/// The application context, passed through the `event_loop` module.
+#[cfg(feature = "graphics-gfx")]
+struct App {
+    g2d: Gfx2d<gfx_device_gl::Resources>,
+    device: gfx_device_gl::Device,
+    glyph_cache:
+        GlyphCache<'static, gfx_device_gl::Factory, gfx_device_gl::Resources>,
+    encoder:
+        gfx::Encoder<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>,
+    output_color: gfx::handle::RenderTargetView<
+        gfx_device_gl::Resources,
+        gfx::format::Srgba8,
+    >,
+    output_stencil: gfx::handle::DepthStencilView<
+        gfx_device_gl::Resources,
+        gfx::format::DepthStencil,
+    >,
     fps_counter: FpsCounter,
     game: Game,
 }
@@ -46,7 +88,7 @@ fn main() {
     let height = 600;
 
     // Create an SDL2 window.
-    let window: Sdl2Window =
+    let mut window: Sdl2Window =
         WindowSettings::new("vigilant-engine", [width, height])
             .opengl(OPENGL)
             .srgb(false)
@@ -54,15 +96,6 @@ fn main() {
             .build()
             .expect("Couldn't create an OpenGL window");
     info!("Window created");
-
-    let gl = GlGraphics::new(OPENGL);
-    info!("OpenGL initialized");
-
-    let glyph_cache = GlyphCache::new(
-        "assets/FiraSans-Regular.ttf",
-        (),
-        TextureSettings::new(),
-    ).unwrap();
 
     let game = {
         let mut args = std::env::args();
@@ -91,12 +124,74 @@ fn main() {
         }
     };
 
-    let mut app = App {
-        gl: gl,
-        glyph_cache: glyph_cache,
-        fps_counter: FpsCounter::new(),
-        game: game,
+    let mut app = {
+        #[cfg(feature = "graphics-gl")]
+        {
+            let gl = GlGraphics::new(OPENGL);
+            info!("OpenGL initialized");
+
+            let glyph_cache = GlyphCache::new(
+                "assets/FiraSans-Regular.ttf",
+                (),
+                TextureSettings::new(),
+            ).unwrap();
+
+            App {
+                g2d: gl,
+                glyph_cache: glyph_cache,
+                fps_counter: FpsCounter::new(),
+                game: game,
+            }
+        }
+        #[cfg(feature = "graphics-gfx")]
+        {
+            let (device, mut factory) = gfx_device_gl::create(|s| {
+                window.get_proc_address(s) as *const _
+            });
+
+            let samples = 4;
+
+            let draw_size = window.draw_size();
+            let aa = samples as gfx::texture::NumSamples;
+            let dim = (
+                draw_size.width as u16,
+                draw_size.height as u16,
+                1,
+                aa.into(),
+            );
+            let color_format = <Srgba8 as Formatted>::get_format();
+            let depth_format = <DepthStencil as Formatted>::get_format();
+            let (output_color, output_stencil) =
+                gfx_device_gl::create_main_targets_raw(
+                    dim,
+                    color_format.0,
+                    depth_format.0,
+                );
+            let output_color = Typed::new(output_color);
+            let output_stencil = Typed::new(output_stencil);
+
+            let g2d = Gfx2d::new(OPENGL, &mut factory);
+            let encoder = factory.create_command_buffer().into();
+
+            let glyph_cache = GlyphCache::new(
+                "assets/FiraSans-Regular.ttf",
+                factory.clone(),
+                TextureSettings::new(),
+            ).unwrap();
+
+            App {
+                g2d: g2d,
+                device: device,
+                encoder: encoder,
+                output_color: output_color,
+                output_stencil: output_stencil,
+                glyph_cache: glyph_cache,
+                fps_counter: FpsCounter::new(),
+                game: game,
+            }
+        }
     };
+
     app.game.world.add_resource(Viewport::new([width, height]));
 
     // Use the event_loop module to handle SDL/Emscripten differences
@@ -162,9 +257,24 @@ fn handle_event(
     if let Some(r) = event.render_args() {
         let world = &mut app.game.world;
         let glyph_cache = &mut app.glyph_cache;
-        app.gl.draw(r.viewport(), |c, g| {
+        #[cfg(feature = "graphics-gl")]
+        app.g2d.draw(r.viewport(), |c, g| {
             render::render(c, g, glyph_cache, world);
         });
+        #[cfg(feature = "graphics-gfx")]
+        {
+            app.g2d.draw(
+                &mut app.encoder,
+                &app.output_color,
+                &app.output_stencil,
+                r.viewport(),
+                |c, g| {
+                    render::render(c, g, glyph_cache, world);
+                },
+            );
+            app.encoder.flush(&mut app.device);
+            app.device.cleanup();
+        }
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
         }
