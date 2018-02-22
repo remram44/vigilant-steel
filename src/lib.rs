@@ -6,6 +6,7 @@ extern crate specs;
 extern crate vecmath;
 
 pub mod asteroid;
+pub mod blocks;
 pub mod input;
 #[cfg(feature = "network")]
 pub mod net;
@@ -20,7 +21,7 @@ use input::{Input, Press};
 use particles::{Effect, Particle, SysParticles};
 #[cfg(feature = "debug_markers")]
 use physics::{Arrow, Marker};
-use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
+use physics::{Blocky, Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
@@ -86,6 +87,7 @@ impl Game {
         let mut world = World::new();
         world.register::<Position>();
         world.register::<Velocity>();
+        world.register::<Blocky>();
         world.register::<Collision>();
         world.register::<Collided>();
         world.register::<LocalControl>();

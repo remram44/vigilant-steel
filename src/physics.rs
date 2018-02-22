@@ -1,6 +1,7 @@
 //! Common components and behaviors for entities.
 
 use Role;
+use blocks::Block;
 #[cfg(feature = "network")]
 use net;
 use sat;
@@ -52,6 +53,15 @@ pub struct Velocity {
 }
 
 impl Component for Velocity {
+    type Storage = VecStorage<Self>;
+}
+
+// Entity is made of blocks
+pub struct Blocky {
+    pub blocks: Vec<([f64; 2], Block)>,
+}
+
+impl Component for Blocky {
     type Storage = VecStorage<Self>;
 }
 
