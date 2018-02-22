@@ -793,7 +793,7 @@ impl<'a> System<'a> for SysNetClient {
                     lazy.insert(
                         entity,
                         Collision {
-                            bounding_box: [4.0, 4.0],
+                            bounding_box: [2.5, 3.0],
                             mass: 1.0,
                             inertia: 0.3,
                         },

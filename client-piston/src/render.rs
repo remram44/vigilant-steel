@@ -1,10 +1,9 @@
 //! Rendering code, using Piston.
 
-use game::asteroid::Asteroid;
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
 use game::physics::{Arrow, Collision, Marker};
-use game::physics::{LocalControl, Position};
+use game::physics::{Blocky, LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
@@ -94,8 +93,8 @@ pub fn render<G, C, E>(
     let pos = world.read::<Position>();
     let ship = world.read::<Ship>();
     let projectile = world.read::<Projectile>();
-    let asteroid = world.read::<Asteroid>();
     let particles = world.read::<Particle>();
+    let blocky = world.read::<Blocky>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], gl);
 
@@ -104,6 +103,7 @@ pub fn render<G, C, E>(
         .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
         .scale(viewport.scale, -viewport.scale);
 
+    // Draw ships
     for (pos, ship) in (&pos, &ship).join() {
         let ship_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         let mut color = [
@@ -121,28 +121,21 @@ pub fn render<G, C, E>(
         );
     }
 
-    for (pos, _) in (&pos, &asteroid).join() {
-        let asteroid_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        draw_line_loop(
-            [1.0, 1.0, 1.0, 1.0],
-            0.1,
-            &[
-                [-3.8, -2.6],
-                [0.0, -4.6],
-                [3.8, -2.6],
-                [3.8, 2.6],
-                [0.0, 4.6],
-                [-3.8, 2.6],
-                [-3.8, -2.6],
-                [3.8, -2.6],
-                [-3.8, 2.6],
-                [3.8, 2.6],
-            ],
-            asteroid_tr,
-            gl,
-        );
+    // Draw blocks
+    for (pos, blocky) in (&pos, &blocky).join() {
+        let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        for block in &blocky.blocks {
+            draw_line_loop(
+                [0.0, 0.0, 0.5, 1.0],
+                0.1,
+                &[[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+                blocks_tr.trans(block.0[0], block.0[1]),
+                gl,
+            );
+        }
     }
 
+    // Draw projectiles
     for (pos, _) in (&pos, &projectile).join() {
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         graphics::line(
@@ -277,6 +270,7 @@ pub fn render<G, C, E>(
         }
     }
 
+    // Show health
     let local = world.read::<LocalControl>();
     let ship = world.read::<Ship>();
     if let Some((_, ship)) = (&local, &ship).join().next() {
