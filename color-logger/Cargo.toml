@@ -3,6 +3,8 @@ workspace = ".."
 name = "color-logger"
 version = "0.1.0"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
+license = "Unlicense/MIT"
+description = "Simple log output with colors"
 
 [dependencies]
 log = "0.3"
