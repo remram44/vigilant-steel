@@ -1,5 +1,6 @@
 //! Rendering code, using Piston.
 
+use game::blocks::BlockInner;
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
 use game::physics::{Arrow, Collision, Marker};
@@ -79,6 +80,16 @@ fn draw_line_loop<G>(
     );
 }
 
+fn block_color(block: &BlockInner) -> [f32; 4] {
+    match *block {
+        BlockInner::Cockpit => [1.0, 0.0, 0.0, 1.0],
+        BlockInner::Thruster(_) => [1.0, 1.0, 1.0, 1.0],
+        BlockInner::Gun(_, _) => [0.7, 0.7, 1.0, 1.0],
+        BlockInner::Armor => [0.7, 0.7, 0.7, 1.0],
+        BlockInner::Rock => [0.4, 0.4, 0.4, 1.0],
+    }
+}
+
 pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
@@ -91,7 +102,6 @@ pub fn render<G, C, E>(
 {
     let viewport = world.read_resource::<Viewport>();
     let pos = world.read::<Position>();
-    let ship = world.read::<Ship>();
     let projectile = world.read::<Projectile>();
     let particles = world.read::<Particle>();
     let blocky = world.read::<Blocky>();
@@ -103,33 +113,15 @@ pub fn render<G, C, E>(
         .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
         .scale(viewport.scale, -viewport.scale);
 
-    // Draw ships
-    for (pos, ship) in (&pos, &ship).join() {
-        let ship_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        let mut color = [
-            ship.color[0] as f32 / 256.0,
-            ship.color[1] as f32 / 256.0,
-            ship.color[2] as f32 / 256.0,
-            1.0,
-        ];
-        draw_line_loop(
-            color,
-            0.1,
-            &[[-1.0, -0.8], [1.0, 0.0], [-1.0, 0.8]],
-            ship_tr,
-            gl,
-        );
-    }
-
     // Draw blocks
     for (pos, blocky) in (&pos, &blocky).join() {
         let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        for block in &blocky.blocks {
+        for &(rel, ref block) in &blocky.blocks {
             draw_line_loop(
-                [0.0, 0.0, 0.5, 1.0],
+                block_color(&block.inner),
                 0.1,
                 &[[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
-                blocks_tr.trans(block.0[0], block.0[1]),
+                blocks_tr.trans(rel[0], rel[1]),
                 gl,
             );
         }

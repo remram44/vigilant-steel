@@ -1,12 +1,13 @@
 //! Ships and projectiles.
 
 use Role;
+use blocks::{Block, BlockInner};
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, Collided, Collision, DeltaTime, LocalControl,
-              Position, Velocity};
+use physics::{delete_entity, Blocky, Collided, Collision, DeltaTime,
+              LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -56,12 +57,22 @@ impl Ship {
         lazy.insert(
             entity,
             Collision {
-                bounding_box: [1.0, 0.8],
+                bounding_box: [1.5, 1.1],
                 mass: 1.0,
                 inertia: 0.3,
             },
         );
         lazy.insert(entity, Ship::new([255, 0, 0]));
+        let blocks = vec![
+            ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.0))),
+            ([-1.0, 0.0], Block::new(BlockInner::Thruster(0.0))),
+            ([-1.0, 1.0], Block::new(BlockInner::Thruster(0.0))),
+            ([0.0, -1.0], Block::new(BlockInner::Armor)),
+            ([0.0, 1.0], Block::new(BlockInner::Armor)),
+            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
+            ([1.0, 0.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+        ];
+        lazy.insert(entity, Blocky { blocks: blocks });
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -251,7 +262,7 @@ impl<'a> System<'a> for SysShip {
                     Projectile::create(
                         &entities,
                         &lazy,
-                        vec2_add(pos.pos, vec2_scale(dir, 1.7)),
+                        vec2_add(pos.pos, vec2_scale(dir, 2.2)),
                         pos.rot,
                     );
                     // Recoil
