@@ -13,10 +13,10 @@ specs, Piston, SDL2, gl, and Conrod.
 * [X] Make a simple game
 * [X] Get this to work in the browser with Emscripten as well as on the desktop
 * [ ] Make it multiplayer
-  * [ ] Get network working (UDP)
+  * [X] Get network working (UDP)
   * [ ] Get network working in the browser (websockets); also needs a websockets server
   * WebRTC is also an option? (has unreliable transport and peer-to-peer)
-  * [ ] Make headless server builds
+  * [X] Make headless server builds
 * [ ] Make a cool game
 
-![dependencies](Cargo.png)
+![dependencies](client-piston/Cargo.png)
