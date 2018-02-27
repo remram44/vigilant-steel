@@ -289,16 +289,20 @@ impl<'a> System<'a> for SysCollision {
                             [-o_s, o_c],
                         ) {
                         // Collision!
-                        if let Some(col) = collided.get_mut(s_e) {
+                        let insert = if let Some(col) = collided.get_mut(s_e) {
                             col.entities.push(o_e);
-                            continue;
+                            false
+                        } else {
+                            true
+                        };
+                        if insert {
+                            collided.insert(
+                                s_e,
+                                Collided {
+                                    entities: vec![o_e],
+                                },
+                            );
                         }
-                        collided.insert(
-                            s_e,
-                            Collided {
-                                entities: vec![o_e],
-                            },
-                        );
                         #[cfg(feature = "network")]
                         lazy.insert(s_e, net::Dirty);
                     }
