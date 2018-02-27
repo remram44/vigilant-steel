@@ -88,6 +88,17 @@ impl Component for LocalControl {
 /// Delta resource, stores the simulation step.
 pub struct DeltaTime(pub f64);
 
+#[cfg(feature = "debug_markers")]
+pub struct Marker {
+    pub loc: [f64; 2],
+    pub frame: u32,
+}
+
+#[cfg(feature = "debug_markers")]
+impl Component for Marker {
+    type Storage = VecStorage<Self>;
+}
+
 /// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
@@ -278,6 +289,11 @@ impl<'a> System<'a> for SysCollision {
                                 entities: vec![o_e],
                             },
                         );
+                    }
+                    #[cfg(feature = "debug_markers")]
+                    {
+                        let me = entities.create();
+                        lazy.insert(me, Marker { loc: loc, frame: 0 });
                     }
                     #[cfg(feature = "network")]
                     lazy.insert(s_e, net::Dirty);
