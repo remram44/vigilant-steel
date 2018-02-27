@@ -177,6 +177,8 @@ impl<'a> System<'a> for SysShip {
                 vec2_scale(thrust, ship.thrust[1] * 0.05 * dt),
             );
 
+            // TODO: Spawn Exhaust particles
+
             // Apply friction
             vel.vel = vec2_add(
                 vel.vel,
