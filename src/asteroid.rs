@@ -3,6 +3,7 @@
 use Role;
 #[cfg(feature = "network")]
 use net;
+use particles::{Effect, EffectInner};
 use physics::{delete_entity, Collided, Collision, DeltaTime, Position,
               Velocity};
 use rand::{self, Rng};
@@ -60,6 +61,17 @@ impl<'a> System<'a> for SysAsteroid {
             if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
                 || pos[1] > 50.0
             {
+                let new_effect = entities.create();
+                lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                lazy.insert(
+                    new_effect,
+                    Effect {
+                        effect: EffectInner::Explosion(4.0),
+                        lifetime: -1.0,
+                    },
+                );
+                #[cfg(feature = "network")]
+                lazy.insert(new_effect, net::Dirty);
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
@@ -71,6 +83,20 @@ impl<'a> System<'a> for SysAsteroid {
                     if asteroid.get(col.entity).is_none() {
                         // Remove this entity
                         info!("Deleting hit asteroid");
+                        let new_effect = entities.create();
+                        lazy.insert(
+                            new_effect,
+                            Position { pos: pos, rot: 0.0 },
+                        );
+                        lazy.insert(
+                            new_effect,
+                            Effect {
+                                effect: EffectInner::Explosion(4.0),
+                                lifetime: -1.0,
+                            },
+                        );
+                        #[cfg(feature = "network")]
+                        lazy.insert(new_effect, net::Dirty);
                         delete_entity(*role, &entities, &lazy, entity);
                         break;
                     }

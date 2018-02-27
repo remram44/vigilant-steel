@@ -1,6 +1,7 @@
 //! Rendering code, using Piston.
 
 use game::asteroid::Asteroid;
+use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
 use game::physics::{Collision, Marker};
 use game::physics::{LocalControl, Position};
@@ -94,6 +95,7 @@ pub fn render<G, C, E>(
     let ship = world.read::<Ship>();
     let projectile = world.read::<Projectile>();
     let asteroid = world.read::<Asteroid>();
+    let particles = world.read::<Particle>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], gl);
 
@@ -150,6 +152,36 @@ pub fn render<G, C, E>(
             projectile_tr,
             gl,
         );
+    }
+
+    for (pos, particle) in (&pos, &particles).join() {
+        let part_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        match particle.which {
+            ParticleType::Spark => {
+                let alpha = (particle.lifetime as f32) / 0.2;
+                graphics::rectangle(
+                    [1.0, 1.0, 1.0, alpha],
+                    graphics::rectangle::centered([0.0, 0.0, 0.05, 0.05]),
+                    part_tr,
+                    gl,
+                );
+            }
+            ParticleType::Exhaust => graphics::rectangle(
+                [1.0, 1.0, 1.0, (particle.lifetime as f32).min(0.5)],
+                graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
+                part_tr,
+                gl,
+            ),
+            ParticleType::Explosion => {
+                let alpha = (particle.lifetime as f32 * 1.6).min(0.8);
+                graphics::rectangle(
+                    [1.0, particle.lifetime as f32 / 0.6, 0.0, alpha],
+                    graphics::rectangle::centered([0.0, 0.0, 1.2, 1.2]),
+                    part_tr,
+                    gl,
+                );
+            }
+        }
     }
 
     #[cfg(feature = "debug_markers")]
