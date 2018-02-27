@@ -27,6 +27,7 @@ use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
+use std::ops::Deref;
 
 /// This describes the role of the local machine in the game.
 ///
@@ -76,6 +77,40 @@ impl Role {
     }
 }
 
+pub struct Clock {
+    time_wrapping: f64,
+}
+
+impl Clock {
+    fn new() -> Clock {
+        Clock { time_wrapping: 0.0 }
+    }
+
+    fn advance_frame(&mut self, dt: f64) {
+        self.time_wrapping += dt;
+        if self.time_wrapping > 1024.0 {
+            self.time_wrapping -= 1024.0;
+        }
+    }
+
+    pub fn seconds_since(&self, past: &Clock) -> f64 {
+        let d = self.time_wrapping - past.time_wrapping;
+        if d < 0.0 {
+            d + 1024.0
+        } else {
+            d
+        }
+    }
+}
+
+impl Deref for Clock {
+    type Target = f64;
+
+    fn deref(&self) -> &f64 {
+        &self.time_wrapping
+    }
+}
+
 /// The game structure, containing globals not specific to frontend.
 pub struct Game {
     pub world: World,
@@ -110,6 +145,7 @@ impl Game {
         }
 
         world.add_resource(DeltaTime(0.0));
+        world.add_resource(Clock::new());
         world.add_resource(Input::new());
         world.add_resource(role);
 
@@ -172,6 +208,8 @@ impl Game {
         {
             let mut r_dt = self.world.write_resource::<DeltaTime>();
             *r_dt = DeltaTime(dt);
+            let mut r_clock = self.world.write_resource::<Clock>();
+            r_clock.advance_frame(dt);
         }
         self.dispatcher.dispatch(&self.world.res);
         self.world.maintain();
