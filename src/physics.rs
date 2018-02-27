@@ -61,6 +61,8 @@ impl Component for Velocity {
 /// Collided component will be added to them when it happens.
 pub struct Collision {
     pub bounding_box: [f64; 2],
+    pub mass: f64,
+    pub inertia: f64,
 }
 
 impl Component for Collision {

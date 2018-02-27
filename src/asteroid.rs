@@ -138,6 +138,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Collision {
                         bounding_box: [4.0, 4.0],
+                        mass: 1.0,
+                        inertia: 0.3,
                     },
                 );
                 lazy.insert(entity, Asteroid);

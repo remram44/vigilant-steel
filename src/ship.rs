@@ -57,6 +57,8 @@ impl Ship {
             entity,
             Collision {
                 bounding_box: [1.0, 0.8],
+                mass: 1.0,
+                inertia: 0.3,
             },
         );
         lazy.insert(entity, Ship::new([255, 0, 0]));
@@ -284,6 +286,8 @@ impl Projectile {
             entity,
             Collision {
                 bounding_box: [0.8, 0.1],
+                mass: 0.1,
+                inertia: 0.01,
             },
         );
         lazy.insert(entity, Projectile);
