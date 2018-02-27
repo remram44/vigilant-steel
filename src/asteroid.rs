@@ -66,9 +66,9 @@ impl<'a> System<'a> for SysAsteroid {
 
             // Get collision info
             if let Some(col) = collided.get(entity) {
-                for ent in &col.entities {
+                for col in &col.hits {
                     // If collision is not with an asteroid
-                    if asteroid.get(*ent).is_none() {
+                    if asteroid.get(col.entity).is_none() {
                         // Remove this entity
                         info!("Deleting hit asteroid");
                         delete_entity(*role, &entities, &lazy, entity);

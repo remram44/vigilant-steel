@@ -68,9 +68,17 @@ impl Component for Collision {
     type Storage = VecStorage<Self>;
 }
 
-/// Collision information: this flags an entity has having collided.
+/// A single collision, stored in the Collided component.
+pub struct Hit {
+    /// Entity we collided with.
+    pub entity: Entity,
+    /// Location of the hit, in this entity's coordinate system.
+    pub rel_location: [f64; 2],
+}
+
+/// Collision information: this flags an entity as having collided.
 pub struct Collided {
-    pub entities: Vec<Entity>,
+    pub hits: Vec<Hit>,
 }
 
 impl Component for Collided {
@@ -275,9 +283,15 @@ impl<'a> System<'a> for SysCollision {
                     &o_pos,
                     &o_col.bounding_box,
                 ) {
-                    // Collision!
+                    let (s, c) = s_pos.rot.sin_cos();
+                    let x = loc[0] - s_pos.pos[0];
+                    let y = loc[1] - s_pos.pos[1];
+                    let rel_loc = [x * c + y * s, -x * s + y * c];
                     let insert = if let Some(col) = collided.get_mut(s_e) {
-                        col.entities.push(o_e);
+                        col.hits.push(Hit {
+                            entity: o_e,
+                            rel_location: rel_loc,
+                        });
                         false
                     } else {
                         true
@@ -286,7 +300,12 @@ impl<'a> System<'a> for SysCollision {
                         collided.insert(
                             s_e,
                             Collided {
-                                entities: vec![o_e],
+                                hits: vec![
+                                    Hit {
+                                        entity: o_e,
+                                        rel_location: rel_loc,
+                                    },
+                                ],
                             },
                         );
                     }

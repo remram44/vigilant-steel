@@ -113,12 +113,10 @@ impl<'a> System<'a> for SysShip {
             for (ent, col, mut ship) in
                 (&*entities, &collided, &mut ship).join()
             {
-                if !col.entities.is_empty() {
-                    ship.health -= col.entities.len() as i32;
-                    warn!("Ship collided! Health now {}", ship.health);
-                    #[cfg(feature = "network")]
-                    lazy.insert(ent, net::Dirty);
-                }
+                ship.health -= col.hits.len() as i32;
+                warn!("Ship collided! Health now {}", ship.health);
+                #[cfg(feature = "network")]
+                lazy.insert(ent, net::Dirty);
             }
 
             // Prevent leaving the screen
