@@ -4,6 +4,7 @@ use Role;
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
+use particles::{ParticleEffects, ParticleType};
 use physics::{delete_entity, Collided, Collision, DeltaTime, LocalControl,
               Position, Velocity};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
@@ -83,6 +84,7 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
+        Fetch<'a, ParticleEffects>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -98,6 +100,7 @@ impl<'a> System<'a> for SysShip {
             role,
             lazy,
             input,
+            effects,
             entities,
             pos,
             mut vel,
@@ -162,6 +165,7 @@ impl<'a> System<'a> for SysShip {
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
+                effects.delay(ParticleType::Explosion, pos.pos);
                 delete_entity(*role, &entities, &lazy, ent);
                 continue;
             }

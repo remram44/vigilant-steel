@@ -4,6 +4,7 @@ use rand::{self, Rng};
 use specs::{Component, Entities, Fetch, FetchMut, Join, LazyUpdate, System,
             VecStorage, WriteStorage};
 use std::cell::RefCell;
+use std::f64::consts::PI;
 use std::sync::{Arc, Mutex};
 
 /// Types of particles, that determine lifetime and render model.
@@ -21,7 +22,7 @@ impl ParticleType {
     /// How long the particle lives for, in seconds.
     fn lifetime(&self) -> f64 {
         match *self {
-            ParticleType::Spark => 0.4,
+            ParticleType::Spark => 0.2,
             ParticleType::Exhaust => 1.0,
             ParticleType::Explosion => 0.6,
         }
@@ -53,7 +54,7 @@ impl ParticleEffects {
         }
     }
 
-    pub fn delay(&mut self, which: ParticleType, pos: [f64; 2]) {
+    pub fn delay(&self, which: ParticleType, pos: [f64; 2]) {
         self.pending_effects
             .lock()
             .unwrap()
@@ -94,39 +95,58 @@ impl<'a> System<'a> for SysParticles {
 
         let dt = dt.0;
 
-        let create = |which: ParticleType, pos, vel| {
+        let mut rng = rand::thread_rng();
+        let mut c_rng = rng.clone();
+        let mut create = |which: ParticleType, pos, vel| {
             let ent = entities.create();
-            lazy.insert(ent, Position { pos: pos, rot: 0.0 });
-            lazy.insert(ent, Velocity { vel: vel, rot: 0.0 });
+            lazy.insert(ent, pos);
+            lazy.insert(ent, vel);
             lazy.insert(
                 ent,
                 Particle {
-                    lifetime: which.lifetime(),
+                    lifetime: which.lifetime() * c_rng.gen_range(0.8, 1.5),
                     which: which,
                 },
             );
         };
-        let mut rng = rand::thread_rng();
         for (which, pos) in effects.drain(..) {
             match which {
-                ParticleType::Spark => for _ in 0..4 {
+                ParticleType::Spark => for _ in 0..2 {
                     create(
                         which,
-                        [
-                            pos[0] + 0.6 * rng.gen_range(-0.3, 0.3),
-                            pos[1] + 0.6 * rng.gen_range(-0.3, 0.3),
-                        ],
-                        [rng.gen_range(-0.2, 0.2), rng.gen_range(-0.2, 0.2)],
+                        Position {
+                            pos: [
+                                pos[0] + 0.6 * rng.gen_range(-0.2, 0.2),
+                                pos[1] + 0.6 * rng.gen_range(-0.2, 0.2),
+                            ],
+                            rot: 0.0,
+                        },
+                        Velocity {
+                            vel: [
+                                rng.gen_range(-0.05, 0.05),
+                                rng.gen_range(-0.05, 0.05),
+                            ],
+                            rot: 0.0,
+                        },
                     );
                 },
-                ParticleType::Explosion => for _ in 0..4 {
+                ParticleType::Explosion => for _ in 0..10 {
                     create(
                         which,
-                        [
-                            pos[0] + 0.6 * rng.gen_range(-0.3, 0.3),
-                            pos[1] + 0.6 * rng.gen_range(-0.3, 0.3),
-                        ],
-                        [rng.gen_range(-0.2, 0.2), rng.gen_range(-0.2, 0.2)],
+                        Position {
+                            pos: [
+                                pos[0] + 0.6 * rng.gen_range(-4.0, 4.0),
+                                pos[1] + 0.6 * rng.gen_range(-4.0, 4.0),
+                            ],
+                            rot: rng.gen_range(0.0, 2.0 * PI),
+                        },
+                        Velocity {
+                            vel: [
+                                rng.gen_range(-0.02, 0.02),
+                                rng.gen_range(-0.02, 0.02),
+                            ],
+                            rot: rng.gen_range(-5.0, 5.0),
+                        },
                     );
                 },
                 _ => warn!("Unexpected pending particle effect {:?}", which),
