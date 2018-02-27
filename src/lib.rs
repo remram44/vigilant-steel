@@ -10,6 +10,7 @@ pub mod input;
 #[cfg(feature = "network")]
 pub mod net;
 pub mod physics;
+mod sat;
 pub mod ship;
 pub mod utils;
 
