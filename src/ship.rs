@@ -4,9 +4,10 @@ use Role;
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
-use particles::{ParticleEffects, ParticleType};
+use particles::{Effect, EffectInner, Particle, ParticleType};
 use physics::{delete_entity, Collided, Collision, DeltaTime, LocalControl,
               Position, Velocity};
+use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
@@ -84,7 +85,6 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
-        Fetch<'a, ParticleEffects>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -100,7 +100,6 @@ impl<'a> System<'a> for SysShip {
             role,
             lazy,
             input,
-            effects,
             entities,
             pos,
             mut vel,
@@ -165,7 +164,23 @@ impl<'a> System<'a> for SysShip {
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
-                effects.delay(ParticleType::Explosion, pos.pos);
+                let new_effect = entities.create();
+                lazy.insert(
+                    new_effect,
+                    Position {
+                        pos: pos.pos,
+                        rot: 0.0,
+                    },
+                );
+                lazy.insert(
+                    new_effect,
+                    Effect {
+                        effect: EffectInner::Explosion(2.0),
+                        lifetime: -1.0,
+                    },
+                );
+                #[cfg(feature = "network")]
+                lazy.insert(new_effect, net::Dirty);
                 delete_entity(*role, &entities, &lazy, ent);
                 continue;
             }
@@ -181,7 +196,39 @@ impl<'a> System<'a> for SysShip {
                 vec2_scale(thrust, ship.thrust[1] * 0.05 * dt),
             );
 
-            // TODO: Spawn Exhaust particles
+            // Spawn Exhaust particles
+            if role.graphical() {
+                if ship.thrust[1] > 0.3 {
+                    let mut rng = rand::thread_rng();
+                    let thrust_pos = vec2_add(pos.pos, [-c, -s]);
+                    let thrust_vel = vec2_scale([-c, -s], 0.05);
+                    let p = entities.create();
+                    lazy.insert(
+                        p,
+                        Position {
+                            pos: thrust_pos,
+                            rot: 0.0,
+                        },
+                    );
+                    lazy.insert(
+                        p,
+                        Velocity {
+                            vel: [
+                                thrust_vel[0] + rng.gen_range(-0.03, 0.03),
+                                thrust_vel[1] + rng.gen_range(-0.03, 0.03),
+                            ],
+                            rot: rng.gen_range(-5.0, 5.0),
+                        },
+                    );
+                    lazy.insert(
+                        p,
+                        Particle {
+                            lifetime: 1.0,
+                            which: ParticleType::Exhaust,
+                        },
+                    );
+                }
+            }
 
             // Apply friction
             vel.vel = vec2_add(

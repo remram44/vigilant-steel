@@ -17,7 +17,7 @@ pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
-use particles::{Particle, ParticleEffects, SysParticles};
+use particles::{Effect, Particle, SysParticles};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 #[cfg(feature = "debug_markers")]
@@ -93,6 +93,7 @@ impl Game {
         world.register::<Projectile>();
         world.register::<Asteroid>();
         world.register::<Particle>();
+        world.register::<Effect>();
         #[cfg(feature = "network")]
         {
             world.register::<net::Replicated>();
@@ -106,7 +107,6 @@ impl Game {
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());
         world.add_resource(role);
-        world.add_resource(ParticleEffects::new());
 
         let mut dispatcher =
             DispatcherBuilder::new().add(SysSimu, "simu", &[]);

@@ -3,7 +3,7 @@
 use Role;
 #[cfg(feature = "network")]
 use net;
-use particles::{ParticleEffects, ParticleType};
+use particles::{Effect, EffectInner};
 use physics::{delete_entity, Collided, Collision, DeltaTime, Position,
               Velocity};
 use rand::{self, Rng};
@@ -38,7 +38,6 @@ impl<'a> System<'a> for SysAsteroid {
         Fetch<'a, DeltaTime>,
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
-        Fetch<'a, ParticleEffects>,
         Entities<'a>,
         ReadStorage<'a, Collided>,
         ReadStorage<'a, Position>,
@@ -47,17 +46,8 @@ impl<'a> System<'a> for SysAsteroid {
 
     fn run(
         &mut self,
-        (
-            dt,
-            role,
-            lazy,
-            effects,
-            entities,
-            collided,
-            pos,
-            asteroid,
-        ): Self::SystemData,
-){
+        (dt, role, lazy, entities, collided, pos, asteroid): Self::SystemData,
+    ) {
         assert!(role.authoritative());
 
         let dt = dt.0;
@@ -71,7 +61,17 @@ impl<'a> System<'a> for SysAsteroid {
             if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
                 || pos[1] > 50.0
             {
-                effects.delay(ParticleType::Explosion, pos);
+                let new_effect = entities.create();
+                lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                lazy.insert(
+                    new_effect,
+                    Effect {
+                        effect: EffectInner::Explosion(4.0),
+                        lifetime: -1.0,
+                    },
+                );
+                #[cfg(feature = "network")]
+                lazy.insert(new_effect, net::Dirty);
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
@@ -83,7 +83,20 @@ impl<'a> System<'a> for SysAsteroid {
                     if asteroid.get(col.entity).is_none() {
                         // Remove this entity
                         info!("Deleting hit asteroid");
-                        effects.delay(ParticleType::Explosion, pos);
+                        let new_effect = entities.create();
+                        lazy.insert(
+                            new_effect,
+                            Position { pos: pos, rot: 0.0 },
+                        );
+                        lazy.insert(
+                            new_effect,
+                            Effect {
+                                effect: EffectInner::Explosion(4.0),
+                                lifetime: -1.0,
+                            },
+                        );
+                        #[cfg(feature = "network")]
+                        lazy.insert(new_effect, net::Dirty);
                         delete_entity(*role, &entities, &lazy, entity);
                         break;
                     }

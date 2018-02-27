@@ -1,11 +1,9 @@
 use Role;
 use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Fetch, FetchMut, Join, LazyUpdate, System,
-            VecStorage, WriteStorage};
-use std::cell::RefCell;
+use specs::{Component, Entities, Fetch, Join, LazyUpdate, ReadStorage,
+            System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
-use std::sync::{Arc, Mutex};
 
 /// Types of particles, that determine lifetime and render model.
 #[derive(Clone, Copy, Debug)]
@@ -16,17 +14,6 @@ pub enum ParticleType {
     Exhaust,
     /// Destroyed parts blow up.
     Explosion,
-}
-
-impl ParticleType {
-    /// How long the particle lives for, in seconds.
-    fn lifetime(&self) -> f64 {
-        match *self {
-            ParticleType::Spark => 0.2,
-            ParticleType::Exhaust => 1.0,
-            ParticleType::Explosion => 0.6,
-        }
-    }
 }
 
 /// This entity is a particle.
@@ -42,33 +29,27 @@ impl Component for Particle {
     type Storage = VecStorage<Self>;
 }
 
-pub struct ParticleEffects {
-    // FIXME: More efficient collection
-    pending_effects: Arc<Mutex<RefCell<Vec<(ParticleType, [f64; 2])>>>>,
+/// Particle effect.
+///
+/// A particle effect emit particles, possibly over time. If the entity is also
+/// tagged with net::Dirty, it will be replicated to clients.
+/// Some systems spawn particles directly, such as thrusters, and no
+/// replication of the effect is needed (the ship is replicated).
+#[derive(Debug, Clone)]
+pub enum EffectInner {
+    Explosion(f64),
 }
 
-impl ParticleEffects {
-    pub fn new() -> ParticleEffects {
-        ParticleEffects {
-            pending_effects: Arc::new(Mutex::new(RefCell::new(Vec::new()))),
-        }
-    }
-
-    pub fn delay(&self, which: ParticleType, pos: [f64; 2]) {
-        self.pending_effects
-            .lock()
-            .unwrap()
-            .get_mut()
-            .push((which, pos));
-    }
-
-    pub fn pending(&self) -> Vec<(ParticleType, [f64; 2])> {
-        let guard = self.pending_effects.lock().unwrap();
-        let v: &Vec<_> = &guard.borrow();
-        v.clone()
-    }
+pub struct Effect {
+    pub effect: EffectInner,
+    pub lifetime: f64,
 }
 
+impl Component for Effect {
+    type Storage = VecStorage<Self>;
+}
+
+/// System that spawns particles (from effects) and deletes old particles.
 pub struct SysParticles;
 
 impl<'a> System<'a> for SysParticles {
@@ -76,83 +57,81 @@ impl<'a> System<'a> for SysParticles {
         Fetch<'a, DeltaTime>,
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
-        FetchMut<'a, ParticleEffects>,
         Entities<'a>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Effect>,
         WriteStorage<'a, Particle>,
     );
 
     fn run(
         &mut self,
-        (dt, role, lazy, effects, entities, mut particles): Self::SystemData,
-    ) {
-        let mut guard = effects.pending_effects.lock().unwrap();
-        let effects: &mut Vec<_> = guard.get_mut();
-
+        (
+            dt,
+            role,
+            lazy,
+            entities,
+            position,
+            mut effects,
+            mut particles,
+        ): Self::SystemData,
+){
         if !role.graphical() {
+            // If not graphical, we only send the effects to the clients once
             effects.clear();
             return;
         }
 
         let dt = dt.0;
 
+        // Spawn particles from effects
         let mut rng = rand::thread_rng();
-        let mut c_rng = rng.clone();
-        let mut create = |which: ParticleType, pos, vel| {
-            let ent = entities.create();
-            lazy.insert(ent, pos);
-            lazy.insert(ent, vel);
-            lazy.insert(
-                ent,
-                Particle {
-                    lifetime: which.lifetime() * c_rng.gen_range(0.8, 1.5),
-                    which: which,
-                },
-            );
-        };
-        for (which, pos) in effects.drain(..) {
-            match which {
-                ParticleType::Spark => for _ in 0..2 {
-                    create(
-                        which,
-                        Position {
-                            pos: [
-                                pos[0] + 0.6 * rng.gen_range(-0.2, 0.2),
-                                pos[1] + 0.6 * rng.gen_range(-0.2, 0.2),
-                            ],
-                            rot: 0.0,
-                        },
-                        Velocity {
-                            vel: [
-                                rng.gen_range(-0.05, 0.05),
-                                rng.gen_range(-0.05, 0.05),
-                            ],
-                            rot: 0.0,
-                        },
-                    );
-                },
-                ParticleType::Explosion => for _ in 0..10 {
-                    create(
-                        which,
-                        Position {
-                            pos: [
-                                pos[0] + 0.6 * rng.gen_range(-4.0, 4.0),
-                                pos[1] + 0.6 * rng.gen_range(-4.0, 4.0),
-                            ],
-                            rot: rng.gen_range(0.0, 2.0 * PI),
-                        },
-                        Velocity {
-                            vel: [
-                                rng.gen_range(-0.02, 0.02),
-                                rng.gen_range(-0.02, 0.02),
-                            ],
-                            rot: rng.gen_range(-5.0, 5.0),
-                        },
-                    );
-                },
-                _ => warn!("Unexpected pending particle effect {:?}", which),
+        for (ent, effect, pos) in (&*entities, &mut effects, &position).join()
+        {
+            match effect.effect {
+                EffectInner::Explosion(size) => {
+                    let lifetime = 0.4 * size.sqrt();
+                    for _ in 0..8 + (size * size) as usize {
+                        let ent = entities.create();
+                        lazy.insert(
+                            ent,
+                            Position {
+                                pos: [
+                                    pos.pos[0]
+                                        + 0.6 * rng.gen_range(-size, size),
+                                    pos.pos[1]
+                                        + 0.6 * rng.gen_range(-size, size),
+                                ],
+                                rot: rng.gen_range(0.0, 2.0 * PI),
+                            },
+                        );
+                        lazy.insert(
+                            ent,
+                            Velocity {
+                                vel: [
+                                    rng.gen_range(-0.005 * size, 0.005 * size),
+                                    rng.gen_range(-0.005 * size, 0.005 * size),
+                                ],
+                                rot: rng.gen_range(-5.0, 5.0),
+                            },
+                        );
+                        particles.insert(
+                            ent,
+                            Particle {
+                                lifetime: lifetime * rng.gen_range(0.7, 1.4),
+                                which: ParticleType::Explosion,
+                            },
+                        );
+                    }
+                }
+            }
+
+            effect.lifetime -= dt;
+            if effect.lifetime <= 0.0 {
+                entities.delete(ent).unwrap();
             }
         }
 
+        // Update particles' lifetime and delete dead ones
         for (ent, mut particle) in (&*entities, &mut particles).join() {
             particle.lifetime -= dt;
             if particle.lifetime < 0.0 {

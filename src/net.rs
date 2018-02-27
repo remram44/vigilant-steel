@@ -2,7 +2,7 @@
 
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
-use particles::ParticleEffects;
+use particles::Effect;
 use physics::{Collision, LocalControl, Position, Velocity};
 use ship::{Projectile, Ship};
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
@@ -286,7 +286,6 @@ impl SysNetServer {
 impl<'a> System<'a> for SysNetServer {
     type SystemData = (
         Fetch<'a, LazyUpdate>,
-        Fetch<'a, ParticleEffects>,
         Entities<'a>,
         ReadStorage<'a, ClientControlled>,
         WriteStorage<'a, Replicated>,
@@ -297,13 +296,13 @@ impl<'a> System<'a> for SysNetServer {
         WriteStorage<'a, Ship>,
         ReadStorage<'a, Asteroid>,
         ReadStorage<'a, Projectile>,
+        ReadStorage<'a, Effect>,
     );
 
     fn run(
         &mut self,
         (
             lazy,
-            effects,
             entities,
             ctrl,
             mut replicated,
@@ -314,6 +313,7 @@ impl<'a> System<'a> for SysNetServer {
             mut ship,
             asteroid,
             projectile,
+            effects,
         ): Self::SystemData,
     ) {
         self.frame = self.frame.wrapping_add(1);
@@ -501,7 +501,7 @@ impl<'a> System<'a> for SysNetServer {
         }
 
         // Send particle effects
-        for effect in effects.pending() {
+        for (effect, _) in (&effects, &dirty).join() {
             // TODO: Send particle effects
         }
 
