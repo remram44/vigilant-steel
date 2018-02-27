@@ -1,6 +1,8 @@
 //! Rendering code, using Piston.
 
 use game::asteroid::Asteroid;
+#[cfg(feature = "debug_markers")]
+use game::physics::{Collision, Marker};
 use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Graphics, Transformed};
@@ -148,6 +150,51 @@ pub fn render<G, C, E>(
             projectile_tr,
             gl,
         );
+    }
+
+    #[cfg(feature = "debug_markers")]
+    {
+        use specs::LazyUpdate;
+
+        let mut markers = world.write::<Marker>();
+        for (ent, mut marker) in (&*world.entities(), &mut markers).join() {
+            graphics::line(
+                [1.0, 0.0, 0.0, (20 - marker.frame) as f32 / 20.0],
+                0.1,
+                [0.0, -2.0, 0.0, 2.0],
+                tr.trans(marker.loc[0], marker.loc[1]),
+                gl,
+            );
+            graphics::line(
+                [1.0, 0.0, 0.0, (20 - marker.frame) as f32 / 20.0],
+                0.1,
+                [-2.0, 0.0, 2.0, 0.0],
+                tr.trans(marker.loc[0], marker.loc[1]),
+                gl,
+            );
+            marker.frame += 1;
+            if marker.frame >= 20 {
+                let lazy = world.read_resource::<LazyUpdate>();
+                lazy.remove::<Marker>(ent);
+            }
+        }
+
+        let collision = world.read::<Collision>();
+        for (pos, col) in (&pos, &collision).join() {
+            let rect_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+            draw_line_loop(
+                [0.0, 1.0, 0.0, 1.0],
+                0.1,
+                &[
+                    [-col.bounding_box[0], -col.bounding_box[1]],
+                    [col.bounding_box[0], -col.bounding_box[1]],
+                    [col.bounding_box[0], col.bounding_box[1]],
+                    [-col.bounding_box[0], col.bounding_box[1]],
+                ],
+                rect_tr,
+                gl,
+            );
+        }
     }
 
     let local = world.read::<LocalControl>();

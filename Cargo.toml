@@ -19,4 +19,5 @@ specs = "0.10"
 vecmath = "0.3"
 
 [features]
+debug_markers = []
 network = []

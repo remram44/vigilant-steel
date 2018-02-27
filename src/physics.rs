@@ -6,6 +6,7 @@ use net;
 use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
+use std::cmp::Ordering;
 use std::f64::consts::PI;
 use utils::IteratorExt;
 use vecmath::*;
@@ -87,6 +88,17 @@ impl Component for LocalControl {
 /// Delta resource, stores the simulation step.
 pub struct DeltaTime(pub f64);
 
+#[cfg(feature = "debug_markers")]
+pub struct Marker {
+    pub loc: [f64; 2],
+    pub frame: u32,
+}
+
+#[cfg(feature = "debug_markers")]
+impl Component for Marker {
+    type Storage = VecStorage<Self>;
+}
+
 /// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
@@ -110,135 +122,128 @@ impl<'a> System<'a> for SysSimu {
 /// Collision detection and response.
 pub struct SysCollision;
 
-/// Checks for collisions between non-axis-oriented rectangles.
+#[derive(Clone, PartialEq)]
+struct Projection {
+    proj: f64,
+    orig: [f64; 2],
+}
+
+impl PartialOrd for Projection {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.proj.partial_cmp(&other.proj)
+    }
+}
+
+/// Checks if two shapes collide when projected on a specific axis.
 ///
-/// Uses SAT to check if two rectangles collide.
-// TODO: replace with better method
-fn check_sat_collision(
-    s_pos: &Position,
-    s_col: &Collision,
-    o_pos: &Position,
-    o_col: &Collision,
+/// This is part of the SAT collision detection method.
+fn check_sat_collision_dir(
+    pos1: &Position,
+    size1: &[f64; 2],
+    pos2: &Position,
+    size2: &[f64; 2],
     dir: [f64; 2],
-) -> bool {
+) -> Option<(f64, [f64; 2])> {
     // This is called for each normal of each rectangle
     // It checks whether there is collision of the shape projected along it
-    let sides = &[(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)];
-    // Project S rectangle
-    let (s, c) = s_pos.rot.sin_cos();
-    let s_proj = sides
+
+    let corners = &[(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)];
+    // Project rectangle 1
+    let (s, c) = pos1.rot.sin_cos();
+    let proj1 = corners
         .iter()
-        .map(|&(xs, ys)| {
+        .map(|&(x, y)| {
             // Compute corner coordinates
             let corner = vec2_add(
-                s_pos.pos,
+                pos1.pos,
                 [
-                    s_col.bounding_box[0] * xs * c
-                        + s_col.bounding_box[1] * ys * (-s),
-                    s_col.bounding_box[0] * xs * s
-                        + s_col.bounding_box[1] * ys * c,
+                    size1[0] * x * c + size1[1] * y * (-s),
+                    size1[0] * x * s + size1[1] * y * c,
                 ],
             );
             // Dot product with dir vector gives the distance along that vector
-            vec2_dot(corner, dir) as f64
+            Projection {
+                proj: vec2_dot(corner, dir) as f64,
+                orig: corner,
+            }
         })
         .minmax()
         .unwrap();
-    // Project O rectangle
-    let (s, c) = o_pos.rot.sin_cos();
-    let o_proj = sides
+    // Project rectangle 2
+    let (s, c) = pos2.rot.sin_cos();
+    let proj2 = corners
         .iter()
-        .map(|&(xs, ys)| {
+        .map(|&(x, y)| {
             // Compute corner coordinates
             let corner = vec2_add(
-                o_pos.pos,
+                pos2.pos,
                 [
-                    o_col.bounding_box[0] * xs * c
-                        + o_col.bounding_box[1] * ys * (-s),
-                    o_col.bounding_box[0] * xs * s
-                        + o_col.bounding_box[1] * ys * c,
+                    size2[0] * x * c + size2[1] * y * (-s),
+                    size2[0] * x * s + size2[1] * y * c,
                 ],
             );
             // Dot product with dir vector gives the distance along that vector
-            vec2_dot(corner, dir) as f64
+            Projection {
+                proj: vec2_dot(corner, dir) as f64,
+                orig: corner,
+            }
         })
         .minmax()
         .unwrap();
 
-    s_proj.0 < o_proj.1 && o_proj.0 < s_proj.1
-}
-
-/// Sliding square/fixed point collision
-///
-/// Finds the time of collision between a moving square and a fixed point.
-/// The square is assumed to be aligned, centered on (0, 0) and of size 1.
-#[allow(dead_code)]
-fn square_point_collision(
-    mut square_move: Vector2<f64>,
-    mut target: Vector2<f64>,
-) -> Option<f64> {
-    // Rotate so direction is positive
-    if square_move[0] < 0.0 {
-        if square_move[1] < 0.0 {
-            square_move = [-square_move[0], -square_move[1]];
-            target = [-target[0], -target[1]];
+    if proj1.0.proj < proj2.1.proj && proj2.0.proj < proj1.1.proj {
+        let dist1 = proj2.1.proj - proj1.0.proj;
+        let dist2 = proj1.1.proj - proj2.0.proj;
+        if dist1 < dist2 {
+            Some((dist1, proj2.1.orig))
         } else {
-            square_move = [square_move[1], -square_move[0]];
-            target = [target[1], -target[0]];
+            Some((dist2, proj2.0.orig))
         }
-    } else if square_move[1] < 0.0 {
-        square_move = [-square_move[1], square_move[0]];
-        target = [-target[1], target[0]];
-    }
-
-    // Find collision with top
-    let top =
-        segment_point_collision([-0.5, 0.5], [0.5, 0.5], square_move, target);
-    // Find collision with right
-    let right =
-        segment_point_collision([0.5, 0.5], [0.5, -0.5], square_move, target);
-    match (top, right) {
-        (Some(t), Some(r)) => Some(t.min(r)),
-        (None, r) => r,
-        (t, None) => t,
-    }
-}
-
-/// Sliding line segment/fixed point collision
-///
-/// Finds the time of collision between a moving line segment and a fixed
-/// point. Assumes that the segment has length 1.
-#[allow(dead_code)]
-fn segment_point_collision(
-    seg_a: Vector2<f64>,
-    seg_b: Vector2<f64>,
-    seg_move: Vector2<f64>,
-    target: Vector2<f64>,
-) -> Option<f64> {
-    let segdir = vec2_sub(seg_b, seg_a);
-    let perdir = [segdir[1], -segdir[0]];
-
-    // Distance to collision
-    let dist = vec2_dot(perdir, vec2_sub(target, seg_a));
-    // Speed of travel along perpendicular to segment/
-    let proj = vec2_dot(perdir, seg_move);
-    // Time of collision with line
-    let t = dist / proj;
-    if t < 0.0 {
-        return None;
-    }
-
-    // We know when we hit the line, now find out if we hit the segment
-    let line_pos = vec2_dot(
-        segdir,
-        vec2_sub(target, vec2_add(seg_a, vec2_scale(seg_move, t))),
-    );
-    if 0.0 <= line_pos && line_pos <= 1.0 {
-        // 1.0 == vec2_square_len(segdir)
-        Some(t)
     } else {
         None
     }
+}
+
+/// Checks if two shapes collide when projected on a specific axis.
+///
+/// Uses SAT to check if two rectangles collide.
+/// If a collision is detected, returns the penetration axis (as a unit vector)
+/// and depth.
+fn check_sat_collision(
+    pos1: &Position,
+    size1: &[f64; 2],
+    pos2: &Position,
+    size2: &[f64; 2],
+) -> Option<([f64; 2], f64, [f64; 2])> {
+    let (s, c) = pos1.rot.sin_cos();
+    let mut dir = [c, s];
+    let (mut depth, mut loc) =
+        check_sat_collision_dir(pos1, size1, pos2, size2, dir)?;
+
+    let d = [-s, c];
+    let r = check_sat_collision_dir(pos1, size1, pos2, size2, d)?;
+    if r.0 < depth {
+        dir = d;
+        depth = r.0;
+        loc = r.1;
+    }
+
+    let (s, c) = pos2.rot.sin_cos();
+    let d = [c, s];
+    let r = check_sat_collision_dir(pos2, size2, pos1, size1, d)?;
+    if r.0 < depth {
+        dir = d;
+        depth = r.0;
+        loc = r.1;
+    }
+    let d = [-s, c];
+    let r = check_sat_collision_dir(pos2, size2, pos1, size1, d)?;
+    if r.0 < depth {
+        dir = d;
+        depth = r.0;
+        loc = r.1;
+    }
+    Some((dir, depth, loc))
 }
 
 impl<'a> System<'a> for SysCollision {
@@ -264,48 +269,34 @@ impl<'a> System<'a> for SysCollision {
                     continue;
                 }
                 // Detect collisions using SAT
-                let (s_s, s_c) = s_pos.rot.sin_cos();
-                if check_sat_collision(s_pos, s_col, o_pos, o_col, [s_c, s_s])
-                    && check_sat_collision(
-                        s_pos,
-                        s_col,
-                        o_pos,
-                        o_col,
-                        [-s_s, s_c],
-                    ) {
-                    let (o_s, o_c) = o_pos.rot.sin_cos();
-                    if check_sat_collision(
-                        s_pos,
-                        s_col,
-                        o_pos,
-                        o_col,
-                        [o_c, o_s],
-                    )
-                        && check_sat_collision(
-                            s_pos,
-                            s_col,
-                            o_pos,
-                            o_col,
-                            [-o_s, o_c],
-                        ) {
-                        // Collision!
-                        let insert = if let Some(col) = collided.get_mut(s_e) {
-                            col.entities.push(o_e);
-                            false
-                        } else {
-                            true
-                        };
-                        if insert {
-                            collided.insert(
-                                s_e,
-                                Collided {
-                                    entities: vec![o_e],
-                                },
-                            );
-                        }
-                        #[cfg(feature = "network")]
-                        lazy.insert(s_e, net::Dirty);
+                if let Some((_dir, _depth, loc)) = check_sat_collision(
+                    &s_pos,
+                    &s_col.bounding_box,
+                    &o_pos,
+                    &o_col.bounding_box,
+                ) {
+                    // Collision!
+                    let insert = if let Some(col) = collided.get_mut(s_e) {
+                        col.entities.push(o_e);
+                        false
+                    } else {
+                        true
+                    };
+                    if insert {
+                        collided.insert(
+                            s_e,
+                            Collided {
+                                entities: vec![o_e],
+                            },
+                        );
                     }
+                    #[cfg(feature = "debug_markers")]
+                    {
+                        let me = entities.create();
+                        lazy.insert(me, Marker { loc: loc, frame: 0 });
+                    }
+                    #[cfg(feature = "network")]
+                    lazy.insert(s_e, net::Dirty);
                 }
             }
         }

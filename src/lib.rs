@@ -17,6 +17,8 @@ use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
+#[cfg(feature = "debug_markers")]
+use physics::Marker;
 use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 #[cfg(feature = "network")]
@@ -94,6 +96,8 @@ impl Game {
             world.register::<net::Delete>();
             world.register::<net::ClientControlled>();
         }
+        #[cfg(feature = "debug_markers")]
+        world.register::<Marker>();
 
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());
