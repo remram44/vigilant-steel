@@ -128,8 +128,8 @@ impl<'a> System<'a> for SysAsteroid {
                     entity,
                     Velocity {
                         vel: [
-                            rng.gen_range(-0.02, 0.02) - xpos * 0.05,
-                            rng.gen_range(-0.02, 0.02) - ypos * 0.05,
+                            rng.gen_range(-4.0, 4.0) - xpos * 10.0,
+                            rng.gen_range(-4.0, 4.0) - ypos * 10.0,
                         ],
                         rot: rng.gen_range(-2.0, 2.0),
                     },

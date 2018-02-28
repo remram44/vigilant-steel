@@ -119,7 +119,7 @@ impl<'a> System<'a> for SysSimu {
     fn run(&mut self, (dt, mut pos, vel): Self::SystemData) {
         let dt = dt.0;
         for (pos, vel) in (&mut pos, &vel).join() {
-            pos.pos = vec2_add(pos.pos, vec2_scale(vel.vel, 200.0 * dt));
+            pos.pos = vec2_add(pos.pos, vec2_scale(vel.vel, dt));
             pos.rot += vel.rot * dt;
             pos.rot %= 2.0 * PI;
         }
