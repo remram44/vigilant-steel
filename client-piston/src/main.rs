@@ -50,6 +50,7 @@ fn main() {
         WindowSettings::new("vigilant-engine", [width, height])
             .opengl(OPENGL)
             .srgb(false)
+            .resizable(true)
             .build()
             .expect("Couldn't create an OpenGL window");
     info!("Window created");

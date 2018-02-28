@@ -118,8 +118,7 @@ impl<'a> System<'a> for SysShip {
                 (&*entities, &collided, &mut ship).join()
             {
                 for hit in &col.hits {
-                    warn!("Ship collided, impulse: {}", hit.impulse);
-                    if hit.impulse > 2.5 {
+                    if hit.impulse > 2.0 {
                         ship.health -= 1;
                         warn!("Ship collided! Health now {}", ship.health);
                         #[cfg(feature = "network")]

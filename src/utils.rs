@@ -74,7 +74,7 @@ impl FpsCounter {
                 return false;
             }
         };
-        if dt.as_secs() >= 1 {
+        if dt.as_secs() >= 10 {
             let duration =
                 dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 0.000_000_001;
             self.value = self.frames_since_report as f64 / duration;
