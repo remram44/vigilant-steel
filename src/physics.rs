@@ -4,6 +4,7 @@ use Role;
 #[cfg(feature = "network")]
 use net;
 use sat;
+use ship::Ship;
 use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
@@ -151,6 +152,7 @@ impl<'a> System<'a> for SysCollision {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collision>,
         WriteStorage<'a, Collided>,
+        ReadStorage<'a, Ship>,
     );
 
     fn run(
@@ -163,15 +165,19 @@ impl<'a> System<'a> for SysCollision {
             mut vel,
             collision,
             mut collided,
+            ship,
         ): Self::SystemData,
-){
+    ) {
         assert!(role.authoritative());
 
         collided.clear();
         let mut hits = Vec::new();
         for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
             for (e2, pos2, col2) in (&*entities, &pos, &collision).join() {
-                if e1 >= e2 {
+                /*if e1 >= e2 {
+                    continue;
+                }*/
+                if e1 == e2 || ship.get(e1).is_none() {
                     continue;
                 }
                 // Detect collisions using SAT
@@ -310,7 +316,7 @@ fn handle_collision<'a>(
                     hit.location,
                     vec2_add(
                         hit.location,
-                        vec2_scale(hit.direction, impulse * 10.0),
+                        vec2_scale(hit.direction, impulse * 20.0),
                     ),
                 ],
                 frame: 0,
