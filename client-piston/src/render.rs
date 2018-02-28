@@ -186,8 +186,6 @@ pub fn render<G, C, E>(
 
     #[cfg(feature = "debug_markers")]
     {
-        use specs::LazyUpdate;
-
         let mut markers = world.write::<Marker>();
         for (ent, mut marker) in (&*world.entities(), &mut markers).join() {
             graphics::line(
@@ -206,8 +204,7 @@ pub fn render<G, C, E>(
             );
             marker.frame += 1;
             if marker.frame >= 20 {
-                let lazy = world.read_resource::<LazyUpdate>();
-                lazy.remove::<Marker>(ent);
+                world.entities().delete(ent).unwrap();
             }
         }
 
