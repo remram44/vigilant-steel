@@ -18,10 +18,10 @@ pub mod utils;
 use asteroid::{Asteroid, SysAsteroid};
 use input::{Input, Press};
 use particles::{Effect, Particle, SysParticles};
+#[cfg(feature = "debug_markers")]
+use physics::{Arrow, Marker};
 use physics::{Collided, Collision, DeltaTime, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
-#[cfg(feature = "debug_markers")]
-use physics::Marker;
 use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 #[cfg(feature = "network")]
@@ -102,7 +102,10 @@ impl Game {
             world.register::<net::ClientControlled>();
         }
         #[cfg(feature = "debug_markers")]
-        world.register::<Marker>();
+        {
+            world.register::<Marker>();
+            world.register::<Arrow>();
+        }
 
         world.add_resource(DeltaTime(0.0));
         world.add_resource(Input::new());

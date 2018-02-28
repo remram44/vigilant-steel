@@ -108,6 +108,17 @@ impl Component for Marker {
     type Storage = VecStorage<Self>;
 }
 
+#[cfg(feature = "debug_markers")]
+pub struct Arrow {
+    pub ends: [[f64; 2]; 2],
+    pub frame: u32,
+}
+
+#[cfg(feature = "debug_markers")]
+impl Component for Arrow {
+    type Storage = VecStorage<Self>;
+}
+
 /// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
@@ -188,6 +199,22 @@ impl<'a> System<'a> for SysCollision {
                     hits.push((e1, e2, hit));
                 }
             }
+        }
+
+        for (e1, e2, hit) in hits {
+            handle_collision(
+                e1,
+                pos.get(e1).unwrap(),
+                vel.get(e1).unwrap(),
+                collision.get(e1).unwrap(),
+                e2,
+                pos.get(e2).unwrap(),
+                vel.get(e2).unwrap(),
+                collision.get(e2).unwrap(),
+                &hit,
+                &lazy,
+                &entities,
+            );
         }
     }
 }
@@ -272,6 +299,24 @@ fn handle_collision<'a>(
     let impulse = (-(1.0 + ELASTICITY) * vec2_dot(vab1, n))
         / (1.0 / ma + 1.0 / mb + cross_dot2(rap, n) / ia
             + cross_dot2(rbp, n) / ib);
+
+    #[cfg(feature = "debug_markers")]
+    {
+        let me = entities.create();
+        lazy.insert(
+            me,
+            Arrow {
+                ends: [
+                    hit.location,
+                    vec2_add(
+                        hit.location,
+                        vec2_scale(hit.direction, impulse * 10.0),
+                    ),
+                ],
+                frame: 0,
+            },
+        );
+    }
 
     #[cfg(feature = "network")]
     lazy.insert(ent, net::Dirty);
