@@ -204,13 +204,10 @@ impl<'a> System<'a> for SysCollision {
         for (e1, e2, hit) in hits {
             handle_collision(
                 e1,
-                pos.get(e1).unwrap(),
-                vel.get(e1).unwrap(),
-                collision.get(e1).unwrap(),
                 e2,
-                pos.get(e2).unwrap(),
-                vel.get(e2).unwrap(),
-                collision.get(e2).unwrap(),
+                &mut pos,
+                &mut vel,
+                &collision,
                 &hit,
                 &lazy,
                 &entities,
@@ -272,33 +269,66 @@ fn cross_dot2(a: [f64; 2], b: [f64; 2]) -> f64 {
 
 fn handle_collision<'a>(
     ent: Entity,
-    pos: &Position,
-    vel: &Velocity,
-    col: &Collision,
     o_ent: Entity,
-    o_pos: &Position,
-    o_vel: &Velocity,
-    o_col: &Collision,
+    position: &mut WriteStorage<'a, Position>,
+    velocity: &mut WriteStorage<'a, Velocity>,
+    collision: &ReadStorage<'a, Collision>,
     hit: &sat::Collision,
     lazy: &Fetch<'a, LazyUpdate>,
     entities: &Entities<'a>,
 ) {
-    // Compute impulse
-    let rap = vec2_sub(hit.location, pos.pos);
-    let rbp = vec2_sub(hit.location, o_pos.pos);
-    let vab1 = vec2_sub(
-        vec2_add(vel.vel, cross(rap, -vel.rot)),
-        vec2_add(o_vel.vel, cross(rbp, -o_vel.rot)),
-    );
-    let n = hit.direction;
-    let ma = col.mass;
-    let mb = o_col.mass;
-    let ia = col.inertia;
-    let ib = o_col.inertia;
+    let col = collision.get(ent).unwrap();
+    let o_col = collision.get(o_ent).unwrap();
+    let (impulse, rap, rbp) = {
+        let pos = position.get(ent).unwrap();
+        let o_pos = position.get(o_ent).unwrap();
+        let vel = velocity.get(ent).unwrap();
+        let o_vel = velocity.get(o_ent).unwrap();
 
-    let impulse = (-(1.0 + ELASTICITY) * vec2_dot(vab1, n))
-        / (1.0 / ma + 1.0 / mb + cross_dot2(rap, n) / ia
-            + cross_dot2(rbp, n) / ib);
+        // Compute impulse
+        let rap = vec2_sub(hit.location, pos.pos);
+        let rbp = vec2_sub(hit.location, o_pos.pos);
+        let vab1 = vec2_sub(
+            vec2_add(vel.vel, cross(rap, -vel.rot)),
+            vec2_add(o_vel.vel, cross(rbp, -o_vel.rot)),
+        );
+        let n = hit.direction;
+        let ma = col.mass;
+        let mb = o_col.mass;
+        let ia = col.inertia;
+        let ib = o_col.inertia;
+
+        (
+            (-(1.0 + ELASTICITY) * vec2_dot(vab1, n))
+                / (1.0 / ma + 1.0 / mb + cross_dot2(rap, n) / ia
+                    + cross_dot2(rbp, n) / ib),
+            rap,
+            rbp,
+        )
+    };
+
+    {
+        let pos = position.get_mut(ent).unwrap();
+        pos.pos =
+            vec2_add(pos.pos, vec2_scale(hit.direction, hit.depth + 0.05));
+        let vel = velocity.get_mut(ent).unwrap();
+        vel.vel =
+            vec2_add(vel.vel, vec2_scale(hit.direction, impulse / col.mass));
+        vel.rot +=
+            impulse * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0]);
+    }
+    {
+        let pos = position.get_mut(o_ent).unwrap();
+        pos.pos =
+            vec2_add(pos.pos, vec2_scale(hit.direction, -(hit.depth + 0.05)));
+        let vel = velocity.get_mut(o_ent).unwrap();
+        vel.vel = vec2_add(
+            vel.vel,
+            vec2_scale(hit.direction, -impulse / o_col.mass),
+        );
+        vel.rot +=
+            -impulse * (rbp[0] * hit.direction[1] - rbp[1] * hit.direction[0]);
+    }
 
     #[cfg(feature = "debug_markers")]
     {
