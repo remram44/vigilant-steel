@@ -187,7 +187,13 @@ impl<'a> System<'a> for SysCollision {
                     #[cfg(feature = "debug_markers")]
                     {
                         let me = entities.create();
-                        lazy.insert(me, Marker { loc: loc, frame: 0 });
+                        lazy.insert(
+                            me,
+                            Marker {
+                                loc: hit.location,
+                                frame: 0,
+                            },
+                        );
                     }
                     #[cfg(feature = "network")]
                     lazy.insert(s_e, net::Dirty);
