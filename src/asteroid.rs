@@ -78,9 +78,8 @@ impl<'a> System<'a> for SysAsteroid {
 
             // Get collision info
             if let Some(col) = collided.get(entity) {
-                for col in &col.hits {
-                    // If collision is not with an asteroid
-                    if asteroid.get(col.entity).is_none() {
+                for hit in &col.hits {
+                    if hit.impulse > 2.5 {
                         // Remove this entity
                         info!("Deleting hit asteroid");
                         let new_effect = entities.create();

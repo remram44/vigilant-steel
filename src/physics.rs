@@ -75,6 +75,8 @@ pub struct Hit {
     pub entity: Entity,
     /// Location of the hit, in this entity's coordinate system.
     pub rel_location: [f64; 2],
+    /// Impulse differential.
+    pub impulse: f64,
 }
 
 /// Collision information: this flags an entity as having collided.
@@ -181,9 +183,6 @@ impl<'a> System<'a> for SysCollision {
                     &pos2,
                     &col2.bounding_box,
                 ) {
-                    mark_collision(e1, pos1, e2, &hit, &mut collided);
-                    mark_collision(e2, pos2, e1, &hit, &mut collided);
-
                     #[cfg(feature = "debug_markers")]
                     {
                         let me = entities.create();
@@ -208,49 +207,12 @@ impl<'a> System<'a> for SysCollision {
                 &mut pos,
                 &mut vel,
                 &collision,
+                &mut collided,
                 &hit,
                 &lazy,
                 &entities,
             );
         }
-    }
-}
-
-fn mark_collision<'a>(
-    ent: Entity,
-    pos: &Position,
-    o_ent: Entity,
-    hit: &sat::Collision,
-    collided: &mut WriteStorage<'a, Collided>,
-) {
-    // Compute location in object space
-    let (s, c) = pos.rot.sin_cos();
-    let x = hit.location[0] - pos.pos[0];
-    let y = hit.location[1] - pos.pos[1];
-    let rel_loc = [x * c + y * s, -x * s + y * c];
-
-    // Add hit in a Collided component
-    let insert = if let Some(col) = collided.get_mut(ent) {
-        col.hits.push(Hit {
-            entity: o_ent,
-            rel_location: rel_loc,
-        });
-        false
-    } else {
-        true
-    };
-    if insert {
-        collided.insert(
-            ent,
-            Collided {
-                hits: vec![
-                    Hit {
-                        entity: o_ent,
-                        rel_location: rel_loc,
-                    },
-                ],
-            },
-        );
     }
 }
 
@@ -273,6 +235,7 @@ fn handle_collision<'a>(
     position: &mut WriteStorage<'a, Position>,
     velocity: &mut WriteStorage<'a, Velocity>,
     collision: &ReadStorage<'a, Collision>,
+    collided: &mut WriteStorage<'a, Collided>,
     hit: &sat::Collision,
     lazy: &Fetch<'a, LazyUpdate>,
     entities: &Entities<'a>,
@@ -308,9 +271,46 @@ fn handle_collision<'a>(
     };
 
     {
+        // Compute location in object space
         let pos = position.get_mut(ent).unwrap();
-        pos.pos =
-            vec2_add(pos.pos, vec2_scale(hit.direction, hit.depth + 0.05));
+        let (s, c) = pos.rot.sin_cos();
+        let x = hit.location[0] - pos.pos[0];
+        let y = hit.location[1] - pos.pos[1];
+        let rel_loc = [x * c + y * s, -x * s + y * c];
+
+        // Add hit in a Collided component
+        let insert = if let Some(col) = collided.get_mut(ent) {
+            col.hits.push(Hit {
+                entity: o_ent,
+                rel_location: rel_loc,
+                impulse: impulse,
+            });
+            false
+        } else {
+            true
+        };
+        if insert {
+            collided.insert(
+                ent,
+                Collided {
+                    hits: vec![
+                        Hit {
+                            entity: o_ent,
+                            rel_location: rel_loc,
+                            impulse: impulse,
+                        },
+                    ],
+                },
+            );
+        }
+
+        // Move object out of collision
+        pos.pos = vec2_add(
+            pos.pos,
+            vec2_scale(hit.direction, hit.depth * 0.5 + 0.05),
+        );
+
+        // Update velocity
         let vel = velocity.get_mut(ent).unwrap();
         vel.vel =
             vec2_add(vel.vel, vec2_scale(hit.direction, impulse / col.mass));
@@ -318,9 +318,46 @@ fn handle_collision<'a>(
             impulse * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0]);
     }
     {
+        // Compute location in object space
         let pos = position.get_mut(o_ent).unwrap();
-        pos.pos =
-            vec2_add(pos.pos, vec2_scale(hit.direction, -(hit.depth + 0.05)));
+        let (s, c) = pos.rot.sin_cos();
+        let x = hit.location[0] - pos.pos[0];
+        let y = hit.location[1] - pos.pos[1];
+        let rel_loc = [x * c + y * s, -x * s + y * c];
+
+        // Add hit in a Collided component
+        let insert = if let Some(col) = collided.get_mut(o_ent) {
+            col.hits.push(Hit {
+                entity: o_ent,
+                rel_location: rel_loc,
+                impulse: impulse,
+            });
+            false
+        } else {
+            true
+        };
+        if insert {
+            collided.insert(
+                o_ent,
+                Collided {
+                    hits: vec![
+                        Hit {
+                            entity: o_ent,
+                            rel_location: rel_loc,
+                            impulse: impulse,
+                        },
+                    ],
+                },
+            );
+        }
+
+        // Move object out of collision
+        pos.pos = vec2_add(
+            pos.pos,
+            vec2_scale(hit.direction, -(hit.depth * 0.5 + 0.05)),
+        );
+
+        // Update velocity
         let vel = velocity.get_mut(o_ent).unwrap();
         vel.vel = vec2_add(
             vel.vel,
