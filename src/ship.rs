@@ -131,7 +131,8 @@ impl<'a> System<'a> for SysShip {
                 {
                     ship.health -= 1;
                     vel.vel = vec2_sub([0.0, 0.0], pos.pos);
-                    vel.vel = vec2_scale(vel.vel, 0.3 * vec2_inv_len(vel.vel));
+                    vel.vel =
+                        vec2_scale(vel.vel, 60.0 * vec2_inv_len(vel.vel));
                     #[cfg(feature = "network")]
                     lazy.insert(ent, net::Dirty);
                 }
@@ -193,7 +194,7 @@ impl<'a> System<'a> for SysShip {
             let thrust = [c, s];
             vel.vel = vec2_add(
                 vel.vel,
-                vec2_scale(thrust, ship.thrust[1] * 0.05 * dt),
+                vec2_scale(thrust, ship.thrust[1] * 10.0 * dt),
             );
 
             // Spawn Exhaust particles
@@ -201,7 +202,7 @@ impl<'a> System<'a> for SysShip {
                 if ship.thrust[1] > 0.3 {
                     let mut rng = rand::thread_rng();
                     let thrust_pos = vec2_add(pos.pos, [-c, -s]);
-                    let thrust_vel = vec2_scale([-c, -s], 0.05);
+                    let thrust_vel = vec2_scale([-c, -s], 10.0);
                     let p = entities.create();
                     lazy.insert(
                         p,
@@ -214,8 +215,8 @@ impl<'a> System<'a> for SysShip {
                         p,
                         Velocity {
                             vel: [
-                                thrust_vel[0] + rng.gen_range(-0.03, 0.03),
-                                thrust_vel[1] + rng.gen_range(-0.03, 0.03),
+                                thrust_vel[0] + rng.gen_range(-6.0, 6.0),
+                                thrust_vel[1] + rng.gen_range(-6.0, 6.0),
                             ],
                             rot: rng.gen_range(-5.0, 5.0),
                         },
@@ -233,7 +234,7 @@ impl<'a> System<'a> for SysShip {
             // Apply friction
             vel.vel = vec2_add(
                 vel.vel,
-                vec2_scale(vel.vel, -8.0 * dt * vec2_len(vel.vel)),
+                vec2_scale(vel.vel, -0.04 * dt * vec2_len(vel.vel)),
             );
 
             // Fire
@@ -275,7 +276,7 @@ impl Projectile {
         lazy.insert(
             entity,
             Velocity {
-                vel: [0.3 * c, 0.3 * s],
+                vel: [60.0 * c, 60.0 * s],
                 rot: 0.0,
             },
         );

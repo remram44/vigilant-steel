@@ -108,8 +108,8 @@ impl<'a> System<'a> for SysParticles {
                             ent,
                             Velocity {
                                 vel: [
-                                    rng.gen_range(-0.005 * size, 0.005 * size),
-                                    rng.gen_range(-0.005 * size, 0.005 * size),
+                                    rng.gen_range(-size, size),
+                                    rng.gen_range(-size, size),
                                 ],
                                 rot: rng.gen_range(-5.0, 5.0),
                             },
