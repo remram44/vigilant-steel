@@ -104,15 +104,33 @@ fn main() {
 }
 
 /// Handles a Piston event fed from the `event_loop` module.
-fn handle_event(
-    _window: &mut Sdl2Window,
-    event: Event,
-    app: &mut App,
-) -> bool {
-    // Window resize
-    if let Some(newsize) = event.resize_args() {
+fn handle_event(window: &mut Sdl2Window, event: Event, app: &mut App) -> bool {
+    {
         let mut viewport = app.game.world.write_resource::<Viewport>();
-        *viewport = Viewport::new(newsize);
+        #[cfg(target_os = "emscripten")]
+        unsafe {
+            extern crate emscripten_sys;
+            let mut width = 0;
+            let mut height = 0;
+            let mut fullscreen = 0;
+            emscripten_sys::emscripten_get_canvas_size(
+                &mut width,
+                &mut height,
+                &mut fullscreen,
+            );
+            let (width, height) = (width as u32, height as u32);
+            if viewport.width != width || viewport.height != height {
+                if let Err(e) = window.window.set_size(width, height) {
+                    error!("Couldn't set video mode: {}", e);
+                }
+                *viewport = Viewport::new([width, height]);
+            }
+        }
+
+        // Window resize
+        if let Some(newsize) = event.resize_args() {
+            *viewport = Viewport::new(newsize);
+        }
     }
 
     // Keyboard input
