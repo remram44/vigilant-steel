@@ -137,55 +137,42 @@ impl<'a> System<'a> for SysCollision {
         Fetch<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collision>,
         WriteStorage<'a, Collided>,
     );
 
     fn run(
         &mut self,
-        (role, lazy, entities, pos, collision, mut collided): Self::SystemData,
-    ) {
+        (
+            role,
+            lazy,
+            entities,
+            mut pos,
+            mut vel,
+            collision,
+            mut collided,
+        ): Self::SystemData,
+){
         assert!(role.authoritative());
 
         collided.clear();
-        for (s_e, s_pos, s_col) in (&*entities, &pos, &collision).join() {
-            for (o_e, o_pos, o_col) in (&*entities, &pos, &collision).join() {
-                if s_e == o_e {
+        let mut hits = Vec::new();
+        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
+            for (e2, pos2, col2) in (&*entities, &pos, &collision).join() {
+                if e1 >= e2 {
                     continue;
                 }
                 // Detect collisions using SAT
                 if let Some(hit) = sat::find(
-                    &s_pos,
-                    &s_col.bounding_box,
-                    &o_pos,
-                    &o_col.bounding_box,
+                    &pos1,
+                    &col1.bounding_box,
+                    &pos2,
+                    &col2.bounding_box,
                 ) {
-                    let (s, c) = s_pos.rot.sin_cos();
-                    let x = hit.location[0] - s_pos.pos[0];
-                    let y = hit.location[1] - s_pos.pos[1];
-                    let rel_loc = [x * c + y * s, -x * s + y * c];
-                    let insert = if let Some(col) = collided.get_mut(s_e) {
-                        col.hits.push(Hit {
-                            entity: o_e,
-                            rel_location: rel_loc,
-                        });
-                        false
-                    } else {
-                        true
-                    };
-                    if insert {
-                        collided.insert(
-                            s_e,
-                            Collided {
-                                hits: vec![
-                                    Hit {
-                                        entity: o_e,
-                                        rel_location: rel_loc,
-                                    },
-                                ],
-                            },
-                        );
-                    }
+                    mark_collision(e1, pos1, e2, &hit, &mut collided);
+                    mark_collision(e2, pos2, e1, &hit, &mut collided);
+
                     #[cfg(feature = "debug_markers")]
                     {
                         let me = entities.create();
@@ -197,10 +184,95 @@ impl<'a> System<'a> for SysCollision {
                             },
                         );
                     }
-                    #[cfg(feature = "network")]
-                    lazy.insert(s_e, net::Dirty);
+
+                    hits.push((e1, e2, hit));
                 }
             }
         }
     }
+}
+
+fn mark_collision<'a>(
+    ent: Entity,
+    pos: &Position,
+    o_ent: Entity,
+    hit: &sat::Collision,
+    collided: &mut WriteStorage<'a, Collided>,
+) {
+    // Compute location in object space
+    let (s, c) = pos.rot.sin_cos();
+    let x = hit.location[0] - pos.pos[0];
+    let y = hit.location[1] - pos.pos[1];
+    let rel_loc = [x * c + y * s, -x * s + y * c];
+
+    // Add hit in a Collided component
+    let insert = if let Some(col) = collided.get_mut(ent) {
+        col.hits.push(Hit {
+            entity: o_ent,
+            rel_location: rel_loc,
+        });
+        false
+    } else {
+        true
+    };
+    if insert {
+        collided.insert(
+            ent,
+            Collided {
+                hits: vec![
+                    Hit {
+                        entity: o_ent,
+                        rel_location: rel_loc,
+                    },
+                ],
+            },
+        );
+    }
+}
+
+const ELASTICITY: f64 = 0.6;
+
+/// Cross-product of planar vector with orthogonal vector.
+fn cross(a: [f64; 2], b: f64) -> [f64; 2] {
+    [a[1] * b, -a[0] * b]
+}
+
+/// Compute cross product of planar vectors and take dot with itself.
+fn cross_dot2(a: [f64; 2], b: [f64; 2]) -> f64 {
+    let c = a[0] * b[1] - a[1] * b[0];
+    c * c
+}
+
+fn handle_collision<'a>(
+    ent: Entity,
+    pos: &Position,
+    vel: &Velocity,
+    col: &Collision,
+    o_ent: Entity,
+    o_pos: &Position,
+    o_vel: &Velocity,
+    o_col: &Collision,
+    hit: &sat::Collision,
+    lazy: &Fetch<'a, LazyUpdate>,
+    entities: &Entities<'a>,
+) {
+    // Compute impulse
+    let rap = vec2_sub(hit.location, pos.pos);
+    let rbp = vec2_sub(hit.location, o_pos.pos);
+    let vab1 = vec2_sub(
+        vec2_add(vel.vel, cross(rap, -vel.rot)),
+        vec2_add(o_vel.vel, cross(rbp, -o_vel.rot)),
+    );
+    let n = hit.direction;
+    let ma = col.mass;
+    let mb = o_col.mass;
+    let ia = col.inertia;
+    let ib = o_col.inertia;
+
+    let impulse = (-(1.0 + ELASTICITY) * vec2_dot(vab1, n))
+        / (1.0 / ma + 1.0 / mb + cross_dot2(rap, n) / ia
+            + cross_dot2(rbp, n) / ib);
+
+    #[cfg(feature = "network")]
+    lazy.insert(ent, net::Dirty);
 }
