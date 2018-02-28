@@ -15,6 +15,12 @@ impl PartialOrd for Projection {
     }
 }
 
+pub struct Collision {
+    pub direction: [f64; 2],
+    pub depth: f64,
+    pub location: [f64; 2],
+}
+
 /// Checks if two rectangles collide when projected on a specific axis.
 ///
 /// This is part of the SAT collision detection method.
@@ -24,7 +30,7 @@ fn check_sat_collision_dir(
     pos2: &Position,
     size2: &[f64; 2],
     dir: [f64; 2],
-) -> Option<(f64, [f64; 2])> {
+) -> Option<Collision> {
     // This is called for each normal of each rectangle
     // It checks whether there is collision of the shape projected along it
 
@@ -76,19 +82,21 @@ fn check_sat_collision_dir(
         let dist1 = proj2.1.proj - proj1.0.proj;
         let dist2 = proj1.1.proj - proj2.0.proj;
         if dist1 < dist2 {
-            Some((dist1, proj2.1.orig))
+            Some(Collision {
+                direction: dir,
+                depth: dist1,
+                location: proj2.1.orig,
+            })
         } else {
-            Some((dist2, proj2.0.orig))
+            Some(Collision {
+                direction: [-dir[0], -dir[1]],
+                depth: dist2,
+                location: proj2.0.orig,
+            })
         }
     } else {
         None
     }
-}
-
-pub struct Collision {
-    pub direction: [f64; 2],
-    pub depth: f64,
-    pub location: [f64; 2],
 }
 
 /// Checks if two rectangles collide when projected on a specific axis.
@@ -103,36 +111,23 @@ pub fn find(
     size2: &[f64; 2],
 ) -> Option<Collision> {
     let (s, c) = pos1.rot.sin_cos();
-    let mut dir = [c, s];
-    let (mut depth, mut loc) =
-        check_sat_collision_dir(pos1, size1, pos2, size2, dir)?;
+    let mut res = check_sat_collision_dir(pos1, size1, pos2, size2, [c, s])?;
 
-    let d = [-s, c];
-    let r = check_sat_collision_dir(pos1, size1, pos2, size2, d)?;
-    if r.0 < depth {
-        dir = d;
-        depth = r.0;
-        loc = r.1;
+    let r = check_sat_collision_dir(pos1, size1, pos2, size2, [-s, c])?;
+    if r.depth < res.depth {
+        res = r;
     }
 
     let (s, c) = pos2.rot.sin_cos();
-    let d = [c, s];
-    let r = check_sat_collision_dir(pos2, size2, pos1, size1, d)?;
-    if r.0 < depth {
-        dir = d;
-        depth = r.0;
-        loc = r.1;
+    let r = check_sat_collision_dir(pos2, size2, pos1, size1, [c, s])?;
+    if r.depth < res.depth {
+        res = r;
+        res.direction = [-res.direction[0], -res.direction[1]];
     }
-    let d = [-s, c];
-    let r = check_sat_collision_dir(pos2, size2, pos1, size1, d)?;
-    if r.0 < depth {
-        dir = d;
-        depth = r.0;
-        loc = r.1;
+    let r = check_sat_collision_dir(pos2, size2, pos1, size1, [-s, c])?;
+    if r.depth < res.depth {
+        res = r;
+        res.direction = [-res.direction[0], -res.direction[1]];
     }
-    Some(Collision {
-        direction: dir,
-        depth: depth,
-        location: loc,
-    })
+    Some(res)
 }

@@ -3,7 +3,7 @@
 use game::asteroid::Asteroid;
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
-use game::physics::{Collision, Marker};
+use game::physics::{Arrow, Collision, Marker};
 use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Graphics, Transformed};
@@ -154,32 +154,35 @@ pub fn render<G, C, E>(
         );
     }
 
-    for (pos, particle) in (&pos, &particles).join() {
-        let part_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        match particle.which {
-            ParticleType::Spark => {
-                let alpha = (particle.lifetime as f32) / 0.2;
-                graphics::rectangle(
-                    [1.0, 1.0, 1.0, alpha],
-                    graphics::rectangle::centered([0.0, 0.0, 0.05, 0.05]),
+    #[cfg(not(feature = "debug_markers"))]
+    {
+        for (pos, particle) in (&pos, &particles).join() {
+            let part_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+            match particle.which {
+                ParticleType::Spark => {
+                    let alpha = (particle.lifetime as f32) / 0.2;
+                    graphics::rectangle(
+                        [1.0, 1.0, 1.0, alpha],
+                        graphics::rectangle::centered([0.0, 0.0, 0.05, 0.05]),
+                        part_tr,
+                        gl,
+                    );
+                }
+                ParticleType::Exhaust => graphics::rectangle(
+                    [1.0, 1.0, 1.0, (particle.lifetime as f32).min(0.5)],
+                    graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
                     part_tr,
                     gl,
-                );
-            }
-            ParticleType::Exhaust => graphics::rectangle(
-                [1.0, 1.0, 1.0, (particle.lifetime as f32).min(0.5)],
-                graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
-                part_tr,
-                gl,
-            ),
-            ParticleType::Explosion => {
-                let alpha = (particle.lifetime as f32 * 1.6).min(0.8);
-                graphics::rectangle(
-                    [1.0, particle.lifetime as f32 / 0.6, 0.0, alpha],
-                    graphics::rectangle::centered([0.0, 0.0, 1.2, 1.2]),
-                    part_tr,
-                    gl,
-                );
+                ),
+                ParticleType::Explosion => {
+                    let alpha = (particle.lifetime as f32 * 1.6).min(0.8);
+                    graphics::rectangle(
+                        [1.0, particle.lifetime as f32 / 0.6, 0.0, alpha],
+                        graphics::rectangle::centered([0.0, 0.0, 1.2, 1.2]),
+                        part_tr,
+                        gl,
+                    );
+                }
             }
         }
     }
@@ -204,6 +207,54 @@ pub fn render<G, C, E>(
             );
             marker.frame += 1;
             if marker.frame >= 20 {
+                world.entities().delete(ent).unwrap();
+            }
+        }
+
+        let mut arrows = world.write::<Arrow>();
+        for (ent, mut arrow) in (&*world.entities(), &mut arrows).join() {
+            let (x, y) = (
+                arrow.ends[0][0] - arrow.ends[1][0],
+                arrow.ends[0][1] - arrow.ends[1][1],
+            );
+            graphics::line(
+                [1.0, 1.0, 0.0, (20 - arrow.frame) as f32 / 20.0],
+                0.1,
+                [
+                    arrow.ends[0][0],
+                    arrow.ends[0][1],
+                    arrow.ends[1][0],
+                    arrow.ends[1][1],
+                ],
+                tr,
+                gl,
+            );
+            graphics::line(
+                [1.0, 1.0, 0.0, (20 - arrow.frame) as f32 / 20.0],
+                0.1,
+                [
+                    arrow.ends[1][0] + 0.2 * (0.577 * x - 0.577 * y),
+                    arrow.ends[1][1] + 0.2 * (0.577 * x + 0.577 * y),
+                    arrow.ends[1][0],
+                    arrow.ends[1][1],
+                ],
+                tr,
+                gl,
+            );
+            graphics::line(
+                [1.0, 1.0, 0.0, (20 - arrow.frame) as f32 / 20.0],
+                0.1,
+                [
+                    arrow.ends[1][0] + 0.2 * (0.577 * x + 0.577 * y),
+                    arrow.ends[1][1] + 0.2 * (-0.577 * x + 0.577 * y),
+                    arrow.ends[1][0],
+                    arrow.ends[1][1],
+                ],
+                tr,
+                gl,
+            );
+            arrow.frame += 1;
+            if arrow.frame >= 20 {
                 world.entities().delete(ent).unwrap();
             }
         }

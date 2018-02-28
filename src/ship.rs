@@ -57,6 +57,8 @@ impl Ship {
             entity,
             Collision {
                 bounding_box: [1.0, 0.8],
+                mass: 1.0,
+                inertia: 0.3,
             },
         );
         lazy.insert(entity, Ship::new([255, 0, 0]));
@@ -115,10 +117,15 @@ impl<'a> System<'a> for SysShip {
             for (ent, col, mut ship) in
                 (&*entities, &collided, &mut ship).join()
             {
-                ship.health -= col.hits.len() as i32;
-                warn!("Ship collided! Health now {}", ship.health);
-                #[cfg(feature = "network")]
-                lazy.insert(ent, net::Dirty);
+                for hit in &col.hits {
+                    warn!("Ship collided, impulse: {}", hit.impulse);
+                    if hit.impulse > 2.5 {
+                        ship.health -= 1;
+                        warn!("Ship collided! Health now {}", ship.health);
+                        #[cfg(feature = "network")]
+                        lazy.insert(ent, net::Dirty);
+                    }
+                }
             }
 
             // Prevent leaving the screen
@@ -284,6 +291,8 @@ impl Projectile {
             entity,
             Collision {
                 bounding_box: [0.8, 0.1],
+                mass: 0.1,
+                inertia: 0.01,
             },
         );
         lazy.insert(entity, Projectile);

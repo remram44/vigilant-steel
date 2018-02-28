@@ -757,6 +757,8 @@ impl<'a> System<'a> for SysNetClient {
                         entity,
                         Collision {
                             bounding_box: [10.0, 8.0],
+                            mass: 1.0,
+                            inertia: 0.3,
                         },
                     );
                     lazy.insert(entity, ship);
@@ -792,6 +794,8 @@ impl<'a> System<'a> for SysNetClient {
                         entity,
                         Collision {
                             bounding_box: [40.0, 40.0],
+                            mass: 1.0,
+                            inertia: 0.3,
                         },
                     );
                     lazy.insert(entity, Asteroid);
@@ -821,6 +825,8 @@ impl<'a> System<'a> for SysNetClient {
                         entity,
                         Collision {
                             bounding_box: [8.0, 1.0],
+                            mass: 1.0,
+                            inertia: 0.3,
                         },
                     );
                     lazy.insert(entity, Projectile);
