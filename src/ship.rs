@@ -21,7 +21,6 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub thrust: [f64; 2],
-    pub reload: f64,
     pub health: i32,
 }
 
@@ -31,7 +30,6 @@ impl Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             thrust: [0.0, 0.0],
-            reload: 0.0,
             health: 8,
         }
     }
@@ -55,7 +53,7 @@ impl Ship {
         lazy.insert(
             entity,
             Collision {
-                bounding_box: [1.5, 1.1],
+                bounding_box: [1.5, 1.5],
                 mass: 1.0,
                 inertia: 0.3,
             },
@@ -68,7 +66,9 @@ impl Ship {
             ([0.0, -1.0], Block::new(BlockInner::Armor)),
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
-            ([1.0, 0.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            ([1.0, 1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            ([1.0, -1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            ([1.0, 0.0], Block::new(BlockInner::Armor)),
         ];
         lazy.insert(entity, Blocky { blocks: blocks });
         #[cfg(feature = "network")]
@@ -102,7 +102,7 @@ impl<'a> System<'a> for SysShip {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collided>,
         WriteStorage<'a, Ship>,
-        ReadStorage<'a, Blocky>,
+        WriteStorage<'a, Blocky>,
         ReadStorage<'a, LocalControl>,
     );
 
@@ -119,11 +119,12 @@ impl<'a> System<'a> for SysShip {
             mut vel,
             collided,
             mut ship,
-            blocky,
+            mut blocky,
             local,
         ): Self::SystemData,
     ) {
         let dt = dt.0;
+        let mut rng = rand::thread_rng();
 
         if role.authoritative() {
             // Handle collisions
@@ -179,8 +180,8 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        for (ent, pos, mut vel, mut ship, blocky) in
-            (&*entities, &pos, &mut vel, &mut ship, &blocky).join()
+        for (ent, pos, mut vel, mut ship, mut blocky) in
+            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
@@ -225,9 +226,10 @@ impl<'a> System<'a> for SysShip {
                     let num = (**clock / rate) as i32
                         - ((**clock - dt) / rate) as i32;
                     for _ in 0..num {
-                        let (ts, tc) = angle.sin_cos();
-                        let thrust_dir = [tc * c - ts * s, ts * c + tc * s];
-                        let mut rng = rand::thread_rng();
+                        let thrust_dir = {
+                            let (ts, tc) = (pos.rot + angle).sin_cos();
+                            [tc, ts]
+                        };
                         let thrust_pos = [
                             pos.pos[0] + rel[0] * c - rel[1] * s,
                             pos.pos[1] + rel[0] * s + rel[1] * c,
@@ -271,21 +273,42 @@ impl<'a> System<'a> for SysShip {
 
             // Fire
             if role.authoritative() {
-                if ship.want_fire && ship.reload <= 0.0 {
-                    ship.reload = 1.5;
-
-                    Projectile::create(
-                        &entities,
-                        &lazy,
-                        vec2_add(pos.pos, vec2_scale(dir, 2.2)),
-                        pos.rot,
-                    );
-                    // Recoil
-                    vel.vel = vec2_add(vel.vel, vec2_scale(dir, -6.0));
-                    #[cfg(feature = "network")]
-                    lazy.insert(ent, net::Dirty);
-                } else if ship.reload > 0.0 {
-                    ship.reload -= dt;
+                let mut fired = false;
+                for &mut (rel, ref mut block) in &mut blocky.blocks {
+                    let (angle, reload) = match block.inner {
+                        BlockInner::Gun(a, r) => (a, r),
+                        _ => continue,
+                    };
+                    if ship.want_fire && reload <= 0.0 {
+                        let fire_dir = {
+                            let (fs, fc) = (pos.rot + angle).sin_cos();
+                            [fc, fs]
+                        };
+                        let fire_pos = [
+                            pos.pos[0] + rel[0] * c - rel[1] * s,
+                            pos.pos[1] + rel[0] * s + rel[1] * c,
+                        ];
+                        Projectile::create(
+                            &entities,
+                            &lazy,
+                            vec2_add(fire_pos, vec2_scale(fire_dir, 1.6)),
+                            pos.rot + angle,
+                        );
+                        // Recoil
+                        vel.vel =
+                            vec2_add(vel.vel, vec2_scale(fire_dir, -6.0));
+                        block.inner =
+                            BlockInner::Gun(angle, rng.gen_range(1.4, 1.6));
+                        fired = true;
+                    } else if reload > 0.0 {
+                        block.inner = BlockInner::Gun(angle, reload - dt);
+                    }
+                }
+                #[cfg(feature = "network")]
+                {
+                    if fired {
+                        lazy.insert(ent, net::Dirty);
+                    }
                 }
             }
         }

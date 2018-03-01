@@ -82,7 +82,6 @@ impl<'a> System<'a> for SysAsteroid {
                 for hit in &col.hits {
                     if hit.impulse > 2.5 {
                         // Remove this entity
-                        info!("Deleting hit asteroid");
                         let new_effect = entities.create();
                         lazy.insert(
                             new_effect,
