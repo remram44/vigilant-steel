@@ -1,6 +1,6 @@
 //! Rendering code, using Piston.
 
-use game::blocks::BlockInner;
+use game::blocks::{Block, BlockInner};
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
 use game::physics::{Arrow, Collision, Marker};
@@ -80,13 +80,74 @@ fn draw_line_loop<G>(
     );
 }
 
-fn block_color(block: &BlockInner) -> [f32; 4] {
-    match *block {
-        BlockInner::Cockpit => [1.0, 0.0, 0.0, 1.0],
-        BlockInner::Thruster(_) => [1.0, 1.0, 1.0, 1.0],
-        BlockInner::Gun(_, _) => [0.7, 0.7, 1.0, 1.0],
-        BlockInner::Armor => [0.7, 0.7, 0.7, 1.0],
-        BlockInner::Rock => [0.4, 0.4, 0.4, 1.0],
+fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
+    match block.inner {
+        BlockInner::Cockpit => {
+            draw_line_loop(
+                [1.0, 0.0, 0.0, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+            draw_line_loop(
+                [1.0, 0.0, 0.0, 1.0],
+                0.02,
+                &[[-0.2, -0.3], [0.2, 0.0], [-0.2, 0.3]],
+                tr,
+                gl,
+            );
+        }
+        BlockInner::Thruster(angle) => for i in &[-0.4, 0.0] {
+            graphics::polygon(
+                [0.4, 0.4, 0.4, 1.0],
+                &[[0.45, 0.25], [0.05, 0.45], [0.05, -0.45], [0.45, -0.25]],
+                tr.rot_rad(angle).trans(*i, 0.0),
+                gl,
+            );
+        },
+        BlockInner::Gun(angle, _) => {
+            draw_line_loop(
+                [0.7, 0.7, 1.0, 1.0],
+                0.05,
+                &[
+                    [-0.35, -0.35],
+                    [0.0, -0.45],
+                    [0.35, -0.35],
+                    [0.45, 0.0],
+                    [0.35, 0.35],
+                    [0.0, 0.45],
+                    [-0.35, 0.35],
+                    [-0.45, 0.0],
+                ],
+                tr,
+                gl,
+            );
+            graphics::polygon(
+                [0.7, 0.7, 1.0, 1.0],
+                &[[-0.0, -0.15], [0.6, -0.15], [0.6, 0.15], [-0.0, 0.15]],
+                tr.rot_rad(angle),
+                gl,
+            );
+        }
+        BlockInner::Armor => {
+            draw_line_loop(
+                [0.7, 0.7, 0.7, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+        }
+        BlockInner::Rock => {
+            draw_line_loop(
+                [0.45, 0.45, 0.45, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+        }
     }
 }
 
@@ -117,13 +178,7 @@ pub fn render<G, C, E>(
     for (pos, blocky) in (&pos, &blocky).join() {
         let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         for &(rel, ref block) in &blocky.blocks {
-            draw_line_loop(
-                block_color(&block.inner),
-                0.1,
-                &[[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
-                blocks_tr.trans(rel[0], rel[1]),
-                gl,
-            );
+            draw_block(&block, blocks_tr.trans(rel[0], rel[1]), gl);
         }
     }
 
