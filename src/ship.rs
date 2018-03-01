@@ -22,18 +22,16 @@ pub struct Ship {
     pub want_thrust: [f64; 2],
     pub thrust: [f64; 2],
     pub reload: f64,
-    pub color: [u8; 3],
     pub health: i32,
 }
 
 impl Ship {
-    pub fn new(color: [u8; 3]) -> Ship {
+    pub fn new() -> Ship {
         Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             thrust: [0.0, 0.0],
             reload: 0.0,
-            color: color,
             health: 8,
         }
     }
@@ -62,7 +60,7 @@ impl Ship {
                 inertia: 0.3,
             },
         );
-        lazy.insert(entity, Ship::new([255, 0, 0]));
+        lazy.insert(entity, Ship::new());
         let blocks = vec![
             ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.0))),
             ([-1.0, 0.0], Block::new(BlockInner::Thruster(0.0))),
