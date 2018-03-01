@@ -1,6 +1,6 @@
 //! Ships and projectiles.
 
-use Role;
+use {Clock, Role};
 use blocks::{Block, BlockInner};
 use input::{Input, Press};
 #[cfg(feature = "network")]
@@ -62,9 +62,9 @@ impl Ship {
         );
         lazy.insert(entity, Ship::new());
         let blocks = vec![
-            ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.0))),
+            ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.7))),
             ([-1.0, 0.0], Block::new(BlockInner::Thruster(0.0))),
-            ([-1.0, 1.0], Block::new(BlockInner::Thruster(0.0))),
+            ([-1.0, 1.0], Block::new(BlockInner::Thruster(-0.7))),
             ([0.0, -1.0], Block::new(BlockInner::Armor)),
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
@@ -96,11 +96,13 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
+        Fetch<'a, Clock>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collided>,
         WriteStorage<'a, Ship>,
+        ReadStorage<'a, Blocky>,
         ReadStorage<'a, LocalControl>,
     );
 
@@ -111,11 +113,13 @@ impl<'a> System<'a> for SysShip {
             role,
             lazy,
             input,
+            clock,
             entities,
             pos,
             mut vel,
             collided,
             mut ship,
+            blocky,
             local,
         ): Self::SystemData,
     ) {
@@ -154,7 +158,7 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        // Control ship thrusters from local input
+        // Set ship controls from local input
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
             ship.want_thrust[0] = -input.movement[0];
             ship.want_thrust[1] = input.movement[1];
@@ -167,7 +171,7 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        // Control ships from input
+        // Action thrusters from controls
         if role.authoritative() {
             for mut ship in (&mut ship).join() {
                 ship.thrust[0] = ship.want_thrust[0].min(1.0).max(-1.0);
@@ -175,8 +179,8 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        for (ent, pos, mut vel, mut ship) in
-            (&*entities, &pos, &mut vel, &mut ship).join()
+        for (ent, pos, mut vel, mut ship, blocky) in
+            (&*entities, &pos, &mut vel, &mut ship, &blocky).join()
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
@@ -205,44 +209,57 @@ impl<'a> System<'a> for SysShip {
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
-            let dir = {
-                let (s, c) = pos.rot.sin_cos();
-                [c, s]
-            };
+            let (s, c) = pos.rot.sin_cos();
+            let dir = [c, s];
             vel.vel =
                 vec2_add(vel.vel, vec2_scale(dir, ship.thrust[1] * 10.0 * dt));
 
             // Spawn Exhaust particles
-            if role.graphical() {
-                if ship.thrust[1] > 0.3 {
-                    let mut rng = rand::thread_rng();
-                    let thrust_pos = vec2_add(pos.pos, vec2_scale(dir, -1.0));
-                    let thrust_vel = vec2_scale(dir, -10.0);
-                    let p = entities.create();
-                    lazy.insert(
-                        p,
-                        Position {
-                            pos: thrust_pos,
-                            rot: 0.0,
-                        },
-                    );
-                    lazy.insert(
-                        p,
-                        Velocity {
-                            vel: [
-                                thrust_vel[0] + rng.gen_range(-6.0, 6.0),
-                                thrust_vel[1] + rng.gen_range(-6.0, 6.0),
-                            ],
-                            rot: rng.gen_range(-5.0, 5.0),
-                        },
-                    );
-                    lazy.insert(
-                        p,
-                        Particle {
-                            lifetime: 0.5,
-                            which: ParticleType::Exhaust,
-                        },
-                    );
+            if role.graphical() && ship.thrust[1] > 0.3 {
+                for &(ref rel, ref block) in &blocky.blocks {
+                    let angle = match block.inner {
+                        BlockInner::Thruster(a) => a,
+                        _ => continue,
+                    };
+                    let rate = 1.0 / (angle.cos() * ship.thrust[1] * 40.0);
+                    let num = (**clock / rate) as i32
+                        - ((**clock - dt) / rate) as i32;
+                    for _ in 0..num {
+                        let (ts, tc) = angle.sin_cos();
+                        let thrust_dir = [tc * c - ts * s, ts * c + tc * s];
+                        let mut rng = rand::thread_rng();
+                        let thrust_pos = [
+                            pos.pos[0] + rel[0] * c - rel[1] * s,
+                            pos.pos[1] + rel[0] * s + rel[1] * c,
+                        ];
+                        let thrust_pos = vec2_sub(thrust_pos, thrust_dir);
+                        let thrust_vel = vec2_scale(thrust_dir, -10.0);
+                        let p = entities.create();
+                        lazy.insert(
+                            p,
+                            Position {
+                                pos: thrust_pos,
+                                rot: 0.0,
+                            },
+                        );
+                        lazy.insert(
+                            p,
+                            Velocity {
+                                vel: [
+                                    thrust_vel[0] + rng.gen_range(-6.0, 6.0),
+                                    thrust_vel[1] + rng.gen_range(-6.0, 6.0),
+                                ],
+                                rot: rng.gen_range(-5.0, 5.0),
+                            },
+                        );
+                        lazy.insert(
+                            p,
+                            Particle {
+                                lifetime: 0.5,
+                                which: ParticleType::Exhaust,
+                            },
+                        );
+                    }
                 }
             }
 
