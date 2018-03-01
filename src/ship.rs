@@ -196,19 +196,19 @@ impl<'a> System<'a> for SysShip {
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
-            let (s, c) = pos.rot.sin_cos();
-            let thrust = [c, s];
-            vel.vel = vec2_add(
-                vel.vel,
-                vec2_scale(thrust, ship.thrust[1] * 10.0 * dt),
-            );
+            let dir = {
+                let (s, c) = pos.rot.sin_cos();
+                [c, s]
+            };
+            vel.vel =
+                vec2_add(vel.vel, vec2_scale(dir, ship.thrust[1] * 10.0 * dt));
 
             // Spawn Exhaust particles
             if role.graphical() {
                 if ship.thrust[1] > 0.3 {
                     let mut rng = rand::thread_rng();
-                    let thrust_pos = vec2_add(pos.pos, [-c, -s]);
-                    let thrust_vel = vec2_scale([-c, -s], 10.0);
+                    let thrust_pos = vec2_add(pos.pos, vec2_scale(dir, -1.0));
+                    let thrust_vel = vec2_scale(dir, -10.0);
                     let p = entities.create();
                     lazy.insert(
                         p,
@@ -230,7 +230,7 @@ impl<'a> System<'a> for SysShip {
                     lazy.insert(
                         p,
                         Particle {
-                            lifetime: 1.0,
+                            lifetime: 0.5,
                             which: ParticleType::Exhaust,
                         },
                     );
@@ -246,14 +246,18 @@ impl<'a> System<'a> for SysShip {
             // Fire
             if role.authoritative() {
                 if ship.want_fire && ship.reload <= 0.0 {
-                    ship.reload = 0.7;
+                    ship.reload = 1.5;
 
                     Projectile::create(
                         &entities,
                         &lazy,
-                        vec2_add(pos.pos, [1.7 * c, 1.7 * s]),
+                        vec2_add(pos.pos, vec2_scale(dir, 1.7)),
                         pos.rot,
                     );
+                    // Recoil
+                    vel.vel = vec2_add(vel.vel, vec2_scale(dir, -6.0));
+                    #[cfg(feature = "network")]
+                    lazy.insert(ent, net::Dirty);
                 } else if ship.reload > 0.0 {
                     ship.reload -= dt;
                 }
@@ -290,8 +294,8 @@ impl Projectile {
             entity,
             Collision {
                 bounding_box: [0.8, 0.1],
-                mass: 0.1,
-                inertia: 0.01,
+                mass: 1000.0,
+                inertia: 1.0,
             },
         );
         lazy.insert(entity, Projectile);
