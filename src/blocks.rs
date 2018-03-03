@@ -1,6 +1,9 @@
-use specs::{Entities, Fetch, LazyUpdate};
+use physics::AABox;
+use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
+use vecmath::*;
 
 /// Active component of the block.
+#[derive(Debug)]
 pub enum BlockInner {
     /// This is what allows a ship to be controlled. Ships can't be operated
     /// without this.
@@ -57,6 +60,7 @@ impl BlockInner {
     }
 }
 
+#[derive(Debug)]
 pub struct Block {
     pub health: f64,
     pub inner: BlockInner,
@@ -69,4 +73,52 @@ impl Block {
             inner: inner,
         }
     }
+}
+
+// Entity is made of blocks
+pub struct Blocky {
+    pub blocks: Vec<([f64; 2], Block)>,
+    pub bounding_box: AABox, // TODO: replace with space partitioning tree
+    pub mass: f64,
+    pub inertia: f64,
+}
+
+impl Blocky {
+    pub fn new(mut blocks: Vec<([f64; 2], Block)>) -> Blocky {
+        let mut mass = 0.0;
+        let mut center = [0.0, 0.0];
+        for &(ref loc, ref block) in &blocks {
+            center = vec2_scale(
+                vec2_add(
+                    vec2_scale(center, mass),
+                    vec2_scale(*loc, block.inner.mass()),
+                ),
+                1.0 / (mass + block.inner.mass()),
+            );
+            mass += block.inner.mass();
+        }
+        let mut inertia = 0.0;
+        let mut bounds = AABox::empty();
+        for &mut (ref mut loc, ref block) in &mut blocks {
+            *loc = vec2_sub(*loc, center);
+            inertia += vec2_square_len(*loc) * block.inner.mass();
+            bounds = AABox {
+                xmin: bounds.xmin.min(loc[0] - 0.5),
+                xmax: bounds.xmax.max(loc[0] + 0.5),
+                ymin: bounds.ymin.min(loc[1] - 0.5),
+                ymax: bounds.ymax.max(loc[1] + 0.5),
+            };
+        }
+
+        Blocky {
+            blocks: blocks,
+            bounding_box: bounds,
+            mass: mass,
+            inertia: inertia,
+        }
+    }
+}
+
+impl Component for Blocky {
+    type Storage = VecStorage<Self>;
 }

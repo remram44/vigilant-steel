@@ -1,7 +1,7 @@
 //! Common components and behaviors for entities.
 
 use Role;
-use blocks::Block;
+use blocks::Blocky;
 #[cfg(feature = "network")]
 use net;
 use sat;
@@ -10,6 +10,35 @@ use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             WriteStorage};
 use std::f64::consts::PI;
 use vecmath::*;
+
+/// Bounding-box.
+#[derive(Debug)]
+pub struct AABox {
+    pub xmin: f64,
+    pub xmax: f64,
+    pub ymin: f64,
+    pub ymax: f64,
+}
+
+impl AABox {
+    pub fn empty() -> AABox {
+        AABox {
+            xmin: ::std::f64::INFINITY,
+            xmax: -::std::f64::INFINITY,
+            ymin: ::std::f64::INFINITY,
+            ymax: -::std::f64::INFINITY,
+        }
+    }
+
+    pub fn corners(&self) -> [[f64; 2]; 4] {
+        [
+            [self.xmin, self.ymin],
+            [self.xmax, self.ymin],
+            [self.xmax, self.ymax],
+            [self.xmin, self.ymax],
+        ]
+    }
+}
 
 /// Wrapper for entity deletion that triggers network update.
 pub fn delete_entity(
@@ -53,29 +82,6 @@ pub struct Velocity {
 }
 
 impl Component for Velocity {
-    type Storage = VecStorage<Self>;
-}
-
-// Entity is made of blocks
-pub struct Blocky {
-    pub blocks: Vec<([f64; 2], Block)>,
-}
-
-impl Component for Blocky {
-    type Storage = VecStorage<Self>;
-}
-
-/// Collision shapes; currently only axes-oriented rectangle.
-///
-/// Entities with Collision components will be checked for collisions, and a
-/// Collided component will be added to them when it happens.
-pub struct Collision {
-    pub bounding_box: [f64; 2],
-    pub mass: f64,
-    pub inertia: f64,
-}
-
-impl Component for Collision {
     type Storage = VecStorage<Self>;
 }
 
@@ -161,7 +167,7 @@ impl<'a> System<'a> for SysCollision {
         Entities<'a>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
-        ReadStorage<'a, Collision>,
+        ReadStorage<'a, Blocky>,
         WriteStorage<'a, Collided>,
     );
 
@@ -173,7 +179,7 @@ impl<'a> System<'a> for SysCollision {
             entities,
             mut pos,
             mut vel,
-            collision,
+            blocky,
             mut collided,
         ): Self::SystemData,
 ){
@@ -181,17 +187,17 @@ impl<'a> System<'a> for SysCollision {
 
         collided.clear();
         let mut hits = Vec::new();
-        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
-            for (e2, pos2, col2) in (&*entities, &pos, &collision).join() {
+        for (e1, pos1, blocky1) in (&*entities, &pos, &blocky).join() {
+            for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
                 if e1 >= e2 {
                     continue;
                 }
                 // Detect collisions using SAT
                 if let Some(hit) = sat::find(
                     &pos1,
-                    &col1.bounding_box,
+                    &blocky1.bounding_box,
                     &pos2,
-                    &col2.bounding_box,
+                    &blocky2.bounding_box,
                 ) {
                     #[cfg(feature = "debug_markers")]
                     {
@@ -216,7 +222,7 @@ impl<'a> System<'a> for SysCollision {
                 e2,
                 &mut pos,
                 &mut vel,
-                &collision,
+                &blocky,
                 &mut collided,
                 &hit,
                 &lazy,
@@ -244,14 +250,14 @@ fn handle_collision<'a>(
     o_ent: Entity,
     position: &mut WriteStorage<'a, Position>,
     velocity: &mut WriteStorage<'a, Velocity>,
-    collision: &ReadStorage<'a, Collision>,
+    blocky: &ReadStorage<'a, Blocky>,
     collided: &mut WriteStorage<'a, Collided>,
     hit: &sat::Collision,
     lazy: &Fetch<'a, LazyUpdate>,
     entities: &Entities<'a>,
 ) {
-    let col = collision.get(ent).unwrap();
-    let o_col = collision.get(o_ent).unwrap();
+    let blk = blocky.get(ent).unwrap();
+    let o_blk = blocky.get(o_ent).unwrap();
     let (impulse, rap, rbp) = {
         let pos = position.get(ent).unwrap();
         let o_pos = position.get(o_ent).unwrap();
@@ -266,10 +272,10 @@ fn handle_collision<'a>(
             vec2_add(o_vel.vel, cross(rbp, -o_vel.rot)),
         );
         let n = hit.direction;
-        let ma = col.mass;
-        let mb = o_col.mass;
-        let ia = col.inertia;
-        let ib = o_col.inertia;
+        let ma = blk.mass;
+        let mb = o_blk.mass;
+        let ia = blk.inertia;
+        let ib = o_blk.inertia;
 
         (
             (-(1.0 + ELASTICITY) * vec2_dot(vab1, n))
@@ -323,10 +329,10 @@ fn handle_collision<'a>(
         // Update velocity
         let vel = velocity.get_mut(ent).unwrap();
         vel.vel =
-            vec2_add(vel.vel, vec2_scale(hit.direction, impulse / col.mass));
+            vec2_add(vel.vel, vec2_scale(hit.direction, impulse / blk.mass));
         vel.rot += impulse
             * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0])
-            / col.inertia;
+            / blk.inertia;
     }
     {
         // Compute location in object space
@@ -372,11 +378,11 @@ fn handle_collision<'a>(
         let vel = velocity.get_mut(o_ent).unwrap();
         vel.vel = vec2_add(
             vel.vel,
-            vec2_scale(hit.direction, -impulse / o_col.mass),
+            vec2_scale(hit.direction, -impulse / o_blk.mass),
         );
         vel.rot += -impulse
             * (rbp[0] * hit.direction[1] - rbp[1] * hit.direction[0])
-            / o_col.inertia;
+            / o_blk.inertia;
     }
 
     #[cfg(feature = "debug_markers")]

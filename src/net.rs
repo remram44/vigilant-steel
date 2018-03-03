@@ -3,7 +3,7 @@
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use particles::Effect;
-use physics::{Collision, LocalControl, Position, Velocity};
+use physics::{LocalControl, Position, Velocity};
 use ship::{Projectile, Ship};
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -743,14 +743,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [1.5, 1.5],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, ship);
                     lazy.insert(
                         entity,
@@ -780,14 +772,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [2.5, 3.0],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, Asteroid);
                     lazy.insert(
                         entity,
@@ -811,14 +795,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [0.8, 0.1],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, Projectile);
                     lazy.insert(
                         entity,

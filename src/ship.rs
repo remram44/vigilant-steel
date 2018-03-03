@@ -1,13 +1,13 @@
 //! Ships and projectiles.
 
 use {Clock, Role};
-use blocks::{Block, BlockInner};
+use blocks::{Block, BlockInner, Blocky};
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, Blocky, Collided, Collision, DeltaTime,
-              LocalControl, Position, Velocity};
+use physics::{delete_entity, Collided, DeltaTime, LocalControl, Position,
+              Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -50,14 +50,6 @@ impl Ship {
                 rot: 0.0,
             },
         );
-        lazy.insert(
-            entity,
-            Collision {
-                bounding_box: [1.5, 1.5],
-                mass: 1.0,
-                inertia: 0.3,
-            },
-        );
         lazy.insert(entity, Ship::new());
         let blocks = vec![
             ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.7))),
@@ -70,7 +62,7 @@ impl Ship {
             ([1.0, -1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
             ([1.0, 0.0], Block::new(BlockInner::Armor)),
         ];
-        lazy.insert(entity, Blocky { blocks: blocks });
+        lazy.insert(entity, Blocky::new(blocks));
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -132,7 +124,7 @@ impl<'a> System<'a> for SysShip {
                 (&*entities, &collided, &mut ship).join()
             {
                 for hit in &col.hits {
-                    if hit.impulse > 2.0 {
+                    if hit.impulse > 40.0 {
                         ship.health -= 1;
                         warn!("Ship collided! Health now {}", ship.health);
                         #[cfg(feature = "network")]
@@ -339,14 +331,14 @@ impl Projectile {
                 rot: 0.0,
             },
         );
-        lazy.insert(
+        /*lazy.insert(
             entity,
             Collision {
                 bounding_box: [0.8, 0.1],
                 mass: 1000.0,
                 inertia: 1.0,
             },
-        );
+        );*/
         lazy.insert(entity, Projectile);
         #[cfg(feature = "network")]
         {

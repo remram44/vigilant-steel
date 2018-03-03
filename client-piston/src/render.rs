@@ -1,10 +1,10 @@
 //! Rendering code, using Piston.
 
-use game::blocks::{Block, BlockInner};
+use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
-use game::physics::{Arrow, Collision, Marker};
-use game::physics::{Blocky, LocalControl, Position};
+use game::physics::{Arrow, Marker};
+use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
@@ -299,17 +299,16 @@ pub fn render<G, C, E>(
             }
         }
 
-        let collision = world.read::<Collision>();
-        for (pos, col) in (&pos, &collision).join() {
+        for (pos, blk) in (&pos, &blocky).join() {
             let rect_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
             draw_line_loop(
                 [0.0, 1.0, 0.0, 1.0],
                 0.1,
                 &[
-                    [-col.bounding_box[0], -col.bounding_box[1]],
-                    [col.bounding_box[0], -col.bounding_box[1]],
-                    [col.bounding_box[0], col.bounding_box[1]],
-                    [-col.bounding_box[0], col.bounding_box[1]],
+                    [blk.bounding_box.xmin, blk.bounding_box.ymin],
+                    [blk.bounding_box.xmax, blk.bounding_box.ymin],
+                    [blk.bounding_box.xmax, blk.bounding_box.ymax],
+                    [blk.bounding_box.xmin, blk.bounding_box.ymax],
                 ],
                 rect_tr,
                 gl,

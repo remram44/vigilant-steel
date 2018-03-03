@@ -17,12 +17,13 @@ pub mod ship;
 pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};
+use blocks::Blocky;
 use input::{Input, Press};
 use particles::{Effect, Particle, SysParticles};
 #[cfg(feature = "debug_markers")]
 use physics::{Arrow, Marker};
-use physics::{Blocky, Collided, Collision, DeltaTime, LocalControl, Position,
-              SysCollision, SysSimu, Velocity};
+use physics::{Collided, DeltaTime, LocalControl, Position, SysCollision,
+              SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
 #[cfg(feature = "network")]
@@ -123,7 +124,6 @@ impl Game {
         world.register::<Position>();
         world.register::<Velocity>();
         world.register::<Blocky>();
-        world.register::<Collision>();
         world.register::<Collided>();
         world.register::<LocalControl>();
         world.register::<Ship>();

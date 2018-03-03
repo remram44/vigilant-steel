@@ -1,12 +1,11 @@
 //! Asteroid objects, floating around for the user to collide with or shoot.
 
 use Role;
-use blocks::{Block, BlockInner};
+use blocks::{Block, BlockInner, Blocky};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner};
-use physics::{delete_entity, Blocky, Collided, Collision, DeltaTime,
-              Position, Velocity};
+use physics::{delete_entity, Collided, DeltaTime, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
@@ -80,7 +79,7 @@ impl<'a> System<'a> for SysAsteroid {
             // Get collision info
             if let Some(col) = collided.get(entity) {
                 for hit in &col.hits {
-                    if hit.impulse > 2.5 {
+                    if hit.impulse > 20000.5 {
                         // Remove this entity
                         let new_effect = entities.create();
                         lazy.insert(
@@ -133,14 +132,6 @@ impl<'a> System<'a> for SysAsteroid {
                         rot: rng.gen_range(-2.0, 2.0),
                     },
                 );
-                lazy.insert(
-                    entity,
-                    Collision {
-                        bounding_box: [2.5, 3.0],
-                        mass: 1.0,
-                        inertia: 0.3,
-                    },
-                );
                 lazy.insert(entity, Asteroid);
                 let mut blocks = Vec::with_capacity(26);
                 for y in 0..6 {
@@ -151,7 +142,7 @@ impl<'a> System<'a> for SysAsteroid {
                         }
                     }
                 }
-                lazy.insert(entity, Blocky { blocks: blocks });
+                lazy.insert(entity, Blocky::new(blocks));
                 #[cfg(feature = "network")]
                 {
                     lazy.insert(entity, net::Replicated::new());
