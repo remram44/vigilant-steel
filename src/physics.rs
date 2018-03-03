@@ -314,8 +314,9 @@ fn handle_collision<'a>(
         let vel = velocity.get_mut(ent).unwrap();
         vel.vel =
             vec2_add(vel.vel, vec2_scale(hit.direction, impulse / col.mass));
-        vel.rot +=
-            impulse * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0]);
+        vel.rot += impulse
+            * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0])
+            / col.inertia;
     }
     {
         // Compute location in object space
@@ -363,8 +364,9 @@ fn handle_collision<'a>(
             vel.vel,
             vec2_scale(hit.direction, -impulse / o_col.mass),
         );
-        vel.rot +=
-            -impulse * (rbp[0] * hit.direction[1] - rbp[1] * hit.direction[0]);
+        vel.rot += -impulse
+            * (rbp[0] * hit.direction[1] - rbp[1] * hit.direction[0])
+            / o_col.inertia;
     }
 
     #[cfg(feature = "debug_markers")]
