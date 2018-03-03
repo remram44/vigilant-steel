@@ -329,7 +329,7 @@ fn handle_collision<'a>(
         // Add hit in a Collided component
         let insert = if let Some(col) = collided.get_mut(o_ent) {
             col.hits.push(Hit {
-                entity: o_ent,
+                entity: ent,
                 rel_location: rel_loc,
                 impulse: impulse,
             });
@@ -343,7 +343,7 @@ fn handle_collision<'a>(
                 Collided {
                     hits: vec![
                         Hit {
-                            entity: o_ent,
+                            entity: ent,
                             rel_location: rel_loc,
                             impulse: impulse,
                         },
