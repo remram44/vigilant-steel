@@ -7,6 +7,7 @@ use net;
 use particles::{Effect, EffectInner};
 use physics::{delete_entity, Collided, DeltaTime, Position, Velocity};
 use rand::{self, Rng};
+use ship::Projectile;
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
 use std::f64::consts::PI;
@@ -42,12 +43,15 @@ impl<'a> System<'a> for SysAsteroid {
         ReadStorage<'a, Collided>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Asteroid>,
+        ReadStorage<'a, Projectile>,
     );
 
     fn run(
         &mut self,
-        (dt, role, lazy, entities, collided, pos, asteroid): Self::SystemData,
-    ) {
+        (
+            dt, role, lazy, entities, collided, pos, asteroid, projectile,
+        ): Self::SystemData,
+){
         assert!(role.authoritative());
 
         let dt = dt.0;
@@ -79,7 +83,7 @@ impl<'a> System<'a> for SysAsteroid {
             // Get collision info
             if let Some(col) = collided.get(entity) {
                 for hit in &col.hits {
-                    if hit.impulse > 20000.5 {
+                    if projectile.get(hit.entity).is_some() {
                         // Remove this entity
                         let new_effect = entities.create();
                         lazy.insert(

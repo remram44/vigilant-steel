@@ -6,8 +6,8 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, Collided, DeltaTime, LocalControl, Position,
-              Velocity};
+use physics::{delete_entity, AABox, Collided, DeltaTime, DetectCollision,
+              LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -331,14 +331,17 @@ impl Projectile {
                 rot: 0.0,
             },
         );
-        /*lazy.insert(
+        lazy.insert(
             entity,
-            Collision {
-                bounding_box: [0.8, 0.1],
-                mass: 1000.0,
-                inertia: 1.0,
+            DetectCollision {
+                bounding_box: AABox {
+                    xmin: -0.8,
+                    xmax: 0.8,
+                    ymin: 0.1,
+                    ymax: 0.1,
+                },
             },
-        );*/
+        );
         lazy.insert(entity, Projectile);
         #[cfg(feature = "network")]
         {

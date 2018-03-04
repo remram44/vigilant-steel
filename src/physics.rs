@@ -85,6 +85,18 @@ impl Component for Velocity {
     type Storage = VecStorage<Self>;
 }
 
+/// Special collision.
+///
+/// No built-in collision response, just detect collision and mark that object.
+/// Don't even mark the other object.
+pub struct DetectCollision {
+    pub bounding_box: AABox,
+}
+
+impl Component for DetectCollision {
+    type Storage = VecStorage<Self>;
+}
+
 /// A single collision, stored in the Collided component.
 pub struct Hit {
     /// Entity we collided with.
@@ -168,6 +180,7 @@ impl<'a> System<'a> for SysCollision {
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Blocky>,
+        ReadStorage<'a, DetectCollision>,
         WriteStorage<'a, Collided>,
     );
 
@@ -180,17 +193,20 @@ impl<'a> System<'a> for SysCollision {
             mut pos,
             mut vel,
             blocky,
+            collision,
             mut collided,
         ): Self::SystemData,
-){
+    ) {
         assert!(role.authoritative());
 
         collided.clear();
+
+        // Detect collisions between Blocky objects
         let mut hits = Vec::new();
         for (e1, pos1, blocky1) in (&*entities, &pos, &blocky).join() {
             for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
-                if e1 >= e2 {
-                    continue;
+                if e2 >= e1 {
+                    break;
                 }
                 // Detect collisions using SAT
                 if let Some(hit) = sat::find(
@@ -216,6 +232,48 @@ impl<'a> System<'a> for SysCollision {
             }
         }
 
+        // Detect collisions between Blocky and DetectCollision objects
+        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
+            for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
+                // Detect collisions using SAT
+                if let Some(hit) = sat::find(
+                    &pos1,
+                    &col1.bounding_box,
+                    &pos2,
+                    &blocky2.bounding_box,
+                ) {
+                    #[cfg(feature = "debug_markers")]
+                    {
+                        let me = entities.create();
+                        lazy.insert(
+                            me,
+                            Marker {
+                                loc: hit.location,
+                                frame: 0,
+                            },
+                        );
+                    }
+
+                    store_collision(
+                        pos1,
+                        hit.location,
+                        0.0,
+                        e1,
+                        e2,
+                        &mut collided,
+                    );
+                    store_collision(
+                        pos2,
+                        hit.location,
+                        0.0,
+                        e2,
+                        e1,
+                        &mut collided,
+                    );
+                }
+            }
+        }
+
         for (e1, e2, hit) in hits {
             handle_collision(
                 e1,
@@ -229,6 +287,46 @@ impl<'a> System<'a> for SysCollision {
                 &entities,
             );
         }
+    }
+}
+
+fn store_collision<'a>(
+    pos: &Position,
+    hit: [f64; 2],
+    impulse: f64,
+    ent: Entity,
+    o_ent: Entity,
+    collided: &mut WriteStorage<'a, Collided>,
+) {
+    let (s, c) = pos.rot.sin_cos();
+    let x = hit[0] - pos.pos[0];
+    let y = hit[1] - pos.pos[1];
+    let rel_loc = [x * c + y * s, -x * s + y * c];
+
+    // Add hit in a Collided component
+    let insert = if let Some(col) = collided.get_mut(ent) {
+        col.hits.push(Hit {
+            entity: o_ent,
+            rel_location: rel_loc,
+            impulse: impulse,
+        });
+        false
+    } else {
+        true
+    };
+    if insert {
+        collided.insert(
+            ent,
+            Collided {
+                hits: vec![
+                    Hit {
+                        entity: o_ent,
+                        rel_location: rel_loc,
+                        impulse: impulse,
+                    },
+                ],
+            },
+        );
     }
 }
 
@@ -289,36 +387,7 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(ent).unwrap();
-        let (s, c) = pos.rot.sin_cos();
-        let x = hit.location[0] - pos.pos[0];
-        let y = hit.location[1] - pos.pos[1];
-        let rel_loc = [x * c + y * s, -x * s + y * c];
-
-        // Add hit in a Collided component
-        let insert = if let Some(col) = collided.get_mut(ent) {
-            col.hits.push(Hit {
-                entity: o_ent,
-                rel_location: rel_loc,
-                impulse: impulse,
-            });
-            false
-        } else {
-            true
-        };
-        if insert {
-            collided.insert(
-                ent,
-                Collided {
-                    hits: vec![
-                        Hit {
-                            entity: o_ent,
-                            rel_location: rel_loc,
-                            impulse: impulse,
-                        },
-                    ],
-                },
-            );
-        }
+        store_collision(pos, hit.location, impulse, ent, o_ent, collided);
 
         // Move object out of collision
         pos.pos = vec2_add(
@@ -337,36 +406,7 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(o_ent).unwrap();
-        let (s, c) = pos.rot.sin_cos();
-        let x = hit.location[0] - pos.pos[0];
-        let y = hit.location[1] - pos.pos[1];
-        let rel_loc = [x * c + y * s, -x * s + y * c];
-
-        // Add hit in a Collided component
-        let insert = if let Some(col) = collided.get_mut(o_ent) {
-            col.hits.push(Hit {
-                entity: ent,
-                rel_location: rel_loc,
-                impulse: impulse,
-            });
-            false
-        } else {
-            true
-        };
-        if insert {
-            collided.insert(
-                o_ent,
-                Collided {
-                    hits: vec![
-                        Hit {
-                            entity: ent,
-                            rel_location: rel_loc,
-                            impulse: impulse,
-                        },
-                    ],
-                },
-            );
-        }
+        store_collision(pos, hit.location, impulse, o_ent, ent, collided);
 
         // Move object out of collision
         pos.pos = vec2_add(
