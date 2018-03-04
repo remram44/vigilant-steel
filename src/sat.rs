@@ -1,4 +1,4 @@
-use physics::Position;
+use physics::{AABox, Position};
 use std::cmp::Ordering;
 use utils::IteratorExt;
 use vecmath::*;
@@ -26,27 +26,24 @@ pub struct Collision {
 /// This is part of the SAT collision detection method.
 fn check_sat_collision_dir(
     pos1: &Position,
-    size1: &[f64; 2],
+    size1: &AABox,
     pos2: &Position,
-    size2: &[f64; 2],
+    size2: &AABox,
     dir: [f64; 2],
 ) -> Option<Collision> {
     // This is called for each normal of each rectangle
     // It checks whether there is collision of the shape projected along it
 
-    let corners = &[(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)];
     // Project rectangle 1
     let (s, c) = pos1.rot.sin_cos();
-    let proj1 = corners
+    let proj1 = size1
+        .corners()
         .iter()
-        .map(|&(x, y)| {
+        .map(|&corner| {
             // Compute corner coordinates
             let corner = vec2_add(
                 pos1.pos,
-                [
-                    size1[0] * x * c + size1[1] * y * (-s),
-                    size1[0] * x * s + size1[1] * y * c,
-                ],
+                [corner[0] * c - corner[1] * s, corner[0] * s + corner[1] * c],
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {
@@ -58,16 +55,14 @@ fn check_sat_collision_dir(
         .unwrap();
     // Project rectangle 2
     let (s, c) = pos2.rot.sin_cos();
-    let proj2 = corners
+    let proj2 = size2
+        .corners()
         .iter()
-        .map(|&(x, y)| {
+        .map(|&corner| {
             // Compute corner coordinates
             let corner = vec2_add(
                 pos2.pos,
-                [
-                    size2[0] * x * c + size2[1] * y * (-s),
-                    size2[0] * x * s + size2[1] * y * c,
-                ],
+                [corner[0] * c - corner[1] * s, corner[0] * s + corner[1] * c],
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {
@@ -106,9 +101,9 @@ fn check_sat_collision_dir(
 /// and depth.
 pub fn find(
     pos1: &Position,
-    size1: &[f64; 2],
+    size1: &AABox,
     pos2: &Position,
-    size2: &[f64; 2],
+    size2: &AABox,
 ) -> Option<Collision> {
     let (s, c) = pos1.rot.sin_cos();
     let mut res = check_sat_collision_dir(pos1, size1, pos2, size2, [c, s])?;

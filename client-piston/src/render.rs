@@ -1,9 +1,9 @@
 //! Rendering code, using Piston.
 
-use game::asteroid::Asteroid;
+use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
 #[cfg(feature = "debug_markers")]
-use game::physics::{Arrow, Collision, Marker};
+use game::physics::{Arrow, Marker};
 use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, Ship};
 use graphics::{self, Context, Graphics, Transformed};
@@ -80,6 +80,77 @@ fn draw_line_loop<G>(
     );
 }
 
+fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
+    match block.inner {
+        BlockInner::Cockpit => {
+            draw_line_loop(
+                [1.0, 0.0, 0.0, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+            draw_line_loop(
+                [1.0, 0.0, 0.0, 1.0],
+                0.02,
+                &[[-0.2, -0.3], [0.2, 0.0], [-0.2, 0.3]],
+                tr,
+                gl,
+            );
+        }
+        BlockInner::Thruster(angle) => for i in &[-0.4, 0.0] {
+            graphics::polygon(
+                [0.4, 0.4, 0.4, 1.0],
+                &[[0.45, 0.25], [0.05, 0.45], [0.05, -0.45], [0.45, -0.25]],
+                tr.rot_rad(angle).trans(*i, 0.0),
+                gl,
+            );
+        },
+        BlockInner::Gun(angle, _) => {
+            draw_line_loop(
+                [0.7, 0.7, 1.0, 1.0],
+                0.05,
+                &[
+                    [-0.35, -0.35],
+                    [0.0, -0.45],
+                    [0.35, -0.35],
+                    [0.45, 0.0],
+                    [0.35, 0.35],
+                    [0.0, 0.45],
+                    [-0.35, 0.35],
+                    [-0.45, 0.0],
+                ],
+                tr,
+                gl,
+            );
+            graphics::polygon(
+                [0.7, 0.7, 1.0, 1.0],
+                &[[-0.0, -0.15], [0.6, -0.15], [0.6, 0.15], [-0.0, 0.15]],
+                tr.rot_rad(angle),
+                gl,
+            );
+        }
+        BlockInner::Armor => {
+            draw_line_loop(
+                [0.7, 0.7, 0.7, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+        }
+        BlockInner::Rock => {
+            draw_line_loop(
+                [0.45, 0.45, 0.45, 1.0],
+                0.05,
+                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                tr,
+                gl,
+            );
+        }
+    }
+}
+
 pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
@@ -92,10 +163,9 @@ pub fn render<G, C, E>(
 {
     let viewport = world.read_resource::<Viewport>();
     let pos = world.read::<Position>();
-    let ship = world.read::<Ship>();
     let projectile = world.read::<Projectile>();
-    let asteroid = world.read::<Asteroid>();
     let particles = world.read::<Particle>();
+    let blocky = world.read::<Blocky>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], gl);
 
@@ -104,45 +174,15 @@ pub fn render<G, C, E>(
         .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
         .scale(viewport.scale, -viewport.scale);
 
-    for (pos, ship) in (&pos, &ship).join() {
-        let ship_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        let mut color = [
-            ship.color[0] as f32 / 256.0,
-            ship.color[1] as f32 / 256.0,
-            ship.color[2] as f32 / 256.0,
-            1.0,
-        ];
-        draw_line_loop(
-            color,
-            0.1,
-            &[[-1.0, -0.8], [1.0, 0.0], [-1.0, 0.8]],
-            ship_tr,
-            gl,
-        );
+    // Draw blocks
+    for (pos, blocky) in (&pos, &blocky).join() {
+        let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        for &(rel, ref block) in &blocky.blocks {
+            draw_block(&block, blocks_tr.trans(rel[0], rel[1]), gl);
+        }
     }
 
-    for (pos, _) in (&pos, &asteroid).join() {
-        let asteroid_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        draw_line_loop(
-            [1.0, 1.0, 1.0, 1.0],
-            0.1,
-            &[
-                [-3.8, -2.6],
-                [0.0, -4.6],
-                [3.8, -2.6],
-                [3.8, 2.6],
-                [0.0, 4.6],
-                [-3.8, 2.6],
-                [-3.8, -2.6],
-                [3.8, -2.6],
-                [-3.8, 2.6],
-                [3.8, 2.6],
-            ],
-            asteroid_tr,
-            gl,
-        );
-    }
-
+    // Draw projectiles
     for (pos, _) in (&pos, &projectile).join() {
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         graphics::line(
@@ -259,17 +299,16 @@ pub fn render<G, C, E>(
             }
         }
 
-        let collision = world.read::<Collision>();
-        for (pos, col) in (&pos, &collision).join() {
+        for (pos, blk) in (&pos, &blocky).join() {
             let rect_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
             draw_line_loop(
                 [0.0, 1.0, 0.0, 1.0],
                 0.1,
                 &[
-                    [-col.bounding_box[0], -col.bounding_box[1]],
-                    [col.bounding_box[0], -col.bounding_box[1]],
-                    [col.bounding_box[0], col.bounding_box[1]],
-                    [-col.bounding_box[0], col.bounding_box[1]],
+                    [blk.bounding_box.xmin, blk.bounding_box.ymin],
+                    [blk.bounding_box.xmax, blk.bounding_box.ymin],
+                    [blk.bounding_box.xmax, blk.bounding_box.ymax],
+                    [blk.bounding_box.xmin, blk.bounding_box.ymax],
                 ],
                 rect_tr,
                 gl,
@@ -277,6 +316,7 @@ pub fn render<G, C, E>(
         }
     }
 
+    // Show health
     let local = world.read::<LocalControl>();
     let ship = world.read::<Ship>();
     if let Some((_, ship)) = (&local, &ship).join().next() {

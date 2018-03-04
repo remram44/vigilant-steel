@@ -1,12 +1,13 @@
 //! Ships and projectiles.
 
-use Role;
+use {Clock, Role};
+use blocks::{Block, BlockInner, Blocky};
 use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, Collided, Collision, DeltaTime, LocalControl,
-              Position, Velocity};
+use physics::{delete_entity, Collided, DeltaTime, LocalControl, Position,
+              Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -20,19 +21,15 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub thrust: [f64; 2],
-    pub reload: f64,
-    pub color: [u8; 3],
     pub health: i32,
 }
 
 impl Ship {
-    pub fn new(color: [u8; 3]) -> Ship {
+    pub fn new() -> Ship {
         Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             thrust: [0.0, 0.0],
-            reload: 0.0,
-            color: color,
             health: 8,
         }
     }
@@ -53,15 +50,19 @@ impl Ship {
                 rot: 0.0,
             },
         );
-        lazy.insert(
-            entity,
-            Collision {
-                bounding_box: [1.0, 0.8],
-                mass: 1.0,
-                inertia: 0.3,
-            },
-        );
-        lazy.insert(entity, Ship::new([255, 0, 0]));
+        lazy.insert(entity, Ship::new());
+        let blocks = vec![
+            ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.7))),
+            ([-1.0, 0.0], Block::new(BlockInner::Thruster(0.0))),
+            ([-1.0, 1.0], Block::new(BlockInner::Thruster(-0.7))),
+            ([0.0, -1.0], Block::new(BlockInner::Armor)),
+            ([0.0, 1.0], Block::new(BlockInner::Armor)),
+            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
+            ([1.0, 1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            ([1.0, -1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            ([1.0, 0.0], Block::new(BlockInner::Armor)),
+        ];
+        lazy.insert(entity, Blocky::new(blocks));
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -87,11 +88,13 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Fetch<'a, Input>,
+        Fetch<'a, Clock>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Collided>,
         WriteStorage<'a, Ship>,
+        WriteStorage<'a, Blocky>,
         ReadStorage<'a, LocalControl>,
     );
 
@@ -102,15 +105,18 @@ impl<'a> System<'a> for SysShip {
             role,
             lazy,
             input,
+            clock,
             entities,
             pos,
             mut vel,
             collided,
             mut ship,
+            mut blocky,
             local,
         ): Self::SystemData,
     ) {
         let dt = dt.0;
+        let mut rng = rand::thread_rng();
 
         if role.authoritative() {
             // Handle collisions
@@ -118,7 +124,7 @@ impl<'a> System<'a> for SysShip {
                 (&*entities, &collided, &mut ship).join()
             {
                 for hit in &col.hits {
-                    if hit.impulse > 2.0 {
+                    if hit.impulse > 40.0 {
                         ship.health -= 1;
                         warn!("Ship collided! Health now {}", ship.health);
                         #[cfg(feature = "network")]
@@ -145,7 +151,7 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        // Control ship thrusters from local input
+        // Set ship controls from local input
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
             ship.want_thrust[0] = -input.movement[0];
             ship.want_thrust[1] = input.movement[1];
@@ -158,7 +164,7 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        // Control ships from input
+        // Action thrusters from controls
         if role.authoritative() {
             for mut ship in (&mut ship).join() {
                 ship.thrust[0] = ship.want_thrust[0].min(1.0).max(-1.0);
@@ -166,8 +172,8 @@ impl<'a> System<'a> for SysShip {
             }
         }
 
-        for (ent, pos, mut vel, mut ship) in
-            (&*entities, &pos, &mut vel, &mut ship).join()
+        for (ent, pos, mut vel, mut ship, mut blocky) in
+            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
         {
             // Death
             if role.authoritative() && ship.health <= 0 {
@@ -196,44 +202,58 @@ impl<'a> System<'a> for SysShip {
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
             // Update velocity
-            let dir = {
-                let (s, c) = pos.rot.sin_cos();
-                [c, s]
-            };
+            let (s, c) = pos.rot.sin_cos();
+            let dir = [c, s];
             vel.vel =
                 vec2_add(vel.vel, vec2_scale(dir, ship.thrust[1] * 10.0 * dt));
 
             // Spawn Exhaust particles
-            if role.graphical() {
-                if ship.thrust[1] > 0.3 {
-                    let mut rng = rand::thread_rng();
-                    let thrust_pos = vec2_add(pos.pos, vec2_scale(dir, -1.0));
-                    let thrust_vel = vec2_scale(dir, -10.0);
-                    let p = entities.create();
-                    lazy.insert(
-                        p,
-                        Position {
-                            pos: thrust_pos,
-                            rot: 0.0,
-                        },
-                    );
-                    lazy.insert(
-                        p,
-                        Velocity {
-                            vel: [
-                                thrust_vel[0] + rng.gen_range(-6.0, 6.0),
-                                thrust_vel[1] + rng.gen_range(-6.0, 6.0),
-                            ],
-                            rot: rng.gen_range(-5.0, 5.0),
-                        },
-                    );
-                    lazy.insert(
-                        p,
-                        Particle {
-                            lifetime: 0.5,
-                            which: ParticleType::Exhaust,
-                        },
-                    );
+            if role.graphical() && ship.thrust[1] > 0.3 {
+                for &(ref rel, ref block) in &blocky.blocks {
+                    let angle = match block.inner {
+                        BlockInner::Thruster(a) => a,
+                        _ => continue,
+                    };
+                    let rate = 1.0 / (angle.cos() * ship.thrust[1] * 40.0);
+                    let num = (**clock / rate) as i32
+                        - ((**clock - dt) / rate) as i32;
+                    for _ in 0..num {
+                        let thrust_dir = {
+                            let (ts, tc) = (pos.rot + angle).sin_cos();
+                            [tc, ts]
+                        };
+                        let thrust_pos = [
+                            pos.pos[0] + rel[0] * c - rel[1] * s,
+                            pos.pos[1] + rel[0] * s + rel[1] * c,
+                        ];
+                        let thrust_pos = vec2_sub(thrust_pos, thrust_dir);
+                        let thrust_vel = vec2_scale(thrust_dir, -10.0);
+                        let p = entities.create();
+                        lazy.insert(
+                            p,
+                            Position {
+                                pos: thrust_pos,
+                                rot: 0.0,
+                            },
+                        );
+                        lazy.insert(
+                            p,
+                            Velocity {
+                                vel: [
+                                    thrust_vel[0] + rng.gen_range(-6.0, 6.0),
+                                    thrust_vel[1] + rng.gen_range(-6.0, 6.0),
+                                ],
+                                rot: rng.gen_range(-5.0, 5.0),
+                            },
+                        );
+                        lazy.insert(
+                            p,
+                            Particle {
+                                lifetime: 0.5,
+                                which: ParticleType::Exhaust,
+                            },
+                        );
+                    }
                 }
             }
 
@@ -245,21 +265,42 @@ impl<'a> System<'a> for SysShip {
 
             // Fire
             if role.authoritative() {
-                if ship.want_fire && ship.reload <= 0.0 {
-                    ship.reload = 1.5;
-
-                    Projectile::create(
-                        &entities,
-                        &lazy,
-                        vec2_add(pos.pos, vec2_scale(dir, 1.7)),
-                        pos.rot,
-                    );
-                    // Recoil
-                    vel.vel = vec2_add(vel.vel, vec2_scale(dir, -6.0));
-                    #[cfg(feature = "network")]
-                    lazy.insert(ent, net::Dirty);
-                } else if ship.reload > 0.0 {
-                    ship.reload -= dt;
+                let mut fired = false;
+                for &mut (rel, ref mut block) in &mut blocky.blocks {
+                    let (angle, reload) = match block.inner {
+                        BlockInner::Gun(a, r) => (a, r),
+                        _ => continue,
+                    };
+                    if ship.want_fire && reload <= 0.0 {
+                        let fire_dir = {
+                            let (fs, fc) = (pos.rot + angle).sin_cos();
+                            [fc, fs]
+                        };
+                        let fire_pos = [
+                            pos.pos[0] + rel[0] * c - rel[1] * s,
+                            pos.pos[1] + rel[0] * s + rel[1] * c,
+                        ];
+                        Projectile::create(
+                            &entities,
+                            &lazy,
+                            vec2_add(fire_pos, vec2_scale(fire_dir, 1.6)),
+                            pos.rot + angle,
+                        );
+                        // Recoil
+                        vel.vel =
+                            vec2_add(vel.vel, vec2_scale(fire_dir, -6.0));
+                        block.inner =
+                            BlockInner::Gun(angle, rng.gen_range(1.4, 1.6));
+                        fired = true;
+                    } else if reload > 0.0 {
+                        block.inner = BlockInner::Gun(angle, reload - dt);
+                    }
+                }
+                #[cfg(feature = "network")]
+                {
+                    if fired {
+                        lazy.insert(ent, net::Dirty);
+                    }
                 }
             }
         }
@@ -290,14 +331,14 @@ impl Projectile {
                 rot: 0.0,
             },
         );
-        lazy.insert(
+        /*lazy.insert(
             entity,
             Collision {
                 bounding_box: [0.8, 0.1],
                 mass: 1000.0,
                 inertia: 1.0,
             },
-        );
+        );*/
         lazy.insert(entity, Projectile);
         #[cfg(feature = "network")]
         {

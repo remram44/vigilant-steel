@@ -3,12 +3,12 @@
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use particles::Effect;
-use physics::{Collision, LocalControl, Position, Velocity};
+use physics::{LocalControl, Position, Velocity};
 use ship::{Projectile, Ship};
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Cursor, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -453,7 +453,7 @@ impl<'a> System<'a> for SysNetServer {
             if let Some(ship) = ship.get(ent) {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
-                data = Vec::with_capacity(43);
+                data = Vec::with_capacity(36);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
                 write_float(&mut data, pos.rot);
@@ -462,10 +462,8 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.rot);
                 write_float(&mut data, ship.thrust[0]);
                 write_float(&mut data, ship.thrust[1]);
-                write_float(&mut data, ship.reload);
-                assert_eq!(data.write(&ship.color).unwrap(), 3);
                 data.write_i32::<ORDER>(ship.health).unwrap();
-                assert_eq!(data.len(), 43);
+                assert_eq!(data.len(), 36);
             } else if asteroid.get(ent).is_some() {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
@@ -672,7 +670,7 @@ impl<'a> System<'a> for SysNetClient {
 
                     // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        assert_eq!(data.len(), 43);
+                        assert_eq!(data.len(), 36);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
                         pos.pos[1] = read_float(&mut data);
@@ -682,10 +680,8 @@ impl<'a> System<'a> for SysNetClient {
                         vel.rot = read_float(&mut data);
                         ship.thrust[0] = read_float(&mut data);
                         ship.thrust[1] = read_float(&mut data);
-                        ship.reload = read_float(&mut data);
-                        assert_eq!(data.read(&mut ship.color).unwrap(), 3);
                         ship.health = data.read_i32::<ORDER>().unwrap();
-                        assert_eq!(data.position(), 43);
+                        assert_eq!(data.position(), 36);
                     } else if asteroid.get(ent).is_some() {
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
@@ -726,7 +722,7 @@ impl<'a> System<'a> for SysNetClient {
                 continue;
             }
             if let Message::EntityUpdate(id, ref data) = *msg {
-                if data.len() == 43 {
+                if data.len() == 36 {
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
@@ -740,12 +736,6 @@ impl<'a> System<'a> for SysNetClient {
                         want_fire: false,
                         want_thrust: [0.0, 0.0],
                         thrust: [read_float(&mut data), read_float(&mut data)],
-                        reload: read_float(&mut data),
-                        color: {
-                            let mut buf = [0u8; 3];
-                            assert_eq!(data.read(&mut buf).unwrap(), 3);
-                            buf
-                        },
                         health: data.read_i32::<ORDER>().unwrap(),
                     };
                     assert_eq!(data.position(), 43);
@@ -753,14 +743,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [1.0, 0.8],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, ship);
                     lazy.insert(
                         entity,
@@ -790,14 +772,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [4.0, 4.0],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, Asteroid);
                     lazy.insert(
                         entity,
@@ -821,14 +795,6 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(
-                        entity,
-                        Collision {
-                            bounding_box: [0.8, 0.1],
-                            mass: 1.0,
-                            inertia: 0.3,
-                        },
-                    );
                     lazy.insert(entity, Projectile);
                     lazy.insert(
                         entity,
