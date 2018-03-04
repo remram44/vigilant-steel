@@ -137,12 +137,18 @@ impl<'a> System<'a> for SysAsteroid {
                     },
                 );
                 lazy.insert(entity, Asteroid);
-                let mut blocks = Vec::with_capacity(26);
-                for y in 0..6 {
-                    for x in 0..5 {
-                        if (x != 0 && x != 4) || (y != 0 && y != 5) {
-                            let pos = [x as f64 - 2.0, y as f64 - 2.5];
-                            blocks.push((pos, Block::new(BlockInner::Rock)));
+                let mut blocks = Vec::new();
+                let a = rng.gen_range(3.0, 4.0);
+                let ai = a as i32 + 1;
+                let b = rng.gen_range(2.0, 3.0);
+                let bi = b as i32 + 1;
+                for y in -ai..ai {
+                    for x in -bi..bi {
+                        let x = x as f64;
+                        let y = y as f64;
+                        if x * x * a * a + y * y * b * b <= a * a * b * b {
+                            blocks
+                                .push(([x, y], Block::new(BlockInner::Rock)));
                         }
                     }
                 }
