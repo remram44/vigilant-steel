@@ -1,4 +1,4 @@
-use physics::AABox;
+use physics::{AABox, Collidable};
 use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
 use vecmath::*;
 
@@ -116,6 +116,16 @@ impl Blocky {
             mass: mass,
             inertia: inertia,
         }
+    }
+}
+
+impl Collidable for Blocky {
+    fn bounding_box(&self) -> &AABox {
+        &self.bounding_box
+    }
+
+    fn mass_inertia(&self) -> (f64, f64) {
+        (self.mass, self.inertia)
     }
 }
 

@@ -85,12 +85,27 @@ impl Component for Velocity {
     type Storage = VecStorage<Self>;
 }
 
+pub trait Collidable {
+    fn bounding_box(&self) -> &AABox;
+    fn mass_inertia(&self) -> (f64, f64);
+}
+
 /// Special collision.
 ///
 /// No built-in collision response, just detect collision and mark that object.
 /// Don't even mark the other object.
 pub struct DetectCollision {
     pub bounding_box: AABox,
+}
+
+impl Collidable for DetectCollision {
+    fn bounding_box(&self) -> &AABox {
+        &self.bounding_box
+    }
+
+    fn mass_inertia(&self) -> (f64, f64) {
+        (0.0, 0.0)
+    }
 }
 
 impl Component for DetectCollision {
