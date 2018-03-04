@@ -226,7 +226,8 @@ impl<'a> System<'a> for SysShip {
                             pos.pos[0] + rel[0] * c - rel[1] * s,
                             pos.pos[1] + rel[0] * s + rel[1] * c,
                         ];
-                        let thrust_pos = vec2_sub(thrust_pos, thrust_dir);
+                        let thrust_pos =
+                            vec2_sub(thrust_pos, vec2_scale(thrust_dir, 0.6));
                         let thrust_vel = vec2_scale(thrust_dir, -10.0);
                         let p = entities.create();
                         lazy.insert(
