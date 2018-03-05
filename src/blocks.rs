@@ -102,12 +102,7 @@ impl Blocky {
         for &mut (ref mut loc, ref block) in &mut blocks {
             *loc = vec2_sub(*loc, center);
             inertia += vec2_square_len(*loc) * block.inner.mass();
-            bounds = AABox {
-                xmin: bounds.xmin.min(loc[0] - 0.5),
-                xmax: bounds.xmax.max(loc[0] + 0.5),
-                ymin: bounds.ymin.min(loc[1] - 0.5),
-                ymax: bounds.ymax.max(loc[1] + 0.5),
-            };
+            bounds.add_square1(*loc);
         }
 
         Blocky {

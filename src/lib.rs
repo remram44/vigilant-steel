@@ -14,6 +14,7 @@ pub mod particles;
 pub mod physics;
 mod sat;
 pub mod ship;
+mod tree;
 pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};

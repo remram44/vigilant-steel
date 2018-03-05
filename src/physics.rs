@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 use vecmath::*;
 
 /// Bounding-box.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AABox {
     pub xmin: f64,
     pub xmax: f64,
@@ -37,6 +37,16 @@ impl AABox {
             [self.xmax, self.ymax],
             [self.xmin, self.ymax],
         ]
+    }
+
+    /// Add a square of size 1 by the location of its center.
+    pub fn add_square1(&mut self, point: [f64; 2]) {
+        *self = AABox {
+            xmin: self.xmin.min(point[0] - 0.5),
+            xmax: self.xmax.max(point[0] + 0.5),
+            ymin: self.ymin.min(point[1] - 0.5),
+            ymax: self.ymax.max(point[1] + 0.5),
+        };
     }
 }
 
