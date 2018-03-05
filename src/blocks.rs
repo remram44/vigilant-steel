@@ -1,5 +1,5 @@
-use physics::AABox;
 use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
+use tree::Tree;
 use vecmath::*;
 
 /// Active component of the block.
@@ -78,7 +78,7 @@ impl Block {
 // Entity is made of blocks
 pub struct Blocky {
     pub blocks: Vec<([f64; 2], Block)>,
-    pub bounding_box: AABox, // TODO: replace with space partitioning tree
+    pub tree: Tree,
     pub mass: f64,
     pub inertia: f64,
 }
@@ -98,16 +98,15 @@ impl Blocky {
             mass += block.inner.mass();
         }
         let mut inertia = 0.0;
-        let mut bounds = AABox::empty();
         for &mut (ref mut loc, ref block) in &mut blocks {
             *loc = vec2_sub(*loc, center);
             inertia += vec2_square_len(*loc) * block.inner.mass();
-            bounds.add_square1(*loc);
         }
 
+        let tree = Tree::new_(&blocks);
         Blocky {
             blocks: blocks,
-            bounding_box: bounds,
+            tree: tree,
             mass: mass,
             inertia: inertia,
         }

@@ -9,6 +9,7 @@ use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
 use std::f64::consts::PI;
+use tree;
 use vecmath::*;
 
 /// Bounding-box.
@@ -218,32 +219,22 @@ impl<'a> System<'a> for SysCollision {
                 if e2 >= e1 {
                     break;
                 }
-                // Detect collisions using SAT
-                if let Some(hit) = sat::find(
+                // Detect collisions using tree
+                if let Some(hit) = find_collision_tree(
                     &pos1,
-                    &blocky1.bounding_box,
+                    &blocky1.tree,
+                    0,
                     &pos2,
-                    &blocky2.bounding_box,
+                    &blocky2.tree,
+                    0,
                 ) {
-                    #[cfg(feature = "debug_markers")]
-                    {
-                        let me = entities.create();
-                        lazy.insert(
-                            me,
-                            Marker {
-                                loc: hit.location,
-                                frame: 0,
-                            },
-                        );
-                    }
-
                     hits.push((e1, e2, hit));
                 }
             }
         }
 
         // Detect collisions between Blocky and DetectCollision objects
-        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
+        /*for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
             for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
                 // Detect collisions using SAT
                 if let Some(hit) = sat::find(
@@ -282,7 +273,7 @@ impl<'a> System<'a> for SysCollision {
                     );
                 }
             }
-        }
+        }*/
 
         for (e1, e2, hit) in hits {
             handle_collision(
@@ -297,6 +288,39 @@ impl<'a> System<'a> for SysCollision {
                 &entities,
             );
         }
+    }
+}
+
+fn find_collision_tree(
+    pos1: &Position,
+    tree1: &tree::Tree,
+    idx1: usize,
+    pos2: &Position,
+    tree2: &tree::Tree,
+    idx2: usize,
+) -> Option<sat::Collision> {
+    let n1 = &tree1.0[idx1];
+    let n2 = &tree2.0[idx2];
+    if let Some(hit) = sat::find(pos1, &n1.bounds, pos2, &n2.bounds) {
+        if let tree::Content::Internal(left, right) = n1.content {
+            match find_collision_tree(pos1, tree1, left, pos2, tree2, idx2) {
+                None => {
+                    find_collision_tree(pos1, tree1, right, pos2, tree2, idx2)
+                }
+                r => r,
+            }
+        } else if let tree::Content::Internal(left, right) = n2.content {
+            match find_collision_tree(pos1, tree1, idx1, pos2, tree2, left) {
+                None => {
+                    find_collision_tree(pos1, tree1, idx1, pos2, tree2, right)
+                }
+                r => r,
+            }
+        } else {
+            Some(hit)
+        }
+    } else {
+        None
     }
 }
 
