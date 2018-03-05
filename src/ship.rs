@@ -58,9 +58,7 @@ impl Ship {
             ([0.0, -1.0], Block::new(BlockInner::Armor)),
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
-            ([1.0, 1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
-            ([1.0, -1.0], Block::new(BlockInner::Gun(0.0, -1.0))),
-            ([1.0, 0.0], Block::new(BlockInner::Armor)),
+            ([1.0, 0.0], Block::new(BlockInner::Gun(0.0, -1.0))),
         ];
         lazy.insert(entity, Blocky::new(blocks));
         #[cfg(feature = "network")]
