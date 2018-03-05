@@ -212,14 +212,15 @@ impl<'a> System<'a> for SysCollision {
         }
 
         // Detect collisions between Blocky and DetectCollision objects
-        /*for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
+        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
             for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
-                // Detect collisions using SAT
-                if let Some(hit) = sat::find(
+                // Detect collisions using tree
+                if let Some(hit) = find_collision_tree_box(
                     &pos1,
                     &col1.bounding_box,
                     &pos2,
-                    &blocky2.bounding_box,
+                    &blocky2.tree,
+                    0,
                 ) {
                     store_collision(
                         pos1,
@@ -239,7 +240,7 @@ impl<'a> System<'a> for SysCollision {
                     );
                 }
             }
-        }*/
+        }
 
         for (e1, e2, hit) in hits {
             handle_collision(
@@ -278,6 +279,30 @@ fn find_collision_tree(
             match find_collision_tree(pos1, tree1, idx1, pos2, tree2, left) {
                 None => {
                     find_collision_tree(pos1, tree1, idx1, pos2, tree2, right)
+                }
+                r => r,
+            }
+        } else {
+            Some(hit)
+        }
+    } else {
+        None
+    }
+}
+
+fn find_collision_tree_box(
+    pos1: &Position,
+    box1: &AABox,
+    pos2: &Position,
+    tree2: &tree::Tree,
+    idx2: usize,
+) -> Option<sat::Collision> {
+    let n2 = &tree2.0[idx2];
+    if let Some(hit) = sat::find(pos1, box1, pos2, &n2.bounds) {
+        if let tree::Content::Internal(left, right) = n2.content {
+            match find_collision_tree_box(pos1, box1, pos2, tree2, left) {
+                None => {
+                    find_collision_tree_box(pos1, box1, pos2, tree2, right)
                 }
                 r => r,
             }
