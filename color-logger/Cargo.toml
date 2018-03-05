@@ -1,11 +1,11 @@
 [package]
 workspace = ".."
 name = "color-logger"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
 license = "Unlicense/MIT"
 description = "Simple log output with colors"
 
 [dependencies]
-log = "0.3"
+log = { version = "0.4", features = ["std"] }
 termcolor = "0.3"

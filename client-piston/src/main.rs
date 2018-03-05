@@ -15,7 +15,6 @@ mod render;
 use game::Game;
 use game::input::{Input, Press};
 use game::utils::FpsCounter;
-use log::LogLevel;
 use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
 use piston::input::*;
 use piston::window::WindowSettings;
@@ -39,7 +38,7 @@ const OPENGL: OpenGL = OpenGL::V2_1;
 
 /// Entrypoint. Sets up SDL and the event loop.
 fn main() {
-    color_logger::init(LogLevel::Info).unwrap();
+    color_logger::init(log::Level::Info).unwrap();
     info!("Starting up");
 
     let width = 800;

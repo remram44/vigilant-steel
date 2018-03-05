@@ -6,7 +6,6 @@ extern crate game;
 extern crate log;
 
 use game::Game;
-use log::LogLevel;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
@@ -18,7 +17,7 @@ fn to_secs(dt: Duration) -> f64 {
 
 /// Entrypoint for server.
 fn main() {
-    color_logger::init(LogLevel::Info).unwrap();
+    color_logger::init(log::Level::Info).unwrap();
     info!("Starting up");
 
     let mut game = Game::new_server(34244);

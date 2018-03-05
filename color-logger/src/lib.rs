@@ -6,7 +6,8 @@
 extern crate log;
 extern crate termcolor;
 
-use log::{set_logger, Log, LogLevel, LogMetadata, LogRecord, SetLoggerError};
+use log::{set_boxed_logger, set_max_level, Level, LevelFilter, Log, Metadata,
+          Record, SetLoggerError};
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -16,11 +17,11 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 /// the `init()` function to make this work.
 struct StderrLogger {
     stderr: StandardStream,
-    level: LogLevel,
+    level: Level,
 }
 
 impl StderrLogger {
-    fn new(level: LogLevel) -> StderrLogger {
+    fn new(level: Level) -> StderrLogger {
         StderrLogger {
             stderr: StandardStream::stdout(ColorChoice::Auto),
             level: level,
@@ -29,19 +30,19 @@ impl StderrLogger {
 }
 
 impl Log for StderrLogger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.level
     }
 
-    fn log(&self, record: &LogRecord) {
+    fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let mut stderr = self.stderr.lock();
             let color = match record.metadata().level() {
-                LogLevel::Error => Color::Red,
-                LogLevel::Warn => Color::Magenta,
-                LogLevel::Info => Color::Yellow,
-                LogLevel::Debug => Color::Cyan,
-                LogLevel::Trace => Color::Blue,
+                Level::Error => Color::Red,
+                Level::Warn => Color::Magenta,
+                Level::Info => Color::Yellow,
+                Level::Debug => Color::Cyan,
+                Level::Trace => Color::Blue,
             };
             stderr
                 .set_color(ColorSpec::new().set_fg(Some(color)))
@@ -52,12 +53,12 @@ impl Log for StderrLogger {
             stderr.flush().unwrap();
         }
     }
+
+    fn flush(&self) {}
 }
 
 /// Sets up the logger object to log on stderr with the given log level.
-pub fn init(level: LogLevel) -> Result<(), SetLoggerError> {
-    set_logger(|max_log_level| {
-        max_log_level.set(level.to_log_level_filter());
-        Box::new(StderrLogger::new(level))
-    })
+pub fn init(level: Level) -> Result<(), SetLoggerError> {
+    set_max_level(LevelFilter::Info);
+    set_boxed_logger(Box::new(StderrLogger::new(level)))
 }

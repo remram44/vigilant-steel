@@ -17,7 +17,7 @@ path = "src/main.rs"
 game = { path = ".." }
 color-logger = { path = "../color-logger" }
 
-log = "0.3"
+log = "0.4"
 specs = "0.10"
 
 # Abstract graphics
