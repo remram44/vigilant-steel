@@ -138,28 +138,6 @@ impl Component for LocalControl {
 /// Delta resource, stores the simulation step.
 pub struct DeltaTime(pub f64);
 
-#[cfg(feature = "debug_markers")]
-pub struct Marker {
-    pub loc: [f64; 2],
-    pub frame: u32,
-}
-
-#[cfg(feature = "debug_markers")]
-impl Component for Marker {
-    type Storage = VecStorage<Self>;
-}
-
-#[cfg(feature = "debug_markers")]
-pub struct Arrow {
-    pub ends: [[f64; 2]; 2],
-    pub frame: u32,
-}
-
-#[cfg(feature = "debug_markers")]
-impl Component for Arrow {
-    type Storage = VecStorage<Self>;
-}
-
 /// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
@@ -243,18 +221,6 @@ impl<'a> System<'a> for SysCollision {
                     &pos2,
                     &blocky2.bounding_box,
                 ) {
-                    #[cfg(feature = "debug_markers")]
-                    {
-                        let me = entities.create();
-                        lazy.insert(
-                            me,
-                            Marker {
-                                loc: hit.location,
-                                frame: 0,
-                            },
-                        );
-                    }
-
                     store_collision(
                         pos1,
                         hit.location,
@@ -285,7 +251,6 @@ impl<'a> System<'a> for SysCollision {
                 &mut collided,
                 &hit,
                 &lazy,
-                &entities,
             );
         }
     }
@@ -386,7 +351,6 @@ fn handle_collision<'a>(
     collided: &mut WriteStorage<'a, Collided>,
     hit: &sat::Collision,
     lazy: &Fetch<'a, LazyUpdate>,
-    entities: &Entities<'a>,
 ) {
     let blk = blocky.get(ent).unwrap();
     let o_blk = blocky.get(o_ent).unwrap();
@@ -457,24 +421,6 @@ fn handle_collision<'a>(
         vel.rot += -impulse
             * (rbp[0] * hit.direction[1] - rbp[1] * hit.direction[0])
             / o_blk.inertia;
-    }
-
-    #[cfg(feature = "debug_markers")]
-    {
-        let me = entities.create();
-        lazy.insert(
-            me,
-            Arrow {
-                ends: [
-                    hit.location,
-                    vec2_add(
-                        hit.location,
-                        vec2_scale(hit.direction, impulse * 10.0),
-                    ),
-                ],
-                frame: 0,
-            },
-        );
     }
 
     #[cfg(feature = "network")]

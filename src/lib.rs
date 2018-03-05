@@ -21,8 +21,6 @@ use asteroid::{Asteroid, SysAsteroid};
 use blocks::Blocky;
 use input::{Input, Press};
 use particles::{Effect, Particle, SysParticles};
-#[cfg(feature = "debug_markers")]
-use physics::{Arrow, Marker};
 use physics::{Collided, DeltaTime, DetectCollision, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
@@ -139,11 +137,6 @@ impl Game {
             world.register::<net::Dirty>();
             world.register::<net::Delete>();
             world.register::<net::ClientControlled>();
-        }
-        #[cfg(feature = "debug_markers")]
-        {
-            world.register::<Marker>();
-            world.register::<Arrow>();
         }
 
         world.add_resource(DeltaTime(0.0));
