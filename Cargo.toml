@@ -12,12 +12,11 @@ readme = "README.md"
 keywords = ["game"]
 
 [dependencies]
-byteorder = "1"
+byteorder = "1.2"
 log = "0.4"
-rand = "0.3"
+rand = "0.4"
 specs = "0.10"
 vecmath = "0.3"
 
 [features]
-debug_markers = []
 network = []
