@@ -109,14 +109,19 @@ impl Component for DetectCollision {
     type Storage = VecStorage<Self>;
 }
 
+/// Attached to a Hit, indicates the effect on the receiving entity.
+pub enum HitEffect {
+    /// Material collision, such as between block objects.
+    Collision(f64),
+}
+
 /// A single collision, stored in the Hits component.
 pub struct Hit {
     /// Entity we collided with.
     pub entity: Entity,
     /// Location of the hit, in this entity's coordinate system.
     pub rel_location: [f64; 2],
-    /// Impulse differential.
-    pub impulse: f64,
+    pub effect: HitEffect,
 }
 
 /// Collision information: this flags an entity as having collided.
@@ -361,7 +366,7 @@ fn store_collision<'a>(
         Hit {
             entity: o_ent,
             rel_location: rel_loc,
-            impulse: impulse,
+            effect: HitEffect::Collision(impulse),
         },
     );
 }

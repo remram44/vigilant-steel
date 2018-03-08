@@ -6,8 +6,8 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, AABox, DeltaTime, DetectCollision, Hits,
-              LocalControl, Position, Velocity};
+use physics::{delete_entity, AABox, DeltaTime, DetectCollision, HitEffect,
+              Hits, LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -133,11 +133,18 @@ impl<'a> System<'a> for SysShip {
             for (ent, hits, mut ship) in (&*entities, &hits, &mut ship).join()
             {
                 for hit in &**hits {
-                    if hit.impulse > 40.0 {
-                        ship.health -= 1;
-                        warn!("Ship collided! Health now {}", ship.health);
-                        #[cfg(feature = "network")]
-                        lazy.insert(ent, net::Dirty);
+                    match hit.effect {
+                        HitEffect::Collision(impulse) => {
+                            if impulse > 40.0 {
+                                ship.health -= 1;
+                                warn!(
+                                    "Ship collided! Health now {}",
+                                    ship.health
+                                );
+                                #[cfg(feature = "network")]
+                                lazy.insert(ent, net::Dirty);
+                            }
+                        }
                     }
                 }
             }
