@@ -52,13 +52,25 @@ impl Ship {
         );
         lazy.insert(entity, Ship::new());
         let blocks = vec![
-            ([-1.0, -1.0], Block::new(BlockInner::Thruster(0.7))),
-            ([-1.0, 0.0], Block::new(BlockInner::Thruster(0.0))),
-            ([-1.0, 1.0], Block::new(BlockInner::Thruster(-0.7))),
+            (
+                [-1.0, -1.0],
+                Block::new(BlockInner::Thruster { angle: 0.7 }),
+            ),
+            ([-1.0, 0.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
+            (
+                [-1.0, 1.0],
+                Block::new(BlockInner::Thruster { angle: -0.7 }),
+            ),
             ([0.0, -1.0], Block::new(BlockInner::Armor)),
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
-            ([1.0, 0.0], Block::new(BlockInner::Gun(0.0, -1.0))),
+            (
+                [1.0, 0.0],
+                Block::new(BlockInner::Gun {
+                    angle: 0.0,
+                    cooldown: -1.0,
+                }),
+            ),
         ];
         lazy.insert(entity, Blocky::new(blocks));
         #[cfg(feature = "network")]
@@ -209,7 +221,7 @@ impl<'a> System<'a> for SysShip {
             if role.graphical() && ship.thrust[1] > 0.3 {
                 for &(ref rel, ref block) in &blocky.blocks {
                     let angle = match block.inner {
-                        BlockInner::Thruster(a) => a,
+                        BlockInner::Thruster { angle } => angle,
                         _ => continue,
                     };
                     let rate = 1.0 / (angle.cos() * ship.thrust[1] * 40.0);
@@ -266,11 +278,13 @@ impl<'a> System<'a> for SysShip {
             if role.authoritative() {
                 let mut fired = false;
                 for &mut (rel, ref mut block) in &mut blocky.blocks {
-                    let (angle, reload) = match block.inner {
-                        BlockInner::Gun(a, r) => (a, r),
+                    let (angle, cooldown) = match block.inner {
+                        BlockInner::Gun { angle, cooldown } => {
+                            (angle, cooldown)
+                        }
                         _ => continue,
                     };
-                    if ship.want_fire && reload <= 0.0 {
+                    if ship.want_fire && cooldown <= 0.0 {
                         let fire_dir = {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
@@ -288,11 +302,16 @@ impl<'a> System<'a> for SysShip {
                         // Recoil
                         vel.vel =
                             vec2_add(vel.vel, vec2_scale(fire_dir, -6.0));
-                        block.inner =
-                            BlockInner::Gun(angle, rng.gen_range(1.4, 1.6));
+                        block.inner = BlockInner::Gun {
+                            angle: angle,
+                            cooldown: rng.gen_range(1.4, 1.6),
+                        };
                         fired = true;
-                    } else if reload > 0.0 {
-                        block.inner = BlockInner::Gun(angle, reload - dt);
+                    } else if cooldown > 0.0 {
+                        block.inner = BlockInner::Gun {
+                            angle: angle,
+                            cooldown: cooldown - dt,
+                        };
                     }
                 }
                 #[cfg(feature = "network")]

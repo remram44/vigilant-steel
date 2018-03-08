@@ -96,7 +96,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 gl,
             );
         }
-        BlockInner::Thruster(angle) => for i in &[-0.4, 0.0] {
+        BlockInner::Thruster { angle } => for i in &[-0.4, 0.0] {
             graphics::polygon(
                 [0.4, 0.4, 0.4, 1.0],
                 &[[0.45, 0.25], [0.05, 0.45], [0.05, -0.45], [0.45, -0.25]],
@@ -104,7 +104,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 gl,
             );
         },
-        BlockInner::Gun(angle, _) => {
+        BlockInner::Gun { angle, .. } => {
             draw_line_loop(
                 [0.7, 0.7, 1.0, 1.0],
                 0.05,

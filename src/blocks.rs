@@ -10,10 +10,9 @@ pub enum BlockInner {
     Cockpit,
     /// Allows a ship to move. A ship needs multiple of this to be able to
     /// move and rotate.
-    Thruster(f64),
-    /// This shoots projectiles. Guns have a reload timer, which is the
-    /// second attribute.
-    Gun(f64, f64),
+    Thruster { angle: f64 },
+    /// This shoots projectiles.
+    Gun { angle: f64, cooldown: f64 },
     /// An armor block does nothing, it is only there to take damage (and
     /// weigh you down).
     Armor,
@@ -30,9 +29,11 @@ impl BlockInner {
         _lazy: &Fetch<LazyUpdate>,
     ) {
         match *self {
-            BlockInner::Gun(_, ref mut reload) => {
-                if *reload > 0.0 {
-                    *reload -= dt;
+            BlockInner::Gun {
+                ref mut cooldown, ..
+            } => {
+                if *cooldown > 0.0 {
+                    *cooldown -= dt;
                 }
             }
             _ => {}
@@ -42,8 +43,8 @@ impl BlockInner {
     pub fn mass(&self) -> f64 {
         match *self {
             BlockInner::Cockpit => 1.0,
-            BlockInner::Thruster(_) => 0.8,
-            BlockInner::Gun(_, _) => 0.2,
+            BlockInner::Thruster { .. } => 0.8,
+            BlockInner::Gun { .. } => 0.2,
             BlockInner::Armor => 0.6,
             BlockInner::Rock => 2.0,
         }
@@ -52,8 +53,8 @@ impl BlockInner {
     pub fn max_health(&self) -> f64 {
         match *self {
             BlockInner::Cockpit => 1.0,
-            BlockInner::Thruster(_) => 0.6,
-            BlockInner::Gun(_, _) => 0.4,
+            BlockInner::Thruster { .. } => 0.6,
+            BlockInner::Gun { .. } => 0.4,
             BlockInner::Armor => 0.4,
             BlockInner::Rock => 0.3,
         }
