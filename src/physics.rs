@@ -41,6 +41,14 @@ impl AABox {
         ]
     }
 
+    pub fn sq_radius(&self) -> f64 {
+        self.corners()
+            .iter()
+            .map(|&c| vec2_square_len(c))
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap()
+    }
+
     /// Add a square of size 1 by the location of its center.
     pub fn add_square1(&mut self, point: [f64; 2]) {
         *self = AABox {
@@ -110,15 +118,16 @@ impl Component for DetectCollision {
 }
 
 /// Attached to a Hit, indicates the effect on the receiving entity.
+#[derive(Clone)]
 pub enum HitEffect {
     /// Material collision, such as between block objects.
     Collision(f64),
+    /// Caught in an explosion.
+    Explosion(f64),
 }
 
 /// A single collision, stored in the Hits component.
 pub struct Hit {
-    /// Entity we collided with.
-    pub entity: Entity,
     /// Location of the hit, in this entity's coordinate system.
     pub rel_location: [f64; 2],
     pub effect: HitEffect,
@@ -248,9 +257,7 @@ impl<'a> System<'a> for SysCollision {
         for (e1, pos1, vel1, col1) in
             (&*entities, &pos, &vel, &collision).join()
         {
-            for (e2, pos2, vel2, blocky2) in
-                (&*entities, &pos, &vel, &blocky).join()
-            {
+            for (pos2, vel2, blocky2) in (&pos, &vel, &blocky).join() {
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree_box(
                     &pos1,
@@ -264,9 +271,8 @@ impl<'a> System<'a> for SysCollision {
                     store_collision(
                         pos1,
                         hit.location,
-                        momentum,
+                        HitEffect::Collision(momentum),
                         e1,
-                        e2,
                         &mut hits,
                     );
                 }
@@ -348,9 +354,8 @@ fn find_collision_tree_box(
 fn store_collision<'a>(
     pos: &Position,
     hit: [f64; 2],
-    impulse: f64,
+    effect: HitEffect,
     ent: Entity,
-    o_ent: Entity,
     hits: &mut WriteStorage<'a, Hits>,
 ) {
     let (s, c) = pos.rot.sin_cos();
@@ -362,9 +367,8 @@ fn store_collision<'a>(
         hits,
         ent,
         Hit {
-            entity: o_ent,
             rel_location: rel_loc,
-            effect: HitEffect::Collision(impulse),
+            effect: effect,
         },
     );
 }
@@ -425,7 +429,13 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(ent).unwrap();
-        store_collision(pos, hit.location, impulse, ent, o_ent, hits);
+        store_collision(
+            pos,
+            hit.location,
+            HitEffect::Collision(impulse),
+            ent,
+            hits,
+        );
 
         // Move object out of collision
         pos.pos = vec2_add(
@@ -444,7 +454,13 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(o_ent).unwrap();
-        store_collision(pos, hit.location, impulse, o_ent, ent, hits);
+        store_collision(
+            pos,
+            hit.location,
+            HitEffect::Collision(impulse),
+            o_ent,
+            hits,
+        );
 
         // Move object out of collision
         pos.pos = vec2_add(
@@ -465,4 +481,23 @@ fn handle_collision<'a>(
 
     #[cfg(feature = "network")]
     lazy.insert(ent, net::Dirty);
+}
+
+pub fn affect_area<'a>(
+    entities: &Entities<'a>,
+    pos: &ReadStorage<'a, Position>,
+    blocky: &ReadStorage<'a, Blocky>,
+    hits: &mut WriteStorage<'a, Hits>,
+    center: [f64; 2],
+    radius: f64,
+    effect: HitEffect,
+) {
+    let sq_radius = radius * radius;
+    for (ent, pos, blk) in (&**entities, &*pos, &*blocky).join() {
+        let entity_sq_radius = blk.tree.0[0].bounds.sq_radius();
+        let dist = vec2_square_len(vec2_sub(pos.pos, center));
+        if dist < sq_radius + entity_sq_radius {
+            store_collision(pos, center, effect.clone(), ent, hits);
+        }
+    }
 }

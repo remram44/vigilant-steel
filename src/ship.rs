@@ -6,8 +6,8 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, AABox, DeltaTime, DetectCollision, HitEffect,
-              Hits, LocalControl, Position, Velocity};
+use physics::{affect_area, delete_entity, AABox, DeltaTime, DetectCollision,
+              HitEffect, Hits, LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
@@ -144,6 +144,15 @@ impl<'a> System<'a> for SysShip {
                                 #[cfg(feature = "network")]
                                 lazy.insert(ent, net::Dirty);
                             }
+                        }
+                        HitEffect::Explosion(_) => {
+                            ship.health -= 1;
+                            warn!(
+                                "Ship caught in explosion! Health now {}",
+                                ship.health
+                            );
+                            #[cfg(feature = "network")]
+                            lazy.insert(ent, net::Dirty);
                         }
                     }
                 }
@@ -388,24 +397,46 @@ impl<'a> System<'a> for SysProjectile {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Entities<'a>,
-        ReadStorage<'a, Hits>,
+        WriteStorage<'a, Hits>,
         ReadStorage<'a, Position>,
+        ReadStorage<'a, Blocky>,
         ReadStorage<'a, Projectile>,
     );
 
     fn run(
         &mut self,
-        (role, lazy, entities, hits, pos, projectile): Self::SystemData,
-    ) {
+            (
+                role,
+                lazy,
+                entities,
+                mut
+                hits,
+                position,
+                blocky,
+                projectile,
+            ): Self::SystemData,
+){
         assert!(role.authoritative());
 
-        // Remove projectiles gone from the screen or hit
-        for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
+        for (entity, pos, _) in (&*entities, &position, &projectile).join() {
+            // Hit projectiles go off and affect an area
             if hits.get(entity).is_some() {
+                // Affect entities in range with an Explosion
+                affect_area(
+                    &entities,
+                    &position,
+                    &blocky,
+                    &mut hits,
+                    pos.pos,
+                    3.0,
+                    HitEffect::Explosion(3.0),
+                );
+
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
 
+            // Remove projectiles gone from the screen
             let pos = pos.pos;
             if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
                 || pos[1] > 50.0

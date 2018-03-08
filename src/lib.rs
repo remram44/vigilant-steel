@@ -149,8 +149,8 @@ impl Game {
         if role.authoritative() {
             dispatcher = dispatcher
                 .add(SysCollision, "collision", &[])
-                .add(SysAsteroid::new(), "asteroid", &[])
                 .add(SysProjectile, "projectile", &[])
+                .add(SysAsteroid::new(), "asteroid", &[])
                 .add(SysParticles, "particles", &[]);
         }
         dispatcher = dispatcher.add(SysShip, "ship", &[]);
