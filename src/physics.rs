@@ -263,14 +263,6 @@ impl<'a> System<'a> for SysCollision {
                         e2,
                         &mut hits,
                     );
-                    store_collision(
-                        pos2,
-                        hit.location,
-                        0.0,
-                        e2,
-                        e1,
-                        &mut hits,
-                    );
                 }
             }
         }
