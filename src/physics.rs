@@ -9,6 +9,7 @@ use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
 use std::f64::consts::PI;
+use std::ops::Deref;
 use tree;
 use vecmath::*;
 
@@ -108,7 +109,7 @@ impl Component for DetectCollision {
     type Storage = VecStorage<Self>;
 }
 
-/// A single collision, stored in the Collided component.
+/// A single collision, stored in the Hits component.
 pub struct Hit {
     /// Entity we collided with.
     pub entity: Entity,
@@ -119,12 +120,39 @@ pub struct Hit {
 }
 
 /// Collision information: this flags an entity as having collided.
-pub struct Collided {
-    pub hits: Vec<Hit>,
+pub struct Hits {
+    hits_vec: Vec<Hit>,
 }
 
-impl Component for Collided {
+impl Hits {
+    pub fn record<'a>(
+        hits: &mut WriteStorage<'a, Hits>,
+        ent: Entity,
+        hit: Hit,
+    ) {
+        if let Some(hits) = hits.get_mut(ent) {
+            hits.hits_vec.push(hit);
+            return;
+        }
+        hits.insert(
+            ent,
+            Hits {
+                hits_vec: vec![hit],
+            },
+        );
+    }
+}
+
+impl Component for Hits {
     type Storage = HashMapStorage<Self>;
+}
+
+impl Deref for Hits {
+    type Target = [Hit];
+
+    fn deref(&self) -> &[Hit] {
+        &self.hits_vec
+    }
 }
 
 /// Marks that this entity is controlled by the local player.
@@ -170,7 +198,7 @@ impl<'a> System<'a> for SysCollision {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Blocky>,
         ReadStorage<'a, DetectCollision>,
-        WriteStorage<'a, Collided>,
+        WriteStorage<'a, Hits>,
     );
 
     fn run(
@@ -183,15 +211,15 @@ impl<'a> System<'a> for SysCollision {
             mut vel,
             blocky,
             collision,
-            mut collided,
+            mut hits,
         ): Self::SystemData,
-    ) {
+){
         assert!(role.authoritative());
 
-        collided.clear();
+        hits.clear();
 
         // Detect collisions between Blocky objects
-        let mut hits = Vec::new();
+        let mut block_hits = Vec::new();
         for (e1, pos1, blocky1) in (&*entities, &pos, &blocky).join() {
             for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
                 if e2 >= e1 {
@@ -206,7 +234,7 @@ impl<'a> System<'a> for SysCollision {
                     &blocky2.tree,
                     0,
                 ) {
-                    hits.push((e1, e2, hit));
+                    block_hits.push((e1, e2, hit));
                 }
             }
         }
@@ -228,7 +256,7 @@ impl<'a> System<'a> for SysCollision {
                         0.0,
                         e1,
                         e2,
-                        &mut collided,
+                        &mut hits,
                     );
                     store_collision(
                         pos2,
@@ -236,20 +264,20 @@ impl<'a> System<'a> for SysCollision {
                         0.0,
                         e2,
                         e1,
-                        &mut collided,
+                        &mut hits,
                     );
                 }
             }
         }
 
-        for (e1, e2, hit) in hits {
+        for (e1, e2, hit) in block_hits {
             handle_collision(
                 e1,
                 e2,
                 &mut pos,
                 &mut vel,
                 &blocky,
-                &mut collided,
+                &mut hits,
                 &hit,
                 &lazy,
             );
@@ -320,38 +348,22 @@ fn store_collision<'a>(
     impulse: f64,
     ent: Entity,
     o_ent: Entity,
-    collided: &mut WriteStorage<'a, Collided>,
+    hits: &mut WriteStorage<'a, Hits>,
 ) {
     let (s, c) = pos.rot.sin_cos();
     let x = hit[0] - pos.pos[0];
     let y = hit[1] - pos.pos[1];
     let rel_loc = [x * c + y * s, -x * s + y * c];
 
-    // Add hit in a Collided component
-    let insert = if let Some(col) = collided.get_mut(ent) {
-        col.hits.push(Hit {
+    Hits::record(
+        hits,
+        ent,
+        Hit {
             entity: o_ent,
             rel_location: rel_loc,
             impulse: impulse,
-        });
-        false
-    } else {
-        true
-    };
-    if insert {
-        collided.insert(
-            ent,
-            Collided {
-                hits: vec![
-                    Hit {
-                        entity: o_ent,
-                        rel_location: rel_loc,
-                        impulse: impulse,
-                    },
-                ],
-            },
-        );
-    }
+        },
+    );
 }
 
 const ELASTICITY: f64 = 0.6;
@@ -373,7 +385,7 @@ fn handle_collision<'a>(
     position: &mut WriteStorage<'a, Position>,
     velocity: &mut WriteStorage<'a, Velocity>,
     blocky: &ReadStorage<'a, Blocky>,
-    collided: &mut WriteStorage<'a, Collided>,
+    hits: &mut WriteStorage<'a, Hits>,
     hit: &sat::Collision,
     lazy: &Fetch<'a, LazyUpdate>,
 ) {
@@ -410,7 +422,7 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(ent).unwrap();
-        store_collision(pos, hit.location, impulse, ent, o_ent, collided);
+        store_collision(pos, hit.location, impulse, ent, o_ent, hits);
 
         // Move object out of collision
         pos.pos = vec2_add(
@@ -429,7 +441,7 @@ fn handle_collision<'a>(
     {
         // Compute location in object space
         let pos = position.get_mut(o_ent).unwrap();
-        store_collision(pos, hit.location, impulse, o_ent, ent, collided);
+        store_collision(pos, hit.location, impulse, o_ent, ent, hits);
 
         // Move object out of collision
         pos.pos = vec2_add(

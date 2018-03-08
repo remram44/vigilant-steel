@@ -21,7 +21,7 @@ use asteroid::{Asteroid, SysAsteroid};
 use blocks::Blocky;
 use input::{Input, Press};
 use particles::{Effect, Particle, SysParticles};
-use physics::{Collided, DeltaTime, DetectCollision, LocalControl, Position,
+use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
@@ -124,7 +124,7 @@ impl Game {
         world.register::<Velocity>();
         world.register::<Blocky>();
         world.register::<DetectCollision>();
-        world.register::<Collided>();
+        world.register::<Hits>();
         world.register::<LocalControl>();
         world.register::<Ship>();
         world.register::<Projectile>();

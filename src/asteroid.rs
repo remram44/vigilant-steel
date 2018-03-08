@@ -5,7 +5,7 @@ use blocks::{Block, BlockInner, Blocky};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner};
-use physics::{delete_entity, Collided, DeltaTime, Position, Velocity};
+use physics::{delete_entity, DeltaTime, Hits, Position, Velocity};
 use rand::{self, Rng};
 use ship::Projectile;
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
@@ -40,7 +40,7 @@ impl<'a> System<'a> for SysAsteroid {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Entities<'a>,
-        ReadStorage<'a, Collided>,
+        ReadStorage<'a, Hits>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Asteroid>,
         ReadStorage<'a, Projectile>,
@@ -49,7 +49,7 @@ impl<'a> System<'a> for SysAsteroid {
     fn run(
         &mut self,
         (
-            dt, role, lazy, entities, collided, pos, asteroid, projectile,
+            dt, role, lazy, entities, hits, pos, asteroid, projectile,
         ): Self::SystemData,
 ){
         assert!(role.authoritative());
@@ -81,8 +81,8 @@ impl<'a> System<'a> for SysAsteroid {
             }
 
             // Get collision info
-            if let Some(col) = collided.get(entity) {
-                for hit in &col.hits {
+            if let Some(hits) = hits.get(entity) {
+                for hit in &**hits {
                     if projectile.get(hit.entity).is_some() {
                         // Remove this entity
                         let new_effect = entities.create();

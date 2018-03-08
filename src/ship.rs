@@ -6,7 +6,7 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{delete_entity, AABox, Collided, DeltaTime, DetectCollision,
+use physics::{delete_entity, AABox, DeltaTime, DetectCollision, Hits,
               LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
@@ -102,7 +102,7 @@ impl<'a> System<'a> for SysShip {
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
-        ReadStorage<'a, Collided>,
+        ReadStorage<'a, Hits>,
         WriteStorage<'a, Ship>,
         WriteStorage<'a, Blocky>,
         ReadStorage<'a, LocalControl>,
@@ -119,7 +119,7 @@ impl<'a> System<'a> for SysShip {
             entities,
             pos,
             mut vel,
-            collided,
+            hits,
             mut ship,
             mut blocky,
             local,
@@ -130,10 +130,9 @@ impl<'a> System<'a> for SysShip {
 
         if role.authoritative() {
             // Handle collisions
-            for (ent, col, mut ship) in
-                (&*entities, &collided, &mut ship).join()
+            for (ent, hits, mut ship) in (&*entities, &hits, &mut ship).join()
             {
-                for hit in &col.hits {
+                for hit in &**hits {
                     if hit.impulse > 40.0 {
                         ship.health -= 1;
                         warn!("Ship collided! Health now {}", ship.health);
@@ -382,20 +381,20 @@ impl<'a> System<'a> for SysProjectile {
         Fetch<'a, Role>,
         Fetch<'a, LazyUpdate>,
         Entities<'a>,
-        ReadStorage<'a, Collided>,
+        ReadStorage<'a, Hits>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Projectile>,
     );
 
     fn run(
         &mut self,
-        (role, lazy, entities, collided, pos, projectile): Self::SystemData,
+        (role, lazy, entities, hits, pos, projectile): Self::SystemData,
     ) {
         assert!(role.authoritative());
 
         // Remove projectiles gone from the screen or hit
         for (entity, pos, _) in (&*entities, &pos, &projectile).join() {
-            if collided.get(entity).is_some() {
+            if hits.get(entity).is_some() {
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
