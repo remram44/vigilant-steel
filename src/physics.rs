@@ -245,8 +245,12 @@ impl<'a> System<'a> for SysCollision {
         }
 
         // Detect collisions between Blocky and DetectCollision objects
-        for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
-            for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
+        for (e1, pos1, vel1, col1) in
+            (&*entities, &pos, &vel, &collision).join()
+        {
+            for (e2, pos2, vel2, blocky2) in
+                (&*entities, &pos, &vel, &blocky).join()
+            {
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree_box(
                     &pos1,
@@ -255,10 +259,12 @@ impl<'a> System<'a> for SysCollision {
                     &blocky2.tree,
                     0,
                 ) {
+                    let momentum = vec2_sub(vel1.vel, vel2.vel);
+                    let momentum = vec2_len(momentum) * blocky2.mass;
                     store_collision(
                         pos1,
                         hit.location,
-                        0.0,
+                        momentum,
                         e1,
                         e2,
                         &mut hits,
