@@ -90,7 +90,7 @@ impl<'a> System<'a> for SysParticles {
             match effect.effect {
                 EffectInner::Explosion(size) => {
                     let lifetime = 0.4 * size.sqrt();
-                    for _ in 0..8 + (size * size) as usize {
+                    for _ in 0..(8.0 * size) as usize {
                         let ent = entities.create();
                         lazy.insert(
                             ent,

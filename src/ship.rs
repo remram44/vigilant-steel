@@ -21,7 +21,6 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub thrust: [f64; 2],
-    pub health: i32,
 }
 
 impl Ship {
@@ -30,7 +29,6 @@ impl Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             thrust: [0.0, 0.0],
-            health: 8,
         }
     }
 
@@ -130,32 +128,62 @@ impl<'a> System<'a> for SysShip {
 
         if role.authoritative() {
             // Handle collisions
-            for (ent, hits, mut ship) in (&*entities, &hits, &mut ship).join()
+            for (ent, pos, mut blk, hits) in
+                (&*entities, &pos, &mut blocky, &hits).join()
             {
+                let mut deleted = false;
                 for hit in &**hits {
                     match hit.effect {
-                        HitEffect::Collision(impulse) => {
-                            if impulse > 40.0 {
-                                ship.health -= 1;
-                                warn!(
-                                    "Ship collided! Health now {}",
-                                    ship.health
-                                );
-                                #[cfg(feature = "network")]
-                                lazy.insert(ent, net::Dirty);
+                        HitEffect::Collision(_) => {}
+                        HitEffect::Explosion(size) => {
+                            // Hurt some blocks
+                            for &mut (loc, ref mut block) in &mut blk.blocks {
+                                let sq_dist = vec2_square_len(vec2_sub(
+                                    hit.rel_location,
+                                    loc,
+                                ));
+                                if sq_dist <= size {
+                                    block.health -=
+                                        1.0 - sq_dist / (size * size);
+                                    if block.health < 0.0 {
+                                        deleted = true;
+                                    }
+                                }
                             }
-                        }
-                        HitEffect::Explosion(_) => {
-                            ship.health -= 1;
-                            warn!(
-                                "Ship caught in explosion! Health now {}",
-                                ship.health
-                            );
-                            #[cfg(feature = "network")]
-                            lazy.insert(ent, net::Dirty);
                         }
                     }
                 }
+
+                if deleted {
+                    let (s, c) = pos.rot.sin_cos();
+                    for (loc, _) in blk.pop_dead_blocks() {
+                        // Add particle effect
+                        let new_effect = entities.create();
+                        lazy.insert(
+                            new_effect,
+                            Position {
+                                pos: vec2_add(
+                                    pos.pos,
+                                    [
+                                        c * loc[0] - s * loc[1],
+                                        s * loc[0] + c * loc[1],
+                                    ],
+                                ),
+                                rot: 0.0,
+                            },
+                        );
+                        lazy.insert(
+                            new_effect,
+                            Effect {
+                                effect: EffectInner::Explosion(0.4),
+                                lifetime: -1.0,
+                            },
+                        );
+                    }
+                }
+
+                #[cfg(feature = "network")]
+                lazy.insert(ent, net::Dirty);
             }
 
             // Prevent leaving the screen
@@ -166,7 +194,6 @@ impl<'a> System<'a> for SysShip {
                     || pos.pos[1] < -35.0
                     || pos.pos[1] > 35.0
                 {
-                    ship.health -= 1;
                     vel.vel = vec2_sub([0.0, 0.0], pos.pos);
                     vel.vel =
                         vec2_scale(vel.vel, 60.0 * vec2_inv_len(vel.vel));
@@ -200,8 +227,8 @@ impl<'a> System<'a> for SysShip {
         for (ent, pos, mut vel, mut ship, mut blocky) in
             (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
         {
-            // Death
-            if role.authoritative() && ship.health <= 0 {
+            // TODO: Death if no Cockpit
+            if role.authoritative() && false {
                 let new_effect = entities.create();
                 lazy.insert(
                     new_effect,

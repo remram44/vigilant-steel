@@ -112,6 +112,24 @@ impl Blocky {
             inertia: inertia,
         }
     }
+
+    pub fn pop_dead_blocks(&mut self) -> Vec<([f64; 2], Block)> {
+        // Drop blocks with no health
+        let mut i = 0;
+        let mut dead_blocks = Vec::new();
+        while i != self.blocks.len() {
+            if self.blocks[i].1.health < 0.0 {
+                dead_blocks.push(self.blocks.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+
+        // Update tree
+        self.tree = Tree::new_(&self.blocks);
+
+        dead_blocks
+    }
 }
 
 impl Component for Blocky {

@@ -453,7 +453,7 @@ impl<'a> System<'a> for SysNetServer {
             if let Some(ship) = ship.get(ent) {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
-                data = Vec::with_capacity(36);
+                data = Vec::with_capacity(32);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
                 write_float(&mut data, pos.rot);
@@ -462,8 +462,7 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.rot);
                 write_float(&mut data, ship.thrust[0]);
                 write_float(&mut data, ship.thrust[1]);
-                data.write_i32::<ORDER>(ship.health).unwrap();
-                assert_eq!(data.len(), 36);
+                assert_eq!(data.len(), 32);
             } else if asteroid.get(ent).is_some() {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
@@ -670,7 +669,7 @@ impl<'a> System<'a> for SysNetClient {
 
                     // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        assert_eq!(data.len(), 36);
+                        assert_eq!(data.len(), 32);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
                         pos.pos[1] = read_float(&mut data);
@@ -680,8 +679,7 @@ impl<'a> System<'a> for SysNetClient {
                         vel.rot = read_float(&mut data);
                         ship.thrust[0] = read_float(&mut data);
                         ship.thrust[1] = read_float(&mut data);
-                        ship.health = data.read_i32::<ORDER>().unwrap();
-                        assert_eq!(data.position(), 36);
+                        assert_eq!(data.position(), 32);
                     } else if asteroid.get(ent).is_some() {
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
@@ -722,7 +720,7 @@ impl<'a> System<'a> for SysNetClient {
                 continue;
             }
             if let Message::EntityUpdate(id, ref data) = *msg {
-                if data.len() == 36 {
+                if data.len() == 32 {
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
@@ -736,7 +734,6 @@ impl<'a> System<'a> for SysNetClient {
                         want_fire: false,
                         want_thrust: [0.0, 0.0],
                         thrust: [read_float(&mut data), read_float(&mut data)],
-                        health: data.read_i32::<ORDER>().unwrap(),
                     };
                     assert_eq!(data.position(), 43);
 
