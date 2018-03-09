@@ -109,6 +109,26 @@ impl Tree {
         self.0[idx].content = Content::Internal(left, right);
         idx
     }
+
+    pub fn find(&self, pos: [f64; 2]) -> Option<usize> {
+        self.find_(pos, 0)
+    }
+
+    fn find_(&self, pos: [f64; 2], idx: usize) -> Option<usize> {
+        let n = &self.0[idx];
+        if n.bounds.xmin > pos[0] || n.bounds.xmax < pos[0]
+            || n.bounds.ymin > pos[1] || n.bounds.ymax < pos[1]
+        {
+            return None;
+        }
+        match n.content {
+            Content::Internal(left, right) => match self.find_(pos, left) {
+                None => self.find_(pos, right),
+                r => r,
+            },
+            Content::Leaf(b) => Some(b),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -122,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build() {
+    fn test() {
         let tree = Tree::new(vec![
             [0.5, 0.5],
             [99.5, 19.5],
@@ -149,5 +169,10 @@ mod tests {
         assert_eq!(tree.0[12].content, Content::Internal(13, 14));
         assert_eq!(tree.0[13].content, Content::Leaf(5));
         assert_eq!(tree.0[14].content, Content::Leaf(1));
+
+        assert_eq!(tree.find([0.7, 0.7]), Some(0));
+        assert_eq!(tree.find([0.7, 1.7]), None);
+        assert_eq!(tree.find([41.4, 1.7]), Some(3));
+        assert_eq!(tree.find([82.6, 8.2]), Some(7));
     }
 }

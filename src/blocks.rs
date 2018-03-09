@@ -123,7 +123,9 @@ impl Blocky {
         (mass, inertia, center, tree)
     }
 
-    pub fn pop_dead_blocks(&mut self) -> Vec<([f64; 2], Block)> {
+    pub fn maintain(
+        &mut self,
+    ) -> (Vec<([f64; 2], Block)>, [f64; 2], Vec<(Blocky, [f64; 2])>) {
         // Drop blocks with no health
         let mut i = 0;
         let mut dead_blocks = Vec::new();
@@ -138,7 +140,57 @@ impl Blocky {
         // Update tree
         self.tree = Tree::new_(&self.blocks);
 
-        dead_blocks
+        // Compute adjacency of blocks
+        let mut blocks =
+            (0..self.blocks.len()).into_iter().collect::<Vec<usize>>();
+        for (mut i, &(loc, _)) in self.blocks.iter().enumerate() {
+            for v in &[[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]] {
+                let pos = vec2_add(loc, *v);
+                if let Some(j) = self.tree.find(pos) {
+                    let a = blocks[i];
+                    let b = blocks[j];
+                    let (min, max) = (a.min(b), a.max(b));
+                    for e in blocks.iter_mut() {
+                        if *e == max {
+                            *e = min;
+                        }
+                    }
+                    i = min;
+                }
+            }
+        }
+
+        // Find broken off blocks
+        let mut pieces: Vec<Vec<([f64; 2], Block)>> =
+            Vec::with_capacity(self.blocks.len() - 1);
+        for _ in 0..self.blocks.len() - 1 {
+            pieces.push(Vec::new());
+        }
+        let mut removed = 0;
+        for (block, &group) in blocks.iter().enumerate() {
+            if group != 0 {
+                let group = group - 1;
+                let b = self.blocks.remove(block - removed);
+                pieces[group].push(b);
+                removed += 1;
+            }
+        }
+
+        // Recompute mass, center, inertia
+        let (mass, inertia, center, tree) =
+            Self::compute_stats(&mut self.blocks);
+        self.mass = mass;
+        self.inertia = inertia;
+        self.tree = tree;
+
+        // Make Blocky components for the broken off pieces
+        let pieces = pieces
+            .into_iter()
+            .filter(|v| !Vec::is_empty(v))
+            .map(Blocky::new)
+            .collect::<Vec<_>>();
+
+        (dead_blocks, center, pieces)
     }
 }
 

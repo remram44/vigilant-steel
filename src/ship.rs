@@ -103,7 +103,7 @@ impl<'a> System<'a> for SysShip {
         Fetch<'a, Input>,
         Fetch<'a, Clock>,
         Entities<'a>,
-        ReadStorage<'a, Position>,
+        WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Hits>,
         WriteStorage<'a, Ship>,
@@ -120,7 +120,7 @@ impl<'a> System<'a> for SysShip {
             input,
             clock,
             entities,
-            pos,
+            mut pos,
             mut vel,
             hits,
             mut ship,
@@ -133,8 +133,8 @@ impl<'a> System<'a> for SysShip {
 
         if role.authoritative() {
             // Handle collisions
-            for (ent, pos, mut blk, hits) in
-                (&*entities, &pos, &mut blocky, &hits).join()
+            for (ent, mut pos, mut blk, hits) in
+                (&*entities, &mut pos, &mut blocky, &hits).join()
             {
                 let mut deleted = false;
                 for hit in &**hits {
@@ -161,8 +161,10 @@ impl<'a> System<'a> for SysShip {
 
                 if deleted {
                     let (s, c) = pos.rot.sin_cos();
-                    for (loc, _) in blk.pop_dead_blocks() {
-                        // Add particle effect
+                    let (dead_blocks, center, pieces) = blk.maintain();
+
+                    // Spawn particle effects for dead blocks
+                    for (loc, _) in dead_blocks {
                         let new_effect = entities.create();
                         lazy.insert(
                             new_effect,
@@ -185,6 +187,43 @@ impl<'a> System<'a> for SysShip {
                             },
                         );
                     }
+
+                    // Create entities from pieces that broke off
+                    let vel = vel.get(ent).unwrap();
+                    for (blocky, center) in pieces {
+                        let center = [
+                            center[0] * c - center[1] * s,
+                            center[0] * s + center[1] * c,
+                        ];
+                        let newent = entities.create();
+                        lazy.insert(
+                            newent,
+                            Position {
+                                pos: vec2_add(pos.pos, center),
+                                rot: pos.rot,
+                            },
+                        );
+                        lazy.insert(
+                            newent,
+                            Velocity {
+                                vel: vel.vel,
+                                rot: vel.rot,
+                            },
+                        );
+                        lazy.insert(newent, blocky);
+                        #[cfg(feature = "network")]
+                        {
+                            lazy.insert(newent, net::Replicated::new());
+                            lazy.insert(newent, net::Dirty);
+                        }
+                    }
+
+                    // Update position for new center of mass
+                    let center = [
+                        center[0] * c - center[1] * s,
+                        center[0] * s + center[1] * c,
+                    ];
+                    pos.pos = vec2_add(pos.pos, center);
                 }
 
                 #[cfg(feature = "network")]
