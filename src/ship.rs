@@ -163,8 +163,8 @@ impl<'a> System<'a> for SysShip {
                     let (s, c) = pos.rot.sin_cos();
                     let (dead_blocks, center, pieces) = blk.maintain();
 
-                    // Spawn particle effects for dead blocks
-                    for (loc, _) in dead_blocks {
+                    for (loc, blk) in dead_blocks {
+                        // Spawn particle effects for dead blocks
                         let new_effect = entities.create();
                         lazy.insert(
                             new_effect,
@@ -186,6 +186,11 @@ impl<'a> System<'a> for SysShip {
                                 lifetime: -1.0,
                             },
                         );
+
+                        // If a cockpit died then this is no longer a ship
+                        if let BlockInner::Cockpit = blk.inner {
+                            lazy.remove::<Ship>(ent);
+                        }
                     }
 
                     // If there is no block remaining, delete the entity
@@ -277,29 +282,6 @@ impl<'a> System<'a> for SysShip {
         for (ent, pos, mut vel, mut ship, mut blocky) in
             (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
         {
-            // TODO: Death if no Cockpit
-            if role.authoritative() && false {
-                let new_effect = entities.create();
-                lazy.insert(
-                    new_effect,
-                    Position {
-                        pos: pos.pos,
-                        rot: 0.0,
-                    },
-                );
-                lazy.insert(
-                    new_effect,
-                    Effect {
-                        effect: EffectInner::Explosion(2.0),
-                        lifetime: -1.0,
-                    },
-                );
-                #[cfg(feature = "network")]
-                lazy.insert(new_effect, net::Dirty);
-                delete_entity(*role, &entities, &lazy, ent);
-                continue;
-            }
-
             // Apply thrust
             // Update orientation
             vel.rot = ship.thrust[0] * 5.0;
