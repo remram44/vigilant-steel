@@ -154,7 +154,7 @@ impl Blocky {
                     let a = blocks[i];
                     let b = blocks[j];
                     let (min, max) = (a.min(b), a.max(b));
-                    for e in blocks.iter_mut() {
+                    for e in &mut blocks {
                         if *e == max {
                             *e = min;
                         }

@@ -17,7 +17,7 @@ pub struct Node {
 pub struct Tree(pub Vec<Node>);
 
 impl Tree {
-    pub fn new(input: Vec<[f64; 2]>) -> Tree {
+    pub fn new(input: &[[f64; 2]]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
             tree.build(&mut input
@@ -29,7 +29,7 @@ impl Tree {
         tree
     }
 
-    pub fn new_<T>(input: &Vec<([f64; 2], T)>) -> Tree {
+    pub fn new_<T>(input: &[([f64; 2], T)]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
             tree.build(&mut input

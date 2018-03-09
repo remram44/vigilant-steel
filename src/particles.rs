@@ -32,7 +32,7 @@ impl Component for Particle {
 /// Particle effect.
 ///
 /// A particle effect emit particles, possibly over time. If the entity is also
-/// tagged with net::Dirty, it will be replicated to clients.
+/// tagged with `net::Dirty`, it will be replicated to clients.
 /// Some systems spawn particles directly, such as thrusters, and no
 /// replication of the effect is needed (the ship is replicated).
 #[derive(Debug, Clone)]

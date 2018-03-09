@@ -244,10 +244,10 @@ impl<'a> System<'a> for SysCollision {
                 }
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree(
-                    &pos1,
+                    pos1,
                     &blocky1.tree,
                     0,
-                    &pos2,
+                    pos2,
                     &blocky2.tree,
                     0,
                 ) {
@@ -266,9 +266,9 @@ impl<'a> System<'a> for SysCollision {
                 }
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree_box(
-                    &pos1,
+                    pos1,
                     &col1.bounding_box,
-                    &pos2,
+                    pos2,
                     &blocky2.tree,
                     0,
                 ) {
