@@ -2,8 +2,8 @@
 
 use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
-use game::physics::{LocalControl, Position};
-use game::ship::{Projectile, Ship};
+use game::physics::Position;
+use game::ship::Projectile;
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
@@ -152,7 +152,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
 pub fn render<G, C, E>(
     context: Context,
     gl: &mut G,
-    glyph_cache: &mut C,
+    _glyph_cache: &mut C,
     world: &mut World,
 ) where
     G: graphics::Graphics,

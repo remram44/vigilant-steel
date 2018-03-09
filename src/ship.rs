@@ -187,8 +187,8 @@ impl<'a> System<'a> for SysShip {
             }
 
             // Prevent leaving the screen
-            for (ent, pos, vel, mut ship) in
-                (&*entities, &pos, &mut vel, &mut ship).join()
+            for (ent, pos, vel, _) in
+                (&*entities, &pos, &mut vel, &ship).join()
             {
                 if pos.pos[0] < -35.0 || pos.pos[0] > 35.0
                     || pos.pos[1] < -35.0

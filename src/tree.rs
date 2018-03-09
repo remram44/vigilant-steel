@@ -134,6 +134,7 @@ mod tests {
             [82.7, 8.0],
         ]);
         assert_eq!(tree.0.len(), 15);
+        assert_eq!(tree.0[0].content, Content::Internal(1, 8));
         assert_eq!(tree.0[1].content, Content::Internal(2, 5));
         assert_eq!(tree.0[2].content, Content::Internal(3, 4));
         assert_eq!(tree.0[3].content, Content::Leaf(0));
