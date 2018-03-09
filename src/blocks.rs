@@ -115,7 +115,7 @@ impl Blocky {
         let mut inertia = 0.0;
         for &mut (ref mut loc, ref block) in blocks.iter_mut() {
             *loc = vec2_sub(*loc, center);
-            inertia += vec2_square_len(*loc) * block.inner.mass();
+            inertia += (0.5 + vec2_square_len(*loc)) * block.inner.mass();
         }
 
         let tree = Tree::new_(blocks);
