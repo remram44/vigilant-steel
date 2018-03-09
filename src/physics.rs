@@ -239,6 +239,9 @@ impl<'a> System<'a> for SysCollision {
                 if e2 >= e1 {
                     break;
                 }
+                if blocky1.blocks.is_empty() || blocky2.blocks.is_empty() {
+                    continue;
+                }
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree(
                     &pos1,
@@ -258,6 +261,9 @@ impl<'a> System<'a> for SysCollision {
             (&*entities, &pos, &vel, &collision).join()
         {
             for (pos2, vel2, blocky2) in (&pos, &vel, &blocky).join() {
+                if blocky2.blocks.is_empty() {
+                    continue;
+                }
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree_box(
                     &pos1,

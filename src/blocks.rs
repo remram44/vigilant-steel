@@ -140,6 +140,10 @@ impl Blocky {
         // Update tree
         self.tree = Tree::new_(&self.blocks);
 
+        if self.blocks.is_empty() {
+            return (dead_blocks, [0.0, 0.0], Vec::new());
+        }
+
         // Compute adjacency of blocks
         let mut blocks =
             (0..self.blocks.len()).into_iter().collect::<Vec<usize>>();

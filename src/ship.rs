@@ -188,6 +188,12 @@ impl<'a> System<'a> for SysShip {
                         );
                     }
 
+                    // If there is no block remaining, delete the entity
+                    if blk.blocks.is_empty() {
+                        entities.delete(ent).unwrap();
+                        continue;
+                    }
+
                     // Create entities from pieces that broke off
                     let vel = vel.get(ent).unwrap();
                     for (blocky, center) in pieces {
