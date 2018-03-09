@@ -348,10 +348,10 @@ impl<'a> System<'a> for SysShip {
                         );
                         // Recoil
                         vel.vel =
-                            vec2_add(vel.vel, vec2_scale(fire_dir, -6.0));
+                            vec2_add(vel.vel, vec2_scale(fire_dir, -1.2));
                         block.inner = BlockInner::Gun {
                             angle: angle,
-                            cooldown: rng.gen_range(1.4, 1.6),
+                            cooldown: rng.gen_range(0.3, 0.4),
                         };
                         fired = true;
                     } else if cooldown > 0.0 {
