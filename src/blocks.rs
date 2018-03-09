@@ -46,7 +46,7 @@ impl BlockInner {
             BlockInner::Thruster { .. } => 0.8,
             BlockInner::Gun { .. } => 0.2,
             BlockInner::Armor => 0.6,
-            BlockInner::Rock => 2.0,
+            BlockInner::Rock => 0.6,
         }
     }
 
