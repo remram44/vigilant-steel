@@ -85,10 +85,24 @@ pub struct Blocky {
 }
 
 impl Blocky {
-    pub fn new(mut blocks: Vec<([f64; 2], Block)>) -> Blocky {
+    pub fn new(mut blocks: Vec<([f64; 2], Block)>) -> (Blocky, [f64; 2]) {
+        let (mass, inertia, center, tree) = Self::compute_stats(&mut blocks);
+
+        let blocky = Blocky {
+            blocks: blocks,
+            tree: tree,
+            mass: mass,
+            inertia: inertia,
+        };
+        (blocky, center)
+    }
+
+    fn compute_stats(
+        blocks: &mut Vec<([f64; 2], Block)>,
+    ) -> (f64, f64, [f64; 2], Tree) {
         let mut mass = 0.0;
         let mut center = [0.0, 0.0];
-        for &(ref loc, ref block) in &blocks {
+        for &(ref loc, ref block) in &*blocks {
             center = vec2_scale(
                 vec2_add(
                     vec2_scale(center, mass),
@@ -99,18 +113,14 @@ impl Blocky {
             mass += block.inner.mass();
         }
         let mut inertia = 0.0;
-        for &mut (ref mut loc, ref block) in &mut blocks {
+        for &mut (ref mut loc, ref block) in blocks.iter_mut() {
             *loc = vec2_sub(*loc, center);
             inertia += vec2_square_len(*loc) * block.inner.mass();
         }
 
-        let tree = Tree::new_(&blocks);
-        Blocky {
-            blocks: blocks,
-            tree: tree,
-            mass: mass,
-            inertia: inertia,
-        }
+        let tree = Tree::new_(blocks);
+
+        (mass, inertia, center, tree)
     }
 
     pub fn pop_dead_blocks(&mut self) -> Vec<([f64; 2], Block)> {

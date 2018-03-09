@@ -33,22 +33,6 @@ impl Ship {
     }
 
     pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
-        let entity = entities.create();
-        lazy.insert(
-            entity,
-            Position {
-                pos: [0.0, 0.0],
-                rot: 0.0,
-            },
-        );
-        lazy.insert(
-            entity,
-            Velocity {
-                vel: [0.0, 0.0],
-                rot: 0.0,
-            },
-        );
-        lazy.insert(entity, Ship::new());
         let blocks = vec![
             (
                 [-1.0, -1.0],
@@ -70,7 +54,28 @@ impl Ship {
                 }),
             ),
         ];
-        lazy.insert(entity, Blocky::new(blocks));
+        let (blocky, center) = Blocky::new(blocks);
+        let entity = entities.create();
+        let angle: f64 = 0.0;
+        let (s, c) = angle.sin_cos();
+        let center =
+            [center[0] * c - center[1] * s, center[0] * s + center[1] * s];
+        lazy.insert(
+            entity,
+            Position {
+                pos: center,
+                rot: angle,
+            },
+        );
+        lazy.insert(
+            entity,
+            Velocity {
+                vel: [0.0, 0.0],
+                rot: 0.0,
+            },
+        );
+        lazy.insert(entity, Ship::new());
+        lazy.insert(entity, blocky);
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());

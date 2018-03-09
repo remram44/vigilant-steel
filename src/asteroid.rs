@@ -66,6 +66,7 @@ impl<'a> System<'a> for SysAsteroid {
 
         self.spawn_delay = if let Some(d) = self.spawn_delay.take() {
             if d <= 0.0 {
+                // Choose position
                 let mut rng = rand::thread_rng();
                 let &(xpos, ypos) = rng.choose(&[
                     (-1.0, 0.0), // left
@@ -73,6 +74,24 @@ impl<'a> System<'a> for SysAsteroid {
                     (0.0, -1.0), // bottom
                     (0.0, 1.0),  // top
                 ]).unwrap();
+                // Generate blocks in an ellipse
+                let mut blocks = Vec::new();
+                let a = rng.gen_range(3.0, 4.0);
+                let ai = a as i32 + 1;
+                let b = rng.gen_range(2.0, 3.0);
+                let bi = b as i32 + 1;
+                for y in -ai..ai {
+                    for x in -bi..bi {
+                        let x = x as f64;
+                        let y = y as f64;
+                        if x * x * a * a + y * y * b * b <= a * a * b * b {
+                            blocks
+                                .push(([x, y], Block::new(BlockInner::Rock)));
+                        }
+                    }
+                }
+                let (blocky, _) = Blocky::new(blocks);
+
                 let entity = entities.create();
                 lazy.insert(
                     entity,
@@ -95,22 +114,7 @@ impl<'a> System<'a> for SysAsteroid {
                     },
                 );
                 lazy.insert(entity, Asteroid);
-                let mut blocks = Vec::new();
-                let a = rng.gen_range(3.0, 4.0);
-                let ai = a as i32 + 1;
-                let b = rng.gen_range(2.0, 3.0);
-                let bi = b as i32 + 1;
-                for y in -ai..ai {
-                    for x in -bi..bi {
-                        let x = x as f64;
-                        let y = y as f64;
-                        if x * x * a * a + y * y * b * b <= a * a * b * b {
-                            blocks
-                                .push(([x, y], Block::new(BlockInner::Rock)));
-                        }
-                    }
-                }
-                lazy.insert(entity, Blocky::new(blocks));
+                lazy.insert(entity, blocky);
                 #[cfg(feature = "network")]
                 {
                     lazy.insert(entity, net::Replicated::new());
