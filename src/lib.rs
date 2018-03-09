@@ -144,16 +144,24 @@ impl Game {
         world.add_resource(Input::new());
         world.add_resource(role);
 
-        let mut dispatcher =
-            DispatcherBuilder::new().add(SysSimu, "simu", &[]);
-        if role.authoritative() {
-            dispatcher = dispatcher
-                .add(SysCollision, "collision", &[])
+        let dispatcher = if role.authoritative() {
+            DispatcherBuilder::new()
+                .add(SysSimu, "simu", &[])
                 .add(SysProjectile, "projectile", &[])
                 .add(SysAsteroid::new(), "asteroid", &[])
-                .add(SysParticles, "particles", &[]);
-        }
-        dispatcher = dispatcher.add(SysShip, "ship", &[]);
+                .add(SysShip, "ship", &[])
+                .add(SysParticles, "particles", &[])
+                .add(
+                    SysCollision,
+                    "collision",
+                    &["projectile", "asteroid", "ship"],
+                )
+        } else {
+            DispatcherBuilder::new()
+                .add(SysSimu, "simu", &[])
+                .add(SysShip, "ship", &[])
+                .add(SysParticles, "particles", &[])
+        };
 
         (world, dispatcher)
     }
