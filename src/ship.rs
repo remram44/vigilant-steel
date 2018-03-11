@@ -330,7 +330,7 @@ impl<'a> System<'a> for SysShip {
         {
             // Apply thrust
             // Update orientation
-            vel.rot = ship.thrust_rot;
+            vel.rot += ship.thrust_rot * dt;
             // Update velocity
             let (s, c) = pos.rot.sin_cos();
             vel.vel = vec2_add(
@@ -400,6 +400,7 @@ impl<'a> System<'a> for SysShip {
                 vel.vel,
                 vec2_scale(vel.vel, -0.04 * dt * vec2_len(vel.vel)),
             );
+            vel.rot -= vel.rot * vel.rot.abs() * 2.0 * dt;
 
             // Fire
             if role.authoritative() {
