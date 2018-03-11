@@ -11,6 +11,7 @@ use physics::{affect_area, delete_entity, AABox, DeltaTime, DetectCollision,
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
+use std::f64::consts::PI;
 use vecmath::*;
 
 /// A ship.
@@ -38,25 +39,57 @@ impl Ship {
 
     pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
         let blocks = vec![
+            ([-2.0, -2.0], Block::new(BlockInner::Armor)),
             (
-                [-1.0, -1.0],
-                Block::new(BlockInner::Thruster { angle: 0.7 }),
+                [-2.0, -1.0],
+                Block::new(BlockInner::Thruster { angle: 0.0 }),
             ),
-            ([-1.0, 0.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
+            ([-2.0, 0.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
+            ([-2.0, 1.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
+            ([-2.0, 2.0], Block::new(BlockInner::Armor)),
             (
-                [-1.0, 1.0],
-                Block::new(BlockInner::Thruster { angle: -0.7 }),
+                [-1.0, -2.0],
+                Block::new(BlockInner::Thruster { angle: 0.5 * PI }),
             ),
-            ([0.0, -1.0], Block::new(BlockInner::Armor)),
-            ([0.0, 1.0], Block::new(BlockInner::Armor)),
-            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
+            ([-1.0, -1.0], Block::new(BlockInner::Armor)),
+            ([-1.0, 0.0], Block::new(BlockInner::Armor)),
+            ([-1.0, 1.0], Block::new(BlockInner::Armor)),
             (
-                [1.0, 0.0],
+                [-1.0, 2.0],
+                Block::new(BlockInner::Thruster { angle: -0.5 * PI }),
+            ),
+            (
+                [0.0, -2.0],
                 Block::new(BlockInner::Gun {
                     angle: 0.0,
                     cooldown: -1.0,
                 }),
             ),
+            ([0.0, -1.0], Block::new(BlockInner::Armor)),
+            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
+            ([0.0, 1.0], Block::new(BlockInner::Armor)),
+            (
+                [0.0, 2.0],
+                Block::new(BlockInner::Gun {
+                    angle: 0.0,
+                    cooldown: -1.0,
+                }),
+            ),
+            ([1.0, -1.0], Block::new(BlockInner::Armor)),
+            ([1.0, 0.0], Block::new(BlockInner::Armor)),
+            ([1.0, 1.0], Block::new(BlockInner::Armor)),
+            (
+                [2.0, -1.0],
+                Block::new(BlockInner::Thruster { angle: 0.5 * PI }),
+            ),
+            ([2.0, 0.0], Block::new(BlockInner::Armor)),
+            (
+                [2.0, 1.0],
+                Block::new(BlockInner::Thruster { angle: -0.5 * PI }),
+            ),
+            ([3.0, -1.0], Block::new(BlockInner::Armor)),
+            ([3.0, 0.0], Block::new(BlockInner::Armor)),
+            ([3.0, 1.0], Block::new(BlockInner::Armor)),
         ];
         let (blocky, center) = Blocky::new(blocks);
         let entity = entities.create();
