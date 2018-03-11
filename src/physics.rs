@@ -111,6 +111,7 @@ impl Component for Velocity {
 /// Don't even mark the other object.
 pub struct DetectCollision {
     pub bounding_box: AABox,
+    pub mass: Option<f64>,
 }
 
 impl Component for DetectCollision {
@@ -256,35 +257,6 @@ impl<'a> System<'a> for SysCollision {
             }
         }
 
-        // Detect collisions between Blocky and DetectCollision objects
-        for (e1, pos1, vel1, col1) in
-            (&*entities, &pos, &vel, &collision).join()
-        {
-            for (pos2, vel2, blocky2) in (&pos, &vel, &blocky).join() {
-                if blocky2.blocks.is_empty() {
-                    continue;
-                }
-                // Detect collisions using tree
-                if let Some(hit) = find_collision_tree_box(
-                    pos1,
-                    &col1.bounding_box,
-                    pos2,
-                    &blocky2.tree,
-                    0,
-                ) {
-                    let momentum = vec2_sub(vel1.vel, vel2.vel);
-                    let momentum = vec2_len(momentum) * blocky2.mass;
-                    store_collision(
-                        pos1,
-                        hit.location,
-                        HitEffect::Collision(momentum),
-                        e1,
-                        &mut hits,
-                    );
-                }
-            }
-        }
-
         for (e1, e2, hit) in block_hits {
             handle_collision(
                 e1,
@@ -296,6 +268,46 @@ impl<'a> System<'a> for SysCollision {
                 &hit,
                 &lazy,
             );
+        }
+
+        // Detect collisions between Blocky and DetectCollision objects
+        for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
+            for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
+                if blocky2.blocks.is_empty() {
+                    continue;
+                }
+                // Detect collisions using tree
+                if let Some(hit) = find_collision_tree_box(
+                    pos1,
+                    &col1.bounding_box,
+                    pos2,
+                    &blocky2.tree,
+                    0,
+                ) {
+                    let vel1 = vel.get(e1).unwrap().vel;
+                    let vel2 = vel.get(e2).unwrap().vel;
+                    let momentum = vec2_sub(vel1, vel2);
+                    let momentum = vec2_len(momentum) * blocky2.mass;
+                    store_collision(
+                        pos1,
+                        hit.location,
+                        HitEffect::Collision(momentum),
+                        e1,
+                        &mut hits,
+                    );
+                    if let Some(mass1) = col1.mass {
+                        let impulse = vec2_scale(vel1, mass1);
+                        let vel2 = vel.get_mut(e2).unwrap();
+                        vel2.vel = vec2_add(
+                            vel2.vel,
+                            vec2_scale(impulse, 1.0 / blocky2.mass),
+                        );
+                        let rel = vec2_sub(hit.location, pos2.pos);
+                        vel2.rot += (rel[0] * impulse[1] - rel[1] * impulse[0])
+                            / blocky2.inertia;
+                    }
+                }
+            }
         }
     }
 }

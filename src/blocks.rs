@@ -13,6 +13,8 @@ pub enum BlockInner {
     Thruster { angle: f64 },
     /// This shoots explosive energy projectiles.
     PlasmaGun { angle: f64, cooldown: f64 },
+    /// This shoots heavy projectiles.
+    RailGun { angle: f64, cooldown: f64 },
     /// An armor block does nothing, it is only there to take damage (and
     /// weigh you down).
     Armor,
@@ -45,6 +47,7 @@ impl BlockInner {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.8,
             BlockInner::PlasmaGun { .. } => 0.2,
+            BlockInner::RailGun { .. } => 0.8,
             BlockInner::Armor => 0.6,
             BlockInner::Rock => 0.6,
         }
@@ -55,6 +58,7 @@ impl BlockInner {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.6,
             BlockInner::PlasmaGun { .. } => 0.4,
+            BlockInner::RailGun { .. } => 0.4,
             BlockInner::Armor => 0.4,
             BlockInner::Rock => 0.3,
         }

@@ -3,7 +3,7 @@
 use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
 use game::physics::Position;
-use game::ship::Projectile;
+use game::ship::{Projectile, ProjectileType};
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
@@ -128,6 +128,30 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 gl,
             );
         }
+        BlockInner::RailGun { angle, .. } => {
+            draw_line_loop(
+                [0.7, 0.7, 1.0, 1.0],
+                0.05,
+                &[
+                    [-0.35, -0.35],
+                    [0.0, -0.45],
+                    [0.35, -0.35],
+                    [0.45, 0.0],
+                    [0.35, 0.35],
+                    [0.0, 0.45],
+                    [-0.35, 0.35],
+                    [-0.45, 0.0],
+                ],
+                tr,
+                gl,
+            );
+            graphics::polygon(
+                [0.7, 0.7, 1.0, 1.0],
+                &[[-0.25, -0.25], [0.6, -0.25], [0.6, 0.25], [-0.25, 0.25]],
+                tr.rot_rad(angle),
+                gl,
+            );
+        }
         BlockInner::Armor => {
             draw_line_loop(
                 [0.7, 0.7, 0.7, 1.0],
@@ -181,15 +205,28 @@ pub fn render<G, C, E>(
     }
 
     // Draw projectiles
-    for (pos, _) in (&pos, &projectile).join() {
+    for (pos, proj) in (&pos, &projectile).join() {
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        graphics::line(
-            [0.0, 1.0, 0.0, 1.0],
-            0.2,
-            [-0.8, 0.0, 0.8, 0.0],
-            projectile_tr,
-            gl,
-        );
+        match proj.0 {
+            ProjectileType::Plasma => {
+                graphics::line(
+                    [0.0, 1.0, 0.0, 1.0],
+                    0.1,
+                    [-0.8, 0.0, 0.8, 0.0],
+                    projectile_tr,
+                    gl,
+                );
+            }
+            ProjectileType::Rail => {
+                graphics::line(
+                    [1.0, 1.0, 1.0, 1.0],
+                    0.6,
+                    [-0.8, 0.0, 0.8, 0.0],
+                    projectile_tr,
+                    gl,
+                );
+            }
+        }
     }
 
     for (pos, particle) in (&pos, &particles).join() {

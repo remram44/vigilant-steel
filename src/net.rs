@@ -4,7 +4,7 @@ use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use particles::Effect;
 use physics::{LocalControl, Position, Velocity};
-use ship::{Projectile, Ship};
+use ship::{Projectile, ProjectileType, Ship};
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
@@ -478,7 +478,7 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.vel[1]);
                 write_float(&mut data, vel.rot);
                 assert_eq!(data.len(), 24);
-            } else if projectile.get(ent).is_some() {
+            } else if let Some(proj) = projectile.get(ent) {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
                 data = Vec::with_capacity(25);
@@ -488,7 +488,11 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.vel[0]);
                 write_float(&mut data, vel.vel[1]);
                 write_float(&mut data, vel.rot);
-                assert_eq!(data.write(&[0u8]).unwrap(), 1); // FIXME
+                let kind = match proj.0 {
+                    ProjectileType::Plasma => 1,
+                    ProjectileType::Rail => 2,
+                };
+                assert_eq!(data.write(&[0u8]).unwrap(), kind);
                 assert_eq!(data.len(), 25);
             } else {
                 panic!("Need to send update for unknown entity!");
@@ -805,12 +809,17 @@ impl<'a> System<'a> for SysNetClient {
                         vel: [read_float(&mut data), read_float(&mut data)],
                         rot: read_float(&mut data),
                     };
-                    assert_eq!(data.position(), 24);
+                    let kind = match data.read_u8().unwrap() {
+                        1 => ProjectileType::Plasma,
+                        2 => ProjectileType::Rail,
+                        _ => panic!("Got unknown projectile type"),
+                    };
+                    assert_eq!(data.position(), 25);
 
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(entity, Projectile);
+                    lazy.insert(entity, Projectile(kind));
                     lazy.insert(
                         entity,
                         Replicated {

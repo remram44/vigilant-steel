@@ -40,6 +40,7 @@ impl Component for Particle {
 #[derive(Debug, Clone)]
 pub enum EffectInner {
     Explosion(f64),
+    MetalHit,
     LaserHit,
 }
 
@@ -126,6 +127,36 @@ impl<'a> System<'a> for SysParticles {
                         );
                     }
                 }
+                EffectInner::MetalHit => for _ in 0..8 as usize {
+                    let ent = entities.create();
+                    lazy.insert(
+                        ent,
+                        Position {
+                            pos: [
+                                pos.pos[0] + rng.gen_range(-0.5, 0.5),
+                                pos.pos[1] + rng.gen_range(-0.5, 0.5),
+                            ],
+                            rot: 0.0,
+                        },
+                    );
+                    lazy.insert(
+                        ent,
+                        Velocity {
+                            vel: [
+                                rng.gen_range(-10.0, 10.0),
+                                rng.gen_range(-10.0, 10.0),
+                            ],
+                            rot: 0.0,
+                        },
+                    );
+                    particles.insert(
+                        ent,
+                        Particle {
+                            lifetime: rng.gen_range(0.4, 0.6),
+                            which: ParticleType::Spark,
+                        },
+                    );
+                },
                 EffectInner::LaserHit => {
                     let ent = entities.create();
                     lazy.insert(ent, pos.clone());

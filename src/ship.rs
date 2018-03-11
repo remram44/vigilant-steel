@@ -10,7 +10,7 @@ use physics::{affect_area, delete_entity, AABox, DeltaTime, DetectCollision,
               HitEffect, Hits, LocalControl, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
-            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
+            ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
 use vecmath::*;
 
@@ -88,7 +88,13 @@ impl Ship {
                 Block::new(BlockInner::Thruster { angle: -0.5 * PI }),
             ),
             ([3.0, -1.0], Block::new(BlockInner::Armor)),
-            ([3.0, 0.0], Block::new(BlockInner::Armor)),
+            (
+                [3.0, 0.0],
+                Block::new(BlockInner::RailGun {
+                    angle: 0.0,
+                    cooldown: -1.0,
+                }),
+            ),
             ([3.0, 1.0], Block::new(BlockInner::Armor)),
         ];
         let (blocky, center) = Blocky::new(blocks);
@@ -433,12 +439,17 @@ impl<'a> System<'a> for SysShip {
                 let mass = blocky.mass;
                 for &mut (rel, ref mut block) in &mut blocky.blocks {
                     let (angle, cooldown) = match block.inner {
-                        BlockInner::PlasmaGun { angle, cooldown } => {
-                            (angle, cooldown)
-                        }
+                        BlockInner::PlasmaGun {
+                            angle,
+                            ref mut cooldown,
+                        } => (angle, cooldown),
+                        BlockInner::RailGun {
+                            angle,
+                            ref mut cooldown,
+                        } => (angle, cooldown),
                         _ => continue,
                     };
-                    if ship.want_fire && cooldown <= 0.0 {
+                    if ship.want_fire && *cooldown <= 0.0 {
                         let fire_dir = {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
@@ -446,27 +457,43 @@ impl<'a> System<'a> for SysShip {
                         let rel =
                             [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c];
                         let fire_pos = vec2_add(pos.pos, rel);
-                        Projectile::create(
-                            &entities,
-                            &lazy,
-                            vec2_add(fire_pos, vec2_scale(fire_dir, 1.6)),
-                            pos.rot + angle,
-                        );
                         // Recoil
                         vel.vel = vec2_add(
                             vel.vel,
                             vec2_scale(fire_dir, -10.0 / mass),
                         );
-                        block.inner = BlockInner::PlasmaGun {
-                            angle: angle,
-                            cooldown: rng.gen_range(0.3, 0.4),
-                        };
+                        match block.inner {
+                            BlockInner::PlasmaGun { .. } => {
+                                Projectile::create(
+                                    &entities,
+                                    &lazy,
+                                    vec2_add(
+                                        fire_pos,
+                                        vec2_scale(fire_dir, 1.6),
+                                    ),
+                                    pos.rot + angle,
+                                    ProjectileType::Plasma,
+                                );
+                                *cooldown = rng.gen_range(0.3, 0.4);
+                            }
+                            BlockInner::RailGun { .. } => {
+                                Projectile::create(
+                                    &entities,
+                                    &lazy,
+                                    vec2_add(
+                                        fire_pos,
+                                        vec2_scale(fire_dir, 1.6),
+                                    ),
+                                    pos.rot + angle,
+                                    ProjectileType::Rail,
+                                );
+                                *cooldown = rng.gen_range(1.4, 1.6);
+                            }
+                            _ => {}
+                        }
                         fired = true;
-                    } else if cooldown > 0.0 {
-                        block.inner = BlockInner::PlasmaGun {
-                            angle: angle,
-                            cooldown: cooldown - dt,
-                        };
+                    } else if *cooldown > 0.0 {
+                        *cooldown -= dt;
                     }
                 }
                 #[cfg(feature = "network")]
@@ -480,12 +507,49 @@ impl<'a> System<'a> for SysShip {
     }
 }
 
+pub enum ProjectileType {
+    Plasma,
+    Rail,
+}
+
+impl ProjectileType {
+    pub fn speed(&self) -> f64 {
+        match *self {
+            ProjectileType::Plasma => 60.0,
+            ProjectileType::Rail => 35.0,
+        }
+    }
+
+    pub fn mass(&self) -> Option<f64> {
+        match *self {
+            ProjectileType::Plasma => None,
+            ProjectileType::Rail => Some(5.0),
+        }
+    }
+
+    pub fn bounds(&self) -> AABox {
+        match *self {
+            ProjectileType::Plasma => AABox {
+                xmin: -0.8,
+                xmax: 0.8,
+                ymin: -0.1,
+                ymax: 0.1,
+            },
+            ProjectileType::Rail => AABox {
+                xmin: -0.8,
+                xmax: 0.8,
+                ymin: -0.6,
+                ymax: 0.6,
+            },
+        }
+    }
+}
+
 /// A projectile.
 ///
 /// This is a simple segment that goes in a straight line, and gets removed
 /// when it hits something or exits the screen.
-#[derive(Default)]
-pub struct Projectile;
+pub struct Projectile(pub ProjectileType);
 
 impl Projectile {
     pub fn create(
@@ -493,6 +557,7 @@ impl Projectile {
         lazy: &Fetch<LazyUpdate>,
         pos: [f64; 2],
         rot: f64,
+        kind: ProjectileType,
     ) -> Entity {
         let entity = entities.create();
         let (s, c) = rot.sin_cos();
@@ -500,22 +565,18 @@ impl Projectile {
         lazy.insert(
             entity,
             Velocity {
-                vel: [60.0 * c, 60.0 * s],
+                vel: [kind.speed() * c, kind.speed() * s],
                 rot: 0.0,
             },
         );
         lazy.insert(
             entity,
             DetectCollision {
-                bounding_box: AABox {
-                    xmin: -0.8,
-                    xmax: 0.8,
-                    ymin: 0.1,
-                    ymax: 0.1,
-                },
+                bounding_box: kind.bounds(),
+                mass: kind.mass(),
             },
         );
-        lazy.insert(entity, Projectile);
+        lazy.insert(entity, Projectile(kind));
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -526,7 +587,7 @@ impl Projectile {
 }
 
 impl Component for Projectile {
-    type Storage = NullStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 /// Deletes projectiles when they fall off.
@@ -558,41 +619,8 @@ impl<'a> System<'a> for SysProjectile {
 ){
         assert!(role.authoritative());
 
-        for (entity, pos, _) in (&*entities, &position, &projectile).join() {
-            // Hit projectiles go off and affect an area
-            if hits.get(entity).is_some() {
-                // Affect entities in range with an Explosion
-                affect_area(
-                    &entities,
-                    &position,
-                    &blocky,
-                    &mut hits,
-                    pos.pos,
-                    3.0,
-                    HitEffect::Explosion(3.0),
-                );
-
-                delete_entity(*role, &entities, &lazy, entity);
-                let new_effect = entities.create();
-                lazy.insert(
-                    new_effect,
-                    Position {
-                        pos: pos.pos,
-                        rot: 0.0,
-                    },
-                );
-                lazy.insert(
-                    new_effect,
-                    Effect {
-                        effect: EffectInner::LaserHit,
-                        lifetime: -1.0,
-                    },
-                );
-                #[cfg(feature = "network")]
-                lazy.insert(new_effect, net::Dirty);
-                continue;
-            }
-
+        for (entity, pos, proj) in (&*entities, &position, &projectile).join()
+        {
             // Remove projectiles gone from the screen
             let pos = pos.pos;
             if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
@@ -600,6 +628,53 @@ impl<'a> System<'a> for SysProjectile {
             {
                 delete_entity(*role, &entities, &lazy, entity);
             }
+
+            // Hit projectiles go off and affect an area
+            if hits.get(entity).is_none() {
+                continue;
+            }
+
+            delete_entity(*role, &entities, &lazy, entity);
+            match proj.0 {
+                ProjectileType::Plasma => {
+                    // Affect entities in range with an Explosion
+                    affect_area(
+                        &entities,
+                        &position,
+                        &blocky,
+                        &mut hits,
+                        pos,
+                        3.0,
+                        HitEffect::Explosion(3.0),
+                    );
+
+                    let new_effect = entities.create();
+                    lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                    lazy.insert(
+                        new_effect,
+                        Effect {
+                            effect: EffectInner::LaserHit,
+                            lifetime: -1.0,
+                        },
+                    );
+                    #[cfg(feature = "network")]
+                    lazy.insert(new_effect, net::Dirty);
+                }
+                ProjectileType::Rail => {
+                    let new_effect = entities.create();
+                    lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                    lazy.insert(
+                        new_effect,
+                        Effect {
+                            effect: EffectInner::MetalHit,
+                            lifetime: -1.0,
+                        },
+                    );
+                    #[cfg(feature = "network")]
+                    lazy.insert(new_effect, net::Dirty);
+                }
+            }
+            continue;
         }
     }
 }
