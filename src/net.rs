@@ -453,7 +453,7 @@ impl<'a> System<'a> for SysNetServer {
             if let Some(ship) = ship.get(ent) {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
-                data = Vec::with_capacity(32);
+                data = Vec::with_capacity(36);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
                 write_float(&mut data, pos.rot);
@@ -462,7 +462,8 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.rot);
                 write_float(&mut data, ship.thrust[0]);
                 write_float(&mut data, ship.thrust[1]);
-                assert_eq!(data.len(), 32);
+                write_float(&mut data, ship.thrust_rot);
+                assert_eq!(data.len(), 36);
             } else if asteroid.get(ent).is_some() {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
@@ -527,6 +528,11 @@ impl<'a> System<'a> for SysNetServer {
                         };
                         ship.want_thrust[1] =
                             if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
+                        ship.want_thrust_rot = match data & 0x30 {
+                            0x10 => 1.0,
+                            0x20 => -1.0,
+                            _ => 0.0,
+                        };
 
                         lazy.insert(ent, Dirty);
                     }
@@ -669,7 +675,7 @@ impl<'a> System<'a> for SysNetClient {
 
                     // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        assert_eq!(data.len(), 32);
+                        assert_eq!(data.len(), 36);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
                         pos.pos[1] = read_float(&mut data);
@@ -679,7 +685,8 @@ impl<'a> System<'a> for SysNetClient {
                         vel.rot = read_float(&mut data);
                         ship.thrust[0] = read_float(&mut data);
                         ship.thrust[1] = read_float(&mut data);
-                        assert_eq!(data.position(), 32);
+                        ship.thrust_rot = read_float(&mut data);
+                        assert_eq!(data.position(), 36);
                     } else if asteroid.get(ent).is_some() {
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
@@ -733,7 +740,9 @@ impl<'a> System<'a> for SysNetClient {
                     let ship = Ship {
                         want_fire: false,
                         want_thrust: [0.0, 0.0],
+                        want_thrust_rot: 0.0,
                         thrust: [read_float(&mut data), read_float(&mut data)],
+                        thrust_rot: read_float(&mut data),
                     };
                     assert_eq!(data.position(), 43);
 
@@ -821,6 +830,11 @@ impl<'a> System<'a> for SysNetClient {
             }
             if ship.want_thrust[1] > 0.5 {
                 data |= 0x08;
+            }
+            if ship.want_thrust_rot > 0.5 {
+                data |= 0x10;
+            } else if ship.want_thrust_rot < -0.5 {
+                data |= 0x20;
             }
             chk(self.send(&Message::EntityUpdate(repli.id, vec![data])))
         }

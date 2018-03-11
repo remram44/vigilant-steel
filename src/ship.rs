@@ -20,7 +20,9 @@ use vecmath::*;
 pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
+    pub want_thrust_rot: f64,
     pub thrust: [f64; 2],
+    pub thrust_rot: f64,
 }
 
 impl Ship {
@@ -28,7 +30,9 @@ impl Ship {
         Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
+            want_thrust_rot: 0.0,
             thrust: [0.0, 0.0],
+            thrust_rot: 0.0,
         }
     }
 
@@ -260,8 +264,8 @@ impl<'a> System<'a> for SysShip {
 
         // Set ship controls from local input
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
-            ship.want_thrust[0] = input.movement[0];
-            ship.want_thrust[1] = input.movement[1];
+            ship.want_thrust = input.movement;
+            ship.want_thrust_rot = input.rotation;
             match input.fire {
                 Press::UP => ship.want_fire = false,
                 Press::PRESSED => ship.want_fire = true,
@@ -273,9 +277,18 @@ impl<'a> System<'a> for SysShip {
 
         // Action thrusters from controls
         if role.authoritative() {
-            for mut ship in (&mut ship).join() {
-                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(0.0);
-                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(-1.0);
+            for (mut ship, blocky) in (&mut ship, &blocky).join() {
+                // TODO: Compute thrust from thrusters
+                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(0.0) * 10.0;
+                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(-1.0) * 4.0;
+                let len = vec2_inv_len(ship.thrust);
+                if len > 0.1 {
+                    let invlen = 1.0 / len;
+                    ship.thrust[0] *= invlen;
+                    ship.thrust[1] *= invlen;
+                }
+                ship.thrust_rot =
+                    ship.want_thrust_rot.min(1.0).max(-1.0) * 5.0;
             }
         }
 
@@ -284,21 +297,28 @@ impl<'a> System<'a> for SysShip {
         {
             // Apply thrust
             // Update orientation
-            vel.rot = ship.thrust[1] * 5.0;
+            vel.rot = ship.thrust_rot;
             // Update velocity
             let (s, c) = pos.rot.sin_cos();
-            let dir = [c, s];
-            vel.vel =
-                vec2_add(vel.vel, vec2_scale(dir, ship.thrust[0] * 10.0 * dt));
+            vel.vel = vec2_add(
+                vel.vel,
+                vec2_scale(
+                    [
+                        c * ship.thrust[0] - s * ship.thrust[1],
+                        s * ship.thrust[0] + c * ship.thrust[1],
+                    ],
+                    dt,
+                ),
+            );
 
             // Spawn Exhaust particles
-            if role.graphical() && ship.thrust[0] > 0.3 {
+            if role.graphical() && ship.thrust[0] > 3.0 {
                 for &(ref rel, ref block) in &blocky.blocks {
                     let angle = match block.inner {
                         BlockInner::Thruster { angle } => angle,
                         _ => continue,
                     };
-                    let rate = 1.0 / (angle.cos() * ship.thrust[0] * 40.0);
+                    let rate = 1.0 / (angle.cos() * ship.thrust[0] * 4.0);
                     let num = (**clock / rate) as i32
                         - ((**clock - dt) / rate) as i32;
                     for _ in 0..num {
