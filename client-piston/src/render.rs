@@ -219,6 +219,16 @@ pub fn render<G, C, E>(
                     gl,
                 );
             }
+            ParticleType::LaserHit => {
+                let alpha = (particle.lifetime as f32 * 4.0).min(0.6);
+                let size = (0.2 - particle.lifetime) * 15.0;
+                graphics::ellipse(
+                    [0.0, 1.0, 0.0, alpha],
+                    graphics::rectangle::centered([0.0, 0.0, size, size]),
+                    part_tr,
+                    gl,
+                );
+            }
         }
     }
 }

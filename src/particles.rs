@@ -14,6 +14,8 @@ pub enum ParticleType {
     Exhaust,
     /// Destroyed parts blow up.
     Explosion,
+    /// Laser hits flash.
+    LaserHit,
 }
 
 /// This entity is a particle.
@@ -38,6 +40,7 @@ impl Component for Particle {
 #[derive(Debug, Clone)]
 pub enum EffectInner {
     Explosion(f64),
+    LaserHit,
 }
 
 pub struct Effect {
@@ -122,6 +125,17 @@ impl<'a> System<'a> for SysParticles {
                             },
                         );
                     }
+                }
+                EffectInner::LaserHit => {
+                    let ent = entities.create();
+                    lazy.insert(ent, pos.clone());
+                    lazy.insert(
+                        ent,
+                        Particle {
+                            lifetime: 0.2,
+                            which: ParticleType::LaserHit,
+                        },
+                    );
                 }
             }
 

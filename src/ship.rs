@@ -425,10 +425,9 @@ impl<'a> System<'a> for SysShip {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
                         };
-                        let fire_pos = [
-                            pos.pos[0] + rel[0] * c - rel[1] * s,
-                            pos.pos[1] + rel[0] * s + rel[1] * c,
-                        ];
+                        let rel =
+                            [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c];
+                        let fire_pos = vec2_add(pos.pos, rel);
                         Projectile::create(
                             &entities,
                             &lazy,
@@ -556,6 +555,23 @@ impl<'a> System<'a> for SysProjectile {
                 );
 
                 delete_entity(*role, &entities, &lazy, entity);
+                let new_effect = entities.create();
+                lazy.insert(
+                    new_effect,
+                    Position {
+                        pos: pos.pos,
+                        rot: 0.0,
+                    },
+                );
+                lazy.insert(
+                    new_effect,
+                    Effect {
+                        effect: EffectInner::LaserHit,
+                        lifetime: -1.0,
+                    },
+                );
+                #[cfg(feature = "network")]
+                lazy.insert(new_effect, net::Dirty);
                 continue;
             }
 

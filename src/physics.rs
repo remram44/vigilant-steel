@@ -84,7 +84,7 @@ pub fn delete_entity(
 }
 
 /// Position component, for entities that are somewhere in the world.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Position {
     pub pos: [f64; 2],
     pub rot: f64,
@@ -95,7 +95,7 @@ impl Component for Position {
 }
 
 /// Velocity component, for entities that move.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Velocity {
     pub vel: [f64; 2],
     pub rot: f64,
