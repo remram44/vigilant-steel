@@ -120,17 +120,17 @@ fn handle_event(
         if let Some(scancode) = button.scancode {
             if button.state == ButtonState::Press {
                 match scancode {
-                    4 => input.movement[0] = -1.0,
-                    7 => input.movement[0] = 1.0,
-                    22 => input.movement[1] = -1.0,
-                    26 => input.movement[1] = 1.0,
+                    22 => input.movement[0] = -1.0,
+                    26 => input.movement[0] = 1.0,
+                    4 => input.movement[1] = 1.0,
+                    7 => input.movement[1] = -1.0,
                     44 => input.fire = Press::PRESSED,
                     _ => {}
                 }
             } else {
                 match scancode {
-                    4 | 7 => input.movement[0] = 0.0,
-                    22 | 26 => input.movement[1] = 0.0,
+                    22 | 26 => input.movement[0] = 0.0,
+                    4 | 7 => input.movement[1] = 0.0,
                     44 => input.fire = Press::UP,
                     _ => {}
                 }

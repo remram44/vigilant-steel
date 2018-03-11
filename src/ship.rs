@@ -260,7 +260,7 @@ impl<'a> System<'a> for SysShip {
 
         // Set ship controls from local input
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
-            ship.want_thrust[0] = -input.movement[0];
+            ship.want_thrust[0] = input.movement[0];
             ship.want_thrust[1] = input.movement[1];
             match input.fire {
                 Press::UP => ship.want_fire = false,
@@ -274,8 +274,8 @@ impl<'a> System<'a> for SysShip {
         // Action thrusters from controls
         if role.authoritative() {
             for mut ship in (&mut ship).join() {
-                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(-1.0);
-                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(0.0)
+                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(0.0);
+                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(-1.0);
             }
         }
 
@@ -284,21 +284,21 @@ impl<'a> System<'a> for SysShip {
         {
             // Apply thrust
             // Update orientation
-            vel.rot = ship.thrust[0] * 5.0;
+            vel.rot = ship.thrust[1] * 5.0;
             // Update velocity
             let (s, c) = pos.rot.sin_cos();
             let dir = [c, s];
             vel.vel =
-                vec2_add(vel.vel, vec2_scale(dir, ship.thrust[1] * 10.0 * dt));
+                vec2_add(vel.vel, vec2_scale(dir, ship.thrust[0] * 10.0 * dt));
 
             // Spawn Exhaust particles
-            if role.graphical() && ship.thrust[1] > 0.3 {
+            if role.graphical() && ship.thrust[0] > 0.3 {
                 for &(ref rel, ref block) in &blocky.blocks {
                     let angle = match block.inner {
                         BlockInner::Thruster { angle } => angle,
                         _ => continue,
                     };
-                    let rate = 1.0 / (angle.cos() * ship.thrust[1] * 40.0);
+                    let rate = 1.0 / (angle.cos() * ship.thrust[0] * 40.0);
                     let num = (**clock / rate) as i32
                         - ((**clock - dt) / rate) as i32;
                     for _ in 0..num {
