@@ -312,8 +312,8 @@ impl<'a> System<'a> for SysShip {
         if role.authoritative() {
             for (mut ship, blocky) in (&mut ship, &blocky).join() {
                 // TODO: Compute thrust from thrusters
-                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(0.0) * 10.0;
-                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(-1.0) * 4.0;
+                ship.thrust[0] = ship.want_thrust[0].min(1.0).max(0.0) * 100.0;
+                ship.thrust[1] = ship.want_thrust[1].min(1.0).max(-1.0) * 60.0;
                 let len = vec2_inv_len(ship.thrust);
                 if len > 0.1 {
                     let invlen = 1.0 / len;
@@ -321,7 +321,7 @@ impl<'a> System<'a> for SysShip {
                     ship.thrust[1] *= invlen;
                 }
                 ship.thrust_rot =
-                    ship.want_thrust_rot.min(1.0).max(-1.0) * 5.0;
+                    ship.want_thrust_rot.min(1.0).max(-1.0) * 500.0;
             }
         }
 
@@ -330,7 +330,7 @@ impl<'a> System<'a> for SysShip {
         {
             // Apply thrust
             // Update orientation
-            vel.rot += ship.thrust_rot * dt;
+            vel.rot += ship.thrust_rot * dt / blocky.inertia;
             // Update velocity
             let (s, c) = pos.rot.sin_cos();
             vel.vel = vec2_add(
@@ -340,7 +340,7 @@ impl<'a> System<'a> for SysShip {
                         c * ship.thrust[0] - s * ship.thrust[1],
                         s * ship.thrust[0] + c * ship.thrust[1],
                     ],
-                    dt,
+                    dt / blocky.mass,
                 ),
             );
 
@@ -351,7 +351,7 @@ impl<'a> System<'a> for SysShip {
                         BlockInner::Thruster { angle } => angle,
                         _ => continue,
                     };
-                    let rate = 1.0 / (angle.cos() * ship.thrust[0] * 4.0);
+                    let rate = 1.0 / (angle.cos() * ship.thrust[0] * 0.4);
                     let num = (**clock / rate) as i32
                         - ((**clock - dt) / rate) as i32;
                     for _ in 0..num {
@@ -405,6 +405,7 @@ impl<'a> System<'a> for SysShip {
             // Fire
             if role.authoritative() {
                 let mut fired = false;
+                let mass = blocky.mass;
                 for &mut (rel, ref mut block) in &mut blocky.blocks {
                     let (angle, cooldown) = match block.inner {
                         BlockInner::Gun { angle, cooldown } => {
@@ -428,8 +429,10 @@ impl<'a> System<'a> for SysShip {
                             pos.rot + angle,
                         );
                         // Recoil
-                        vel.vel =
-                            vec2_add(vel.vel, vec2_scale(fire_dir, -1.2));
+                        vel.vel = vec2_add(
+                            vel.vel,
+                            vec2_scale(fire_dir, -10.0 / mass),
+                        );
                         block.inner = BlockInner::Gun {
                             angle: angle,
                             cooldown: rng.gen_range(0.3, 0.4),
