@@ -173,31 +173,49 @@ impl<'a> System<'a> for SysShip {
             for (ent, mut pos, mut blk, hits) in
                 (&*entities, &mut pos, &mut blocky, &hits).join()
             {
+                let (s, c) = pos.rot.sin_cos();
                 let mut deleted = false;
                 for hit in &**hits {
                     match hit.effect {
                         HitEffect::Collision(_) => {}
                         HitEffect::Explosion(size) => {
+                            let mut impulse = [0.0, 0.0];
+                            let mut rot = 0.0;
+
                             // Hurt some blocks
                             for &mut (loc, ref mut block) in &mut blk.blocks {
-                                let sq_dist = vec2_square_len(vec2_sub(
-                                    hit.rel_location,
-                                    loc,
-                                ));
+                                let diff = vec2_sub(hit.rel_location, loc);
+                                let sq_dist = vec2_square_len(diff);
                                 if sq_dist <= size {
                                     block.health -=
                                         1.0 - sq_dist / (size * size);
                                     if block.health < 0.0 {
                                         deleted = true;
                                     }
+                                    let impulse_blk =
+                                        vec2_scale(diff, -10.0 / sq_dist);
+                                    impulse = vec2_add(impulse, impulse_blk);
+                                    rot += loc[0] * impulse_blk[1]
+                                        - loc[1] * impulse_blk[0];
                                 }
                             }
+
+                            // Push object back
+                            impulse = [
+                                impulse[0] * c - impulse[1] * s,
+                                impulse[1] * s + impulse[1] * c,
+                            ];
+                            let vel = vel.get_mut(ent).unwrap();
+                            vel.vel = vec2_add(
+                                vel.vel,
+                                vec2_scale(impulse, 1.0 / blk.mass),
+                            );
+                            vel.rot += rot / blk.inertia;
                         }
                     }
                 }
 
                 if deleted {
-                    let (s, c) = pos.rot.sin_cos();
                     let (dead_blocks, center, pieces) = blk.maintain();
 
                     for (loc, blk) in dead_blocks {
