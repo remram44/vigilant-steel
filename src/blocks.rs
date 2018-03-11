@@ -11,8 +11,8 @@ pub enum BlockInner {
     /// Allows a ship to move. A ship needs multiple of this to be able to
     /// move and rotate.
     Thruster { angle: f64 },
-    /// This shoots projectiles.
-    Gun { angle: f64, cooldown: f64 },
+    /// This shoots explosive energy projectiles.
+    PlasmaGun { angle: f64, cooldown: f64 },
     /// An armor block does nothing, it is only there to take damage (and
     /// weigh you down).
     Armor,
@@ -29,7 +29,7 @@ impl BlockInner {
         _lazy: &Fetch<LazyUpdate>,
     ) {
         match *self {
-            BlockInner::Gun {
+            BlockInner::PlasmaGun {
                 ref mut cooldown, ..
             } => {
                 if *cooldown > 0.0 {
@@ -44,7 +44,7 @@ impl BlockInner {
         match *self {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.8,
-            BlockInner::Gun { .. } => 0.2,
+            BlockInner::PlasmaGun { .. } => 0.2,
             BlockInner::Armor => 0.6,
             BlockInner::Rock => 0.6,
         }
@@ -54,7 +54,7 @@ impl BlockInner {
         match *self {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.6,
-            BlockInner::Gun { .. } => 0.4,
+            BlockInner::PlasmaGun { .. } => 0.4,
             BlockInner::Armor => 0.4,
             BlockInner::Rock => 0.3,
         }

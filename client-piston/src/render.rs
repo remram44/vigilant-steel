@@ -104,7 +104,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 gl,
             );
         },
-        BlockInner::Gun { angle, .. } => {
+        BlockInner::PlasmaGun { angle, .. } => {
             draw_line_loop(
                 [0.7, 0.7, 1.0, 1.0],
                 0.05,

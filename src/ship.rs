@@ -60,7 +60,7 @@ impl Ship {
             ),
             (
                 [0.0, -2.0],
-                Block::new(BlockInner::Gun {
+                Block::new(BlockInner::PlasmaGun {
                     angle: 0.0,
                     cooldown: -1.0,
                 }),
@@ -70,7 +70,7 @@ impl Ship {
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             (
                 [0.0, 2.0],
-                Block::new(BlockInner::Gun {
+                Block::new(BlockInner::PlasmaGun {
                     angle: 0.0,
                     cooldown: -1.0,
                 }),
@@ -415,7 +415,7 @@ impl<'a> System<'a> for SysShip {
                 let mass = blocky.mass;
                 for &mut (rel, ref mut block) in &mut blocky.blocks {
                     let (angle, cooldown) = match block.inner {
-                        BlockInner::Gun { angle, cooldown } => {
+                        BlockInner::PlasmaGun { angle, cooldown } => {
                             (angle, cooldown)
                         }
                         _ => continue,
@@ -440,13 +440,13 @@ impl<'a> System<'a> for SysShip {
                             vel.vel,
                             vec2_scale(fire_dir, -10.0 / mass),
                         );
-                        block.inner = BlockInner::Gun {
+                        block.inner = BlockInner::PlasmaGun {
                             angle: angle,
                             cooldown: rng.gen_range(0.3, 0.4),
                         };
                         fired = true;
                     } else if cooldown > 0.0 {
-                        block.inner = BlockInner::Gun {
+                        block.inner = BlockInner::PlasmaGun {
                             angle: angle,
                             cooldown: cooldown - dt,
                         };
