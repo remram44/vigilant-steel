@@ -137,13 +137,13 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let tree = Tree::new(vec![]);
+        let tree = Tree::new(&vec![]);
         assert!(tree.0.is_empty());
     }
 
     #[test]
     fn test() {
-        let tree = Tree::new(vec![
+        let tree = Tree::new(&vec![
             [0.5, 0.5],
             [99.5, 19.5],
             [12.31, 8.05],
