@@ -7,7 +7,7 @@
 ///
 /// This is useful as some actions must be triggered only on press, and others
 /// can be repeated as long as the key is down.
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Press {
     /// Key is up (not pressed).
     UP,
@@ -17,11 +17,21 @@ pub enum Press {
     KEPT,
 }
 
-// Input resource, stores the keyboard state
+impl Press {
+    fn update(&mut self) {
+        if let Press::PRESSED = *self {
+            *self = Press::KEPT;
+        }
+    }
+}
+
+// Input resource, stores the local user's controls
 pub struct Input {
     pub movement: [f64; 2],
     pub rotation: f64,
     pub fire: Press,
+    pub mouse: [f64; 2],
+    pub buttons: [Press; 3],
 }
 
 impl Input {
@@ -30,6 +40,15 @@ impl Input {
             movement: [0.0, 0.0],
             rotation: 0.0,
             fire: Press::UP,
+            mouse: [0.0; 2],
+            buttons: [Press::UP; 3],
         }
+    }
+
+    pub fn update(&mut self) {
+        self.fire.update();
+        self.buttons[0].update();
+        self.buttons[1].update();
+        self.buttons[2].update();
     }
 }

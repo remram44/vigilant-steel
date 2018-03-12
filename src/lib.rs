@@ -19,7 +19,7 @@ pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};
 use blocks::Blocky;
-use input::{Input, Press};
+use input::Input;
 use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
@@ -218,8 +218,6 @@ impl Game {
         self.world.maintain();
 
         let mut input = self.world.write_resource::<Input>();
-        if input.fire == Press::PRESSED {
-            input.fire = Press::KEPT;
-        }
+        input.update();
     }
 }

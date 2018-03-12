@@ -114,10 +114,21 @@ fn handle_event(
         *viewport = Viewport::new(newsize);
     }
 
-    // Keyboard input
+    // Keyboard input and buttons
     if let Some(button) = event.button_args() {
         let mut input = app.game.world.write_resource::<Input>();
-        if let Some(scancode) = button.scancode {
+        if let Button::Mouse(m) = button.button {
+            let pressed = match button.state {
+                ButtonState::Press => Press::PRESSED,
+                ButtonState::Release => Press::UP,
+            };
+            match m {
+                MouseButton::Left => input.buttons[0] = pressed,
+                MouseButton::Right => input.buttons[1] = pressed,
+                MouseButton::Middle => input.buttons[2] = pressed,
+                _ => {}
+            }
+        } else if let Some(scancode) = button.scancode {
             if button.state == ButtonState::Press {
                 match scancode {
                     22 => input.movement[0] = -1.0,
@@ -139,6 +150,16 @@ fn handle_event(
                 }
             }
         }
+    }
+
+    // Mouse
+    if let Some(cursor) = event.mouse_cursor_args() {
+        let mut input = app.game.world.write_resource::<Input>();
+        let viewport = app.game.world.read_resource::<Viewport>();
+        input.mouse = [
+            (cursor[0] - 0.5 * viewport.width as f64) / viewport.scale,
+            (0.5 * viewport.height as f64 - cursor[1]) / viewport.scale,
+        ];
     }
 
     // Update
