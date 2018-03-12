@@ -1,3 +1,9 @@
+//! Collision detection code using Separating Axis Theorem.
+//!
+//! This contains the low-level SAT code used by `physics.rs`. It detects
+//! collisions and returns location, direction, and depth, but `SysCollision`
+//! actually handles it.
+
 use physics::{AABox, Position};
 use std::cmp::Ordering;
 use utils::IteratorExt;
@@ -15,6 +21,7 @@ impl PartialOrd for Projection {
     }
 }
 
+/// Little structure returned by `find()`.
 pub struct Collision {
     pub direction: [f64; 2],
     pub depth: f64,

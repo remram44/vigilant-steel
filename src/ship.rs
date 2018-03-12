@@ -1,4 +1,8 @@
 //! Ships and projectiles.
+//!
+//! A ship is just a `Blocky` object that has a cockpit. A `Ship` component
+//! gets tacked on to store control and thruster state.
+// TODO: Take some behavior out of SysShip and into blocks.rs
 
 use {Clock, Role};
 use blocks::{Block, BlockInner, Blocky};

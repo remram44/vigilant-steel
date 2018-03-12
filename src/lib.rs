@@ -1,3 +1,17 @@
+//! vigilant steel game.
+//!
+//! This crate contains all the game logic, while the frontend lives
+//! separately.
+//!
+//! # List of modules
+//!
+//! * `lib.rs`: this file. Contains the `Game` structure, and the constructors
+//! that initialize the game.
+//! * `physics.rs`: base components and logic for the physic simulation:
+//! `Position`, `Velocity`, `Hits`... Integrates positions, finds collisions.
+//! * `asteroid.rs`: system spawning asteroids, deleting them when they fall
+//! off.
+
 extern crate byteorder;
 #[macro_use]
 extern crate log;
@@ -77,6 +91,11 @@ impl Role {
     }
 }
 
+/// Game clock, available as a resource.
+///
+/// This is used to trigger and time things around the game. It wraps so as to
+/// preserve resolution, be aware of it when doing computations (or use
+/// `seconds_since()`).
 pub struct Clock {
     time_wrapping: f64,
 }
@@ -86,6 +105,7 @@ impl Clock {
         Clock { time_wrapping: 0.0 }
     }
 
+    /// Called by `Game` to move to the next frame.
     fn advance_frame(&mut self, dt: f64) {
         self.time_wrapping += dt;
         if self.time_wrapping > 1024.0 {
@@ -93,6 +113,8 @@ impl Clock {
         }
     }
 
+    /// Compute the difference between two points in time, aware of
+    /// wrapping.
     pub fn seconds_since(&self, past: &Clock) -> f64 {
         let d = self.time_wrapping - past.time_wrapping;
         if d < 0.0 {

@@ -1,4 +1,7 @@
 //! Keyboard input structure.
+//!
+//! This is a simple structure used as a specs resource to store input from the
+//! local player.
 
 /// A key status.
 ///
@@ -25,7 +28,7 @@ impl Press {
     }
 }
 
-// Input resource, stores the local user's controls
+/// Input resource, stores the local user's controls.
 pub struct Input {
     pub movement: [f64; 2],
     pub rotation: f64,
@@ -45,6 +48,7 @@ impl Input {
         }
     }
 
+    /// Update status of keys, called once per frame.
     pub fn update(&mut self) {
         self.fire.update();
         self.buttons[0].update();

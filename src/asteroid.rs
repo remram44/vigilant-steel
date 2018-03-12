@@ -1,4 +1,8 @@
 //! Asteroid objects, floating around for the user to collide with or shoot.
+//!
+//! Asteroids are not really special now. The components only marks the objects
+//! so they are removed when falling off the screen, and more asteroids spawned
+//! when their number is low.
 
 use Role;
 use blocks::{Block, BlockInner, Blocky};

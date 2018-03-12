@@ -1,3 +1,12 @@
+//! Particles and particle effects.
+//!
+//! Particles can be created directly, from client code; for example, the
+//! ship's exhaust spawns particles.
+//! Particle effects can also be spawned, from server code: it will be
+//! replicated so that the effect happens on clients as well. For example,
+//! explosions are an `Effect`, that is turned into particles by `SysParticles`
+//! once we got to replicate it to the clients.
+
 use Role;
 use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};

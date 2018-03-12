@@ -55,6 +55,10 @@ pub struct FpsCounter {
     frames_since_report: u32,
 }
 
+/// Measures average FPS over 10-second windows.
+///
+/// After rendering a frame, call `rendered()` to update the value. If it
+/// returns true, a new average is available.
 impl FpsCounter {
     pub fn new() -> FpsCounter {
         FpsCounter {
@@ -64,6 +68,10 @@ impl FpsCounter {
         }
     }
 
+    /// Update the value after rendering a frame.
+    ///
+    /// Returns true once every 10 seconds to signify that a new average is
+    /// available.
     pub fn rendered(&mut self) -> bool {
         let now = SystemTime::now();
         let dt = match now.duration_since(self.last_report) {
@@ -87,6 +95,7 @@ impl FpsCounter {
         }
     }
 
+    /// Current average of frames per second (updated every 10 seconds).
     pub fn value(&self) -> f64 {
         self.value
     }

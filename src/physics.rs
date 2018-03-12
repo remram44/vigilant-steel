@@ -1,4 +1,7 @@
 //! Common components and behaviors for entities.
+//!
+//! This contains `Position`, `Velocity`, `Hits`, ... `SysSimu` integrates
+//! positions, finds collisions.
 
 use Role;
 use blocks::Blocky;
@@ -22,7 +25,9 @@ pub struct AABox {
     pub ymax: f64,
 }
 
+/// A rectangle bounding box.
 impl AABox {
+    /// Creates a box that doesn't contain anything.
     pub fn empty() -> AABox {
         AABox {
             xmin: ::std::f64::INFINITY,
@@ -32,6 +37,7 @@ impl AABox {
         }
     }
 
+    /// Returns an array of the 4 corners' coordinates.
     pub fn corners(&self) -> [[f64; 2]; 4] {
         [
             [self.xmin, self.ymin],
@@ -41,6 +47,8 @@ impl AABox {
         ]
     }
 
+    /// The square of the maximum radius from (0, 0) containing the whole
+    /// box.
     pub fn sq_radius(&self) -> f64 {
         self.corners()
             .iter()
@@ -140,6 +148,7 @@ pub struct Hits {
 }
 
 impl Hits {
+    /// Record a `Hit`, possibly creating a new `Hits` component.
     pub fn record<'a>(
         hits: &mut WriteStorage<'a, Hits>,
         ent: Entity,
@@ -257,6 +266,7 @@ impl<'a> System<'a> for SysCollision {
             }
         }
 
+        // Handle the detected collisions
         for (e1, e2, hit) in block_hits {
             handle_collision(
                 e1,
@@ -288,6 +298,7 @@ impl<'a> System<'a> for SysCollision {
                     let vel2 = vel.get(e2).unwrap().vel;
                     let momentum = vec2_sub(vel1, vel2);
                     let momentum = vec2_len(momentum) * blocky2.mass;
+                    // Store collision on for the DetectCollision entity
                     store_collision(
                         pos1,
                         hit.location,

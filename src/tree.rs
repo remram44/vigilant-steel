@@ -1,3 +1,7 @@
+//! K-D Tree implementation.
+//!
+//! This is used to accelerate collision detection between `Blocky` objects.
+
 use physics::AABox;
 use std::cmp::Ordering;
 
@@ -17,6 +21,8 @@ pub struct Node {
 pub struct Tree(pub Vec<Node>);
 
 impl Tree {
+    /// Builds the tree from a slice of coordinates, centers of size 1
+    /// squares.
     pub fn new(input: &[[f64; 2]]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
@@ -29,6 +35,8 @@ impl Tree {
         tree
     }
 
+    /// Builds the tree from coordinates + something. Used for
+    /// `Blocky.blocks`.
     pub fn new_<T>(input: &[([f64; 2], T)]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
@@ -41,6 +49,7 @@ impl Tree {
         tree
     }
 
+    /// Actually build the tree.
     fn build(&mut self, points: &mut [(usize, [f64; 2])]) -> usize {
         if points.len() == 1 {
             let p = points[0].1;

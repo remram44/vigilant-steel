@@ -1,3 +1,16 @@
+//! The block definitions, as well as the `Blocky` component.
+//!
+//! `Blocky` is an important component. A lot of entities are made of blocks,
+//! like ships, remnants of ships, drifting modules, and asteroids.
+//!
+//! A ship is a `Blocky` entity with a cockpit.
+//!
+//! This module contains the code to update `Blocky` objects, computing mass,
+//! center, inertia, removing blocks, and splitting the entity in multiple new
+//! entities. However their is currently no blocky system, as that
+//! functionality is factored in `SysShip` right now.
+// TODO: Refactor some blocky behavior out of SysShip, into a blocky system?
+
 use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
 use tree::Tree;
 use vecmath::*;
@@ -42,6 +55,8 @@ impl BlockInner {
         }
     }
 
+    /// The mass of this block. Must be constant, queried on structure
+    /// changes.
     pub fn mass(&self) -> f64 {
         match *self {
             BlockInner::Cockpit => 1.0,
@@ -53,6 +68,7 @@ impl BlockInner {
         }
     }
 
+    /// The starting health of this block.
     pub fn max_health(&self) -> f64 {
         match *self {
             BlockInner::Cockpit => 1.0,
@@ -67,11 +83,15 @@ impl BlockInner {
 
 #[derive(Debug)]
 pub struct Block {
+    /// Health of this blocks, starting at `inner.max_health()`.
     pub health: f64,
+    /// The state and behavior of this block, depending on its concrete
+    /// type.
     pub inner: BlockInner,
 }
 
 impl Block {
+    /// Creates a block of a given type with correct starting health.
     pub fn new(inner: BlockInner) -> Block {
         Block {
             health: inner.max_health(),
@@ -127,6 +147,13 @@ impl Blocky {
         (mass, inertia, center, tree)
     }
 
+    /// Called when some blocks are added or reach 0 health.
+    ///
+    /// Removes dead blocks, split the entity in multiple `Blocky` objects if
+    /// disjoint, recompute mass/center/inertia.
+    ///
+    /// Returns a triple of dead blocks, new center of mass, and broken off
+    /// pieces.
     pub fn maintain(
         &mut self,
     ) -> (Vec<([f64; 2], Block)>, [f64; 2], Vec<(Blocky, [f64; 2])>) {
