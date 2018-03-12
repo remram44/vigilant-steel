@@ -115,8 +115,10 @@ impl Component for Velocity {
 
 /// Special collision.
 ///
-/// No built-in collision response, just detect collision and mark that object.
-/// Don't even mark the other object.
+/// If `mass` is `None`No built-in collision response, just detect collision
+/// and mark that object. Don't even mark the other object.
+/// If `mass` is set, the other object's velocity will be affected, and it will
+/// get a `HitEffect::Collision`.
 pub struct DetectCollision {
     pub bounding_box: AABox,
     pub mass: Option<f64>,
@@ -320,6 +322,14 @@ impl<'a> System<'a> for SysCollision {
                         let rel = vec2_sub(hit.location, pos2.pos);
                         vel2.rot += (rel[0] * impulse[1] - rel[1] * impulse[0])
                             / blocky2.inertia;
+                        // Store the collision on the other object
+                        store_collision(
+                            pos2,
+                            hit.location,
+                            HitEffect::Collision(impulse),
+                            e2,
+                            &mut hits,
+                        );
                     }
                 }
             }
