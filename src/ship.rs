@@ -17,6 +17,7 @@ use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
+use utils::angle_wrap;
 use vecmath::*;
 
 /// A ship.
@@ -375,7 +376,8 @@ impl<'a> System<'a> for SysShip {
                     &mut BlockInner::PlasmaGun { ref mut angle, .. } => {
                         let target_rel = vec2_sub(target_rel, rel);
                         let bearing = target_rel[1].atan2(target_rel[0]);
-                        *angle = bearing;
+                        let chg = angle_wrap(bearing - *angle);
+                        *angle += angle_wrap(chg.min(3.0 * dt).max(-3.0 * dt));
                     }
                     _ => {}
                 }
