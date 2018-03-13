@@ -5,6 +5,7 @@
 // TODO: Take some behavior out of SysShip and into blocks.rs
 
 use {Clock, Role};
+use asteroid::Asteroid;
 use blocks::{Block, BlockInner, Blocky};
 use input::{Input, Press};
 #[cfg(feature = "network")]
@@ -155,6 +156,7 @@ impl<'a> System<'a> for SysShip {
         ReadStorage<'a, Hits>,
         WriteStorage<'a, Ship>,
         WriteStorage<'a, Blocky>,
+        ReadStorage<'a, Asteroid>,
         ReadStorage<'a, LocalControl>,
     );
 
@@ -172,6 +174,7 @@ impl<'a> System<'a> for SysShip {
             hits,
             mut ship,
             mut blocky,
+            asteroid,
             local,
         ): Self::SystemData,
     ) {
@@ -266,6 +269,7 @@ impl<'a> System<'a> for SysShip {
 
                     // Create entities from pieces that broke off
                     let vel = vel.get(ent).unwrap();
+                    let is_asteroid = asteroid.get(ent).is_some();
                     for (blocky, center) in pieces {
                         let center = [
                             center[0] * c - center[1] * s,
@@ -287,6 +291,10 @@ impl<'a> System<'a> for SysShip {
                             },
                         );
                         lazy.insert(newent, blocky);
+                        // Asteroids stay asteroids
+                        if is_asteroid {
+                            lazy.insert(newent, Asteroid);
+                        }
                         #[cfg(feature = "network")]
                         {
                             lazy.insert(newent, net::Replicated::new());
