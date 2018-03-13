@@ -27,6 +27,7 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub want_thrust_rot: f64,
+    pub want_target: [f64; 2],
     pub thrust: [f64; 2],
     pub thrust_rot: f64,
 }
@@ -37,6 +38,7 @@ impl Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             want_thrust_rot: 0.0,
+            want_target: [0.0, 0.0],
             thrust: [0.0, 0.0],
             thrust_rot: 0.0,
         }
@@ -335,6 +337,7 @@ impl<'a> System<'a> for SysShip {
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
             ship.want_thrust = input.movement;
             ship.want_thrust_rot = input.rotation;
+            ship.want_target = input.mouse;
             match input.fire {
                 Press::UP => ship.want_fire = false,
                 Press::PRESSED => ship.want_fire = true,
@@ -344,9 +347,13 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        // Action thrusters from controls
-        if role.authoritative() {
-            for (mut ship, blocky) in (&mut ship, &blocky).join() {
+        for (ent, pos, mut vel, mut ship, mut blocky) in
+            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
+        {
+            let (s, c) = pos.rot.sin_cos();
+
+            // Action thrusters from controls
+            if role.authoritative() {
                 let (thrust, rot) = compute_thrust(
                     blocky.blocks.iter().enumerate(),
                     |_, _| {},
@@ -356,16 +363,28 @@ impl<'a> System<'a> for SysShip {
                 ship.thrust = thrust;
                 ship.thrust_rot = rot;
             }
-        }
 
-        for (ent, pos, mut vel, mut ship, mut blocky) in
-            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
-        {
+            // Update blocks
+            let target_rel = vec2_sub(ship.want_target, pos.pos);
+            let target_rel = [
+                target_rel[0] * c + target_rel[1] * s,
+                -target_rel[0] * s + target_rel[1] * c,
+            ];
+            for &mut (rel, ref mut block) in &mut blocky.blocks {
+                match &mut block.inner {
+                    &mut BlockInner::PlasmaGun { ref mut angle, .. } => {
+                        let target_rel = vec2_sub(target_rel, rel);
+                        let bearing = target_rel[1].atan2(target_rel[0]);
+                        *angle = bearing;
+                    }
+                    _ => {}
+                }
+            }
+
             // Apply thrust
             // Update orientation
             vel.rot += ship.thrust_rot * dt / blocky.inertia;
             // Update velocity
-            let (s, c) = pos.rot.sin_cos();
             vel.vel = vec2_add(
                 vel.vel,
                 vec2_scale(
