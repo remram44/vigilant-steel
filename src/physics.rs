@@ -130,8 +130,8 @@ impl Component for DetectCollision {
 /// Attached to a Hit, indicates the effect on the receiving entity.
 #[derive(Clone)]
 pub enum HitEffect {
-    /// Material collision, such as between block objects.
-    Collision(f64),
+    /// Material collision, such as between blocky objects.
+    Collision(f64, Entity),
     /// Caught in an explosion.
     Explosion(f64),
 }
@@ -306,7 +306,7 @@ impl<'a> System<'a> for SysCollision {
                     store_collision(
                         pos1,
                         hit.location,
-                        HitEffect::Collision(momentum),
+                        HitEffect::Collision(momentum, e2),
                         e1,
                         &mut hits,
                     );
@@ -465,7 +465,7 @@ fn handle_collision<'a>(
         store_collision(
             pos,
             hit.location,
-            HitEffect::Collision(impulse),
+            HitEffect::Collision(impulse, o_ent),
             ent,
             hits,
         );
@@ -490,7 +490,7 @@ fn handle_collision<'a>(
         store_collision(
             pos,
             hit.location,
-            HitEffect::Collision(impulse),
+            HitEffect::Collision(impulse, ent),
             o_ent,
             hits,
         );

@@ -490,7 +490,7 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.vel[0]);
                 write_float(&mut data, vel.vel[1]);
                 write_float(&mut data, vel.rot);
-                let kind = match proj.0 {
+                let kind = match proj.kind {
                     ProjectileType::Plasma => 1,
                     ProjectileType::Rail => 2,
                 };
@@ -829,7 +829,13 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(entity, Projectile(kind));
+                    lazy.insert(
+                        entity,
+                        Projectile {
+                            kind,
+                            shooter: entity,
+                        },
+                    );
                     lazy.insert(
                         entity,
                         Replicated {

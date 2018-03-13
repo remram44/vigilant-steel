@@ -193,7 +193,7 @@ impl<'a> System<'a> for SysShip {
                 let mut deleted = false;
                 for hit in &**hits {
                     match hit.effect {
-                        HitEffect::Collision(_) => {}
+                        HitEffect::Collision(_, _) => {}
                         HitEffect::Explosion(size) => {
                             let mut impulse = [0.0, 0.0];
                             let mut rot = 0.0;
@@ -584,7 +584,10 @@ impl ProjectileType {
 ///
 /// This is a simple segment that goes in a straight line, and gets removed
 /// when it hits something or exits the screen.
-pub struct Projectile(pub ProjectileType);
+pub struct Projectile {
+    pub kind: ProjectileType,
+    pub shooter: Entity,
+}
 
 impl Projectile {
     pub fn create(
@@ -610,10 +613,10 @@ impl Projectile {
             DetectCollision {
                 bounding_box: kind.bounds(),
                 mass: kind.mass(),
-                ignore: Some(shooter),
+                ignore: None,
             },
         );
-        lazy.insert(entity, Projectile(kind));
+        lazy.insert(entity, Projectile { kind, shooter });
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -667,12 +670,30 @@ impl<'a> System<'a> for SysProjectile {
             }
 
             // Hit projectiles go off and affect an area
-            if hits.get(entity).is_none() {
+            let (mut delete, mut go_off) = (false, false);
+            match hits.get(entity) {
+                Some(v) => for h in &**v {
+                    match h.effect {
+                        HitEffect::Collision(_, e) => {
+                            delete = true;
+                            if e != proj.shooter {
+                                go_off = true;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                },
+                None => {}
+            };
+            if delete {
+                delete_entity(*role, &entities, &lazy, entity);
+            }
+            if !go_off {
                 continue;
             }
 
-            delete_entity(*role, &entities, &lazy, entity);
-            match proj.0 {
+            match proj.kind {
                 ProjectileType::Plasma => {
                     // Affect entities in range with an Explosion
                     affect_area(
