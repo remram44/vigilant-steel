@@ -120,6 +120,7 @@ impl Component for Velocity {
 pub struct DetectCollision {
     pub bounding_box: AABox,
     pub mass: Option<f64>,
+    pub ignore: Option<Entity>,
 }
 
 impl Component for DetectCollision {
@@ -282,8 +283,11 @@ impl<'a> System<'a> for SysCollision {
 
         // Detect collisions between Blocky and DetectCollision objects
         for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
+            if blocky2.blocks.is_empty() {
+                continue;
+            }
             for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
-                if blocky2.blocks.is_empty() {
+                if col1.ignore == Some(e2) {
                     continue;
                 }
                 // Detect collisions using tree

@@ -506,6 +506,7 @@ impl<'a> System<'a> for SysShip {
                                     ),
                                     pos.rot + angle,
                                     ProjectileType::Plasma,
+                                    ent,
                                 );
                                 *cooldown = rng.gen_range(0.3, 0.4);
                             }
@@ -519,6 +520,7 @@ impl<'a> System<'a> for SysShip {
                                     ),
                                     pos.rot + angle,
                                     ProjectileType::Rail,
+                                    ent,
                                 );
                                 *cooldown = rng.gen_range(1.4, 1.6);
                             }
@@ -591,6 +593,7 @@ impl Projectile {
         pos: [f64; 2],
         rot: f64,
         kind: ProjectileType,
+        shooter: Entity,
     ) -> Entity {
         let entity = entities.create();
         let (s, c) = rot.sin_cos();
@@ -607,6 +610,7 @@ impl Projectile {
             DetectCollision {
                 bounding_box: kind.bounds(),
                 mass: kind.mass(),
+                ignore: Some(shooter),
             },
         );
         lazy.insert(entity, Projectile(kind));
