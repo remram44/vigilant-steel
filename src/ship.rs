@@ -44,6 +44,7 @@ impl Ship {
 
     pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
         let blocks = vec![
+            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
             ([-2.0, -2.0], Block::new(BlockInner::Armor)),
             (
                 [-2.0, -1.0],
@@ -71,7 +72,6 @@ impl Ship {
                 }),
             ),
             ([0.0, -1.0], Block::new(BlockInner::Armor)),
-            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
             ([0.0, 1.0], Block::new(BlockInner::Armor)),
             (
                 [0.0, 2.0],
