@@ -11,8 +11,9 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{affect_area, delete_entity, AABox, DeltaTime, DetectCollision,
-              HitEffect, Hits, LocalControl, Position, Velocity};
+use physics::{affect_area, delete_entity, find_collision_tree_ray, AABox,
+              DeltaTime, DetectCollision, HitEffect, Hits, LocalControl,
+              Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
@@ -487,16 +488,28 @@ impl<'a> System<'a> for SysShip {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
                         };
-                        let rel =
-                            [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c];
-                        let fire_pos = vec2_add(pos.pos, rel);
-                        // Recoil
-                        vel.vel = vec2_add(
-                            vel.vel,
-                            vec2_scale(fire_dir, -10.0 / mass),
+                        let fire_pos = vec2_add(
+                            pos.pos,
+                            [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c],
                         );
                         match block.inner {
                             BlockInner::PlasmaGun { .. } => {
+                                let fire_dir_loc = {
+                                    let (ps, pc) = angle.sin_cos();
+                                    [pc, ps]
+                                };
+                                let proj_loc = vec2_add(
+                                    rel,
+                                    vec2_scale(fire_dir_loc, 1.6),
+                                );
+                                if find_collision_tree_ray(
+                                    proj_loc,
+                                    fire_dir_loc,
+                                    &blocky.tree,
+                                ).is_some()
+                                {
+                                    continue;
+                                }
                                 Projectile::create(
                                     &entities,
                                     &lazy,
@@ -526,6 +539,11 @@ impl<'a> System<'a> for SysShip {
                             }
                             _ => {}
                         }
+                        // Recoil
+                        vel.vel = vec2_add(
+                            vel.vel,
+                            vec2_scale(fire_dir, -10.0 / mass),
+                        );
                         fired = true;
                     } else if *cooldown > 0.0 {
                         *cooldown -= dt;
