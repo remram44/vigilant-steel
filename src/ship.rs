@@ -11,12 +11,14 @@ use input::{Input, Press};
 #[cfg(feature = "network")]
 use net;
 use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{affect_area, delete_entity, AABox, DeltaTime, DetectCollision,
-              HitEffect, Hits, LocalControl, Position, Velocity};
+use physics::{affect_area, delete_entity, find_collision_tree_ray, AABox,
+              DeltaTime, DetectCollision, HitEffect, Hits, LocalControl,
+              Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
+use utils::angle_wrap;
 use vecmath::*;
 
 /// A ship.
@@ -27,6 +29,7 @@ pub struct Ship {
     pub want_fire: bool,
     pub want_thrust: [f64; 2],
     pub want_thrust_rot: f64,
+    pub want_target: [f64; 2],
     pub thrust: [f64; 2],
     pub thrust_rot: f64,
 }
@@ -37,6 +40,7 @@ impl Ship {
             want_fire: false,
             want_thrust: [0.0, 0.0],
             want_thrust_rot: 0.0,
+            want_target: [0.0, 0.0],
             thrust: [0.0, 0.0],
             thrust_rot: 0.0,
         }
@@ -190,7 +194,7 @@ impl<'a> System<'a> for SysShip {
                 let mut deleted = false;
                 for hit in &**hits {
                     match hit.effect {
-                        HitEffect::Collision(_) => {}
+                        HitEffect::Collision(_, _) => {}
                         HitEffect::Explosion(size) => {
                             let mut impulse = [0.0, 0.0];
                             let mut rot = 0.0;
@@ -335,6 +339,7 @@ impl<'a> System<'a> for SysShip {
         for (ent, mut ship, _) in (&*entities, &mut ship, &local).join() {
             ship.want_thrust = input.movement;
             ship.want_thrust_rot = input.rotation;
+            ship.want_target = input.mouse;
             match input.fire {
                 Press::UP => ship.want_fire = false,
                 Press::PRESSED => ship.want_fire = true,
@@ -344,9 +349,13 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        // Action thrusters from controls
-        if role.authoritative() {
-            for (mut ship, blocky) in (&mut ship, &blocky).join() {
+        for (ent, pos, mut vel, mut ship, mut blocky) in
+            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
+        {
+            let (s, c) = pos.rot.sin_cos();
+
+            // Action thrusters from controls
+            if role.authoritative() {
                 let (thrust, rot) = compute_thrust(
                     blocky.blocks.iter().enumerate(),
                     |_, _| {},
@@ -356,16 +365,29 @@ impl<'a> System<'a> for SysShip {
                 ship.thrust = thrust;
                 ship.thrust_rot = rot;
             }
-        }
 
-        for (ent, pos, mut vel, mut ship, mut blocky) in
-            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
-        {
+            // Update blocks
+            let target_rel = vec2_sub(ship.want_target, pos.pos);
+            let target_rel = [
+                target_rel[0] * c + target_rel[1] * s,
+                -target_rel[0] * s + target_rel[1] * c,
+            ];
+            for &mut (rel, ref mut block) in &mut blocky.blocks {
+                match &mut block.inner {
+                    &mut BlockInner::PlasmaGun { ref mut angle, .. } => {
+                        let target_rel = vec2_sub(target_rel, rel);
+                        let bearing = target_rel[1].atan2(target_rel[0]);
+                        let chg = angle_wrap(bearing - *angle);
+                        *angle += angle_wrap(chg.min(3.0 * dt).max(-3.0 * dt));
+                    }
+                    _ => {}
+                }
+            }
+
             // Apply thrust
             // Update orientation
             vel.rot += ship.thrust_rot * dt / blocky.inertia;
             // Update velocity
-            let (s, c) = pos.rot.sin_cos();
             vel.vel = vec2_add(
                 vel.vel,
                 vec2_scale(
@@ -466,16 +488,28 @@ impl<'a> System<'a> for SysShip {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
                         };
-                        let rel =
-                            [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c];
-                        let fire_pos = vec2_add(pos.pos, rel);
-                        // Recoil
-                        vel.vel = vec2_add(
-                            vel.vel,
-                            vec2_scale(fire_dir, -10.0 / mass),
+                        let fire_pos = vec2_add(
+                            pos.pos,
+                            [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c],
                         );
                         match block.inner {
                             BlockInner::PlasmaGun { .. } => {
+                                let fire_dir_loc = {
+                                    let (ps, pc) = angle.sin_cos();
+                                    [pc, ps]
+                                };
+                                let proj_loc = vec2_add(
+                                    rel,
+                                    vec2_scale(fire_dir_loc, 1.6),
+                                );
+                                if find_collision_tree_ray(
+                                    proj_loc,
+                                    fire_dir_loc,
+                                    &blocky.tree,
+                                ).is_some()
+                                {
+                                    continue;
+                                }
                                 Projectile::create(
                                     &entities,
                                     &lazy,
@@ -485,6 +519,7 @@ impl<'a> System<'a> for SysShip {
                                     ),
                                     pos.rot + angle,
                                     ProjectileType::Plasma,
+                                    ent,
                                 );
                                 *cooldown = rng.gen_range(0.3, 0.4);
                             }
@@ -498,11 +533,17 @@ impl<'a> System<'a> for SysShip {
                                     ),
                                     pos.rot + angle,
                                     ProjectileType::Rail,
+                                    ent,
                                 );
                                 *cooldown = rng.gen_range(1.4, 1.6);
                             }
                             _ => {}
                         }
+                        // Recoil
+                        vel.vel = vec2_add(
+                            vel.vel,
+                            vec2_scale(fire_dir, -10.0 / mass),
+                        );
                         fired = true;
                     } else if *cooldown > 0.0 {
                         *cooldown -= dt;
@@ -561,7 +602,10 @@ impl ProjectileType {
 ///
 /// This is a simple segment that goes in a straight line, and gets removed
 /// when it hits something or exits the screen.
-pub struct Projectile(pub ProjectileType);
+pub struct Projectile {
+    pub kind: ProjectileType,
+    pub shooter: Entity,
+}
 
 impl Projectile {
     pub fn create(
@@ -570,6 +614,7 @@ impl Projectile {
         pos: [f64; 2],
         rot: f64,
         kind: ProjectileType,
+        shooter: Entity,
     ) -> Entity {
         let entity = entities.create();
         let (s, c) = rot.sin_cos();
@@ -586,9 +631,10 @@ impl Projectile {
             DetectCollision {
                 bounding_box: kind.bounds(),
                 mass: kind.mass(),
+                ignore: None,
             },
         );
-        lazy.insert(entity, Projectile(kind));
+        lazy.insert(entity, Projectile { kind, shooter });
         #[cfg(feature = "network")]
         {
             lazy.insert(entity, net::Replicated::new());
@@ -642,12 +688,30 @@ impl<'a> System<'a> for SysProjectile {
             }
 
             // Hit projectiles go off and affect an area
-            if hits.get(entity).is_none() {
+            let (mut delete, mut go_off) = (false, false);
+            match hits.get(entity) {
+                Some(v) => for h in &**v {
+                    match h.effect {
+                        HitEffect::Collision(_, e) => {
+                            delete = true;
+                            if e != proj.shooter {
+                                go_off = true;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                },
+                None => {}
+            };
+            if delete {
+                delete_entity(*role, &entities, &lazy, entity);
+            }
+            if !go_off {
                 continue;
             }
 
-            delete_entity(*role, &entities, &lazy, entity);
-            match proj.0 {
+            match proj.kind {
                 ProjectileType::Plasma => {
                     // Affect entities in range with an Explosion
                     affect_area(

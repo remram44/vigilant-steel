@@ -453,7 +453,7 @@ impl<'a> System<'a> for SysNetServer {
             if let Some(ship) = ship.get(ent) {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
-                data = Vec::with_capacity(48);
+                data = Vec::with_capacity(56);
                 write_float(&mut data, pos.pos[0]);
                 write_float(&mut data, pos.pos[1]);
                 write_float(&mut data, pos.rot);
@@ -463,10 +463,12 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, ship.want_thrust[0]);
                 write_float(&mut data, ship.want_thrust[1]);
                 write_float(&mut data, ship.want_thrust_rot);
+                write_float(&mut data, ship.want_target[0]);
+                write_float(&mut data, ship.want_target[1]);
                 write_float(&mut data, ship.thrust[0]);
                 write_float(&mut data, ship.thrust[1]);
                 write_float(&mut data, ship.thrust_rot);
-                assert_eq!(data.len(), 48);
+                assert_eq!(data.len(), 56);
             } else if asteroid.get(ent).is_some() {
                 let pos = position.get(ent).unwrap();
                 let vel = velocity.get(ent).unwrap();
@@ -488,7 +490,7 @@ impl<'a> System<'a> for SysNetServer {
                 write_float(&mut data, vel.vel[0]);
                 write_float(&mut data, vel.vel[1]);
                 write_float(&mut data, vel.rot);
-                let kind = match proj.0 {
+                let kind = match proj.kind {
                     ProjectileType::Plasma => 1,
                     ProjectileType::Rail => 2,
                 };
@@ -526,21 +528,23 @@ impl<'a> System<'a> for SysNetServer {
                             info!("Invalid ship control update");
                             continue;
                         }
-                        let data = data[0];
-                        ship.want_fire = data & 0x01 == 0x01;
-                        ship.want_thrust[0] = match data & 0x06 {
+                        let flags = data[0];
+                        ship.want_fire = flags & 0x01 == 0x01;
+                        ship.want_thrust[0] = match flags & 0x06 {
                             0x02 => 1.0,
                             0x04 => -1.0,
                             _ => 0.0,
                         };
                         ship.want_thrust[1] =
-                            if data & 0x08 == 0x08 { 1.0 } else { 0.0 };
-                        ship.want_thrust_rot = match data & 0x30 {
+                            if flags & 0x08 == 0x08 { 1.0 } else { 0.0 };
+                        ship.want_thrust_rot = match flags & 0x30 {
                             0x10 => 1.0,
                             0x20 => -1.0,
                             _ => 0.0,
                         };
-
+                        let mut data = Cursor::new(&data[1..]);
+                        ship.want_target[0] = read_float(&mut data);
+                        ship.want_target[1] = read_float(&mut data);
                         lazy.insert(ent, Dirty);
                     }
                 }
@@ -682,7 +686,7 @@ impl<'a> System<'a> for SysNetClient {
 
                     // Update entity from message
                     if let Some(ship) = ship.get_mut(ent) {
-                        assert_eq!(data.len(), 48);
+                        assert_eq!(data.len(), 56);
                         let mut data = Cursor::new(data);
                         pos.pos[0] = read_float(&mut data);
                         pos.pos[1] = read_float(&mut data);
@@ -693,10 +697,12 @@ impl<'a> System<'a> for SysNetClient {
                         ship.want_thrust[0] = read_float(&mut data);
                         ship.want_thrust[1] = read_float(&mut data);
                         ship.want_thrust_rot = read_float(&mut data);
+                        ship.want_target[0] = read_float(&mut data);
+                        ship.want_target[1] = read_float(&mut data);
                         ship.thrust[0] = read_float(&mut data);
                         ship.thrust[1] = read_float(&mut data);
                         ship.thrust_rot = read_float(&mut data);
-                        assert_eq!(data.position(), 48);
+                        assert_eq!(data.position(), 56);
                     } else if asteroid.get(ent).is_some() {
                         assert_eq!(data.len(), 24);
                         let mut data = Cursor::new(data);
@@ -754,6 +760,10 @@ impl<'a> System<'a> for SysNetClient {
                             read_float(&mut data),
                         ],
                         want_thrust_rot: read_float(&mut data),
+                        want_target: [
+                            read_float(&mut data),
+                            read_float(&mut data),
+                        ],
                         thrust: [read_float(&mut data), read_float(&mut data)],
                         thrust_rot: read_float(&mut data),
                     };
@@ -819,7 +829,13 @@ impl<'a> System<'a> for SysNetClient {
                     let entity = entities.create();
                     lazy.insert(entity, pos);
                     lazy.insert(entity, vel);
-                    lazy.insert(entity, Projectile(kind));
+                    lazy.insert(
+                        entity,
+                        Projectile {
+                            kind,
+                            shooter: entity,
+                        },
+                    );
                     lazy.insert(
                         entity,
                         Replicated {
@@ -837,24 +853,28 @@ impl<'a> System<'a> for SysNetClient {
 
         // Go over Dirty, send messages
         for (ship, repli, _) in (&ship, &replicated, &dirty).join() {
-            let mut data = 0;
+            let mut flags = 0;
             if ship.want_fire {
-                data |= 0x01;
+                flags |= 0x01;
             }
             if ship.want_thrust[0] > 0.5 {
-                data |= 0x02;
+                flags |= 0x02;
             } else if ship.want_thrust[0] < -0.5 {
-                data |= 0x04;
+                flags |= 0x04;
             }
             if ship.want_thrust[1] > 0.5 {
-                data |= 0x08;
+                flags |= 0x08;
             }
             if ship.want_thrust_rot > 0.5 {
-                data |= 0x10;
+                flags |= 0x10;
             } else if ship.want_thrust_rot < -0.5 {
-                data |= 0x20;
+                flags |= 0x20;
             }
-            chk(self.send(&Message::EntityUpdate(repli.id, vec![data])))
+            let mut data = Vec::with_capacity(9);
+            data.write_u8(flags).unwrap();
+            write_float(&mut data, ship.want_target[0]);
+            write_float(&mut data, ship.want_target[1]);
+            chk(self.send(&Message::EntityUpdate(repli.id, data)))
         }
 
         dirty.clear();

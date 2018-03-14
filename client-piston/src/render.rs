@@ -207,7 +207,7 @@ pub fn render<G, C, E>(
     // Draw projectiles
     for (pos, proj) in (&pos, &projectile).join() {
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
-        match proj.0 {
+        match proj.kind {
             ProjectileType::Plasma => {
                 graphics::line(
                     [0.0, 1.0, 0.0, 1.0],

@@ -1,5 +1,6 @@
 //! General utility functions.
 
+use std::f64::consts::PI;
 use std::time::SystemTime;
 
 pub trait IteratorExt<T>: Iterator<Item = T> {
@@ -101,12 +102,16 @@ impl FpsCounter {
     }
 }
 
+pub fn angle_wrap(a: f64) -> f64 {
+    (a + 9.0 * PI) % (2.0 * PI) - PI
+}
+
 #[cfg(test)]
 mod tests {
     use super::IteratorExt;
 
     #[test]
-    fn test() {
+    fn test_minmax() {
         let r = [2, 4, 1, 5, 3].iter().minmax();
         assert_eq!(r, Some((&1, &5)));
         let r = [5, 4, 3, 2, 1].iter().minmax();

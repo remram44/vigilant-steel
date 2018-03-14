@@ -120,6 +120,7 @@ impl Component for Velocity {
 pub struct DetectCollision {
     pub bounding_box: AABox,
     pub mass: Option<f64>,
+    pub ignore: Option<Entity>,
 }
 
 impl Component for DetectCollision {
@@ -129,8 +130,8 @@ impl Component for DetectCollision {
 /// Attached to a Hit, indicates the effect on the receiving entity.
 #[derive(Clone)]
 pub enum HitEffect {
-    /// Material collision, such as between block objects.
-    Collision(f64),
+    /// Material collision, such as between blocky objects.
+    Collision(f64, Entity),
     /// Caught in an explosion.
     Explosion(f64),
 }
@@ -282,8 +283,11 @@ impl<'a> System<'a> for SysCollision {
 
         // Detect collisions between Blocky and DetectCollision objects
         for (e2, pos2, blocky2) in (&*entities, &pos, &blocky).join() {
+            if blocky2.blocks.is_empty() {
+                continue;
+            }
             for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
-                if blocky2.blocks.is_empty() {
+                if col1.ignore == Some(e2) {
                     continue;
                 }
                 // Detect collisions using tree
@@ -302,7 +306,7 @@ impl<'a> System<'a> for SysCollision {
                     store_collision(
                         pos1,
                         hit.location,
-                        HitEffect::Collision(momentum),
+                        HitEffect::Collision(momentum, e2),
                         e1,
                         &mut hits,
                     );
@@ -377,6 +381,82 @@ fn find_collision_tree_box(
         }
     } else {
         None
+    }
+}
+
+pub fn find_collision_tree_ray(
+    pos: [f64; 2],
+    dir: [f64; 2],
+    tree: &tree::Tree,
+) -> Option<(f64, [f64; 2])> {
+    find_collision_tree_ray_(pos, dir, tree, 0)
+}
+
+fn find_collision_tree_ray_(
+    pos: [f64; 2],
+    dir: [f64; 2],
+    tree: &tree::Tree,
+    idx: usize,
+) -> Option<(f64, [f64; 2])> {
+    let n = &tree.0[idx];
+    let mut tmin: Option<f64> = None;
+    // Left side
+    let t = (n.bounds.xmin - pos[0]) / dir[0];
+    if t > 0.0 && n.bounds.ymin <= pos[1] + dir[1] * t
+        && pos[1] + dir[1] * t <= n.bounds.ymax
+    {
+        tmin = match tmin {
+            Some(m) => Some(m.min(t)),
+            None => Some(t),
+        }
+    }
+    // Right side
+    let t = (n.bounds.xmax - pos[0]) / dir[0];
+    if t > 0.0 && n.bounds.ymin <= pos[1] + dir[1] * t
+        && pos[1] + dir[1] * t <= n.bounds.ymax
+    {
+        tmin = match tmin {
+            Some(m) => Some(m.min(t)),
+            None => Some(t),
+        }
+    }
+    // Bottom side
+    let t = (n.bounds.ymin - pos[1]) / dir[1];
+    if t > 0.0 && n.bounds.xmin <= pos[0] + dir[0] * t
+        && pos[0] + dir[0] * t <= n.bounds.xmax
+    {
+        tmin = match tmin {
+            Some(m) => Some(m.min(t)),
+            None => Some(t),
+        }
+    }
+    // Top side
+    let t = (n.bounds.ymax - pos[1]) / dir[1];
+    if t > 0.0 && n.bounds.xmin <= pos[0] + dir[0] * t
+        && pos[0] + dir[0] * t <= n.bounds.xmax
+    {
+        tmin = match tmin {
+            Some(m) => Some(m.min(t)),
+            None => Some(t),
+        }
+    }
+
+    let tmin = match tmin {
+        Some(t) => t,
+        None => return None,
+    };
+
+    if let tree::Content::Internal(left, right) = n.content {
+        match (
+            find_collision_tree_ray_(pos, dir, tree, left),
+            find_collision_tree_ray_(pos, dir, tree, right),
+        ) {
+            (None, r) => r,
+            (r, None) => r,
+            (Some(r1), Some(r2)) => Some(if r1.0 < r2.0 { r1 } else { r2 }),
+        }
+    } else {
+        Some((tmin, [pos[0] + tmin * dir[0], pos[1] + tmin * dir[1]]))
     }
 }
 
@@ -461,7 +541,7 @@ fn handle_collision<'a>(
         store_collision(
             pos,
             hit.location,
-            HitEffect::Collision(impulse),
+            HitEffect::Collision(impulse, o_ent),
             ent,
             hits,
         );
@@ -486,7 +566,7 @@ fn handle_collision<'a>(
         store_collision(
             pos,
             hit.location,
-            HitEffect::Collision(impulse),
+            HitEffect::Collision(impulse, ent),
             o_ent,
             hits,
         );
