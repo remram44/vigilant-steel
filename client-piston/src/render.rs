@@ -78,7 +78,7 @@ fn draw_line_loop<G>(
     );
 }
 
-fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
+fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
     match block.inner {
         BlockInner::Cockpit => {
             draw_line_loop(
@@ -86,14 +86,14 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 0.05,
                 &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
                 tr,
-                gl,
+                g,
             );
             draw_line_loop(
                 [1.0, 0.0, 0.0, 1.0],
                 0.02,
                 &[[-0.2, -0.3], [0.2, 0.0], [-0.2, 0.3]],
                 tr,
-                gl,
+                g,
             );
         }
         BlockInner::Thruster { angle } => for i in &[-0.4, 0.0] {
@@ -101,7 +101,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 [0.4, 0.4, 0.4, 1.0],
                 &[[0.45, 0.25], [0.05, 0.45], [0.05, -0.45], [0.45, -0.25]],
                 tr.rot_rad(angle).trans(*i, 0.0),
-                gl,
+                g,
             );
         },
         BlockInner::PlasmaGun { angle, .. } => {
@@ -119,13 +119,13 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                     [-0.45, 0.0],
                 ],
                 tr,
-                gl,
+                g,
             );
             graphics::polygon(
                 [0.7, 0.7, 1.0, 1.0],
                 &[[-0.0, -0.15], [0.6, -0.15], [0.6, 0.15], [-0.0, 0.15]],
                 tr.rot_rad(angle),
-                gl,
+                g,
             );
         }
         BlockInner::RailGun { angle, .. } => {
@@ -143,13 +143,13 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                     [-0.45, 0.0],
                 ],
                 tr,
-                gl,
+                g,
             );
             graphics::polygon(
                 [0.7, 0.7, 1.0, 1.0],
                 &[[-0.25, -0.25], [0.6, -0.25], [0.6, 0.25], [-0.25, 0.25]],
                 tr.rot_rad(angle),
-                gl,
+                g,
             );
         }
         BlockInner::Armor => {
@@ -158,7 +158,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 0.05,
                 &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
                 tr,
-                gl,
+                g,
             );
         }
         BlockInner::Rock => {
@@ -167,7 +167,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
                 0.05,
                 &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
                 tr,
-                gl,
+                g,
             );
         }
     }
@@ -175,7 +175,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, gl: &mut G) {
 
 pub fn render<G, C, E>(
     context: Context,
-    gl: &mut G,
+    g: &mut G,
     _glyph_cache: &mut C,
     world: &mut World,
 ) where
@@ -189,7 +189,7 @@ pub fn render<G, C, E>(
     let particles = world.read::<Particle>();
     let blocky = world.read::<Blocky>();
 
-    graphics::clear([0.0, 0.0, 0.1, 1.0], gl);
+    graphics::clear([0.0, 0.0, 0.1, 1.0], g);
 
     let tr = context
         .transform
@@ -200,7 +200,7 @@ pub fn render<G, C, E>(
     for (pos, blocky) in (&pos, &blocky).join() {
         let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         for &(rel, ref block) in &blocky.blocks {
-            draw_block(&block, blocks_tr.trans(rel[0], rel[1]), gl);
+            draw_block(&block, blocks_tr.trans(rel[0], rel[1]), g);
         }
     }
 
@@ -214,7 +214,7 @@ pub fn render<G, C, E>(
                     0.1,
                     [-0.8, 0.0, 0.8, 0.0],
                     projectile_tr,
-                    gl,
+                    g,
                 );
             }
             ProjectileType::Rail => {
@@ -223,7 +223,7 @@ pub fn render<G, C, E>(
                     0.6,
                     [-0.8, 0.0, 0.8, 0.0],
                     projectile_tr,
-                    gl,
+                    g,
                 );
             }
         }
@@ -238,14 +238,14 @@ pub fn render<G, C, E>(
                     [1.0, 1.0, 1.0, alpha],
                     graphics::rectangle::centered([0.0, 0.0, 0.05, 0.05]),
                     part_tr,
-                    gl,
+                    g,
                 );
             }
             ParticleType::Exhaust => graphics::rectangle(
                 [1.0, 1.0, 1.0, (particle.lifetime as f32).min(0.5)],
                 graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
                 part_tr,
-                gl,
+                g,
             ),
             ParticleType::Explosion => {
                 let alpha = (particle.lifetime as f32 * 1.6).min(0.8);
@@ -253,7 +253,7 @@ pub fn render<G, C, E>(
                     [1.0, particle.lifetime as f32 / 0.6, 0.0, alpha],
                     graphics::rectangle::centered([0.0, 0.0, 1.2, 1.2]),
                     part_tr,
-                    gl,
+                    g,
                 );
             }
             ParticleType::LaserHit => {
@@ -263,7 +263,7 @@ pub fn render<G, C, E>(
                     [0.0, 1.0, 0.0, alpha],
                     graphics::rectangle::centered([0.0, 0.0, size, size]),
                     part_tr,
-                    gl,
+                    g,
                 );
             }
         }
