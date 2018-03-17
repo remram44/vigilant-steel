@@ -2,7 +2,7 @@
 
 use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
-use game::physics::Position;
+use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, ProjectileType};
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
@@ -81,11 +81,10 @@ fn draw_line_loop<G>(
 
 fn draw_background<G: graphics::Graphics>(
     viewport: &Viewport,
+    pos: [f64; 2],
     tr: Matrix2d,
     g: &mut G,
 ) {
-    let pos = [0.0, 0.0];
-
     // First layer: bright, almost move with world
     draw_background_layer(
         pos[0],
@@ -264,6 +263,7 @@ pub fn render<G, C, E>(
     g: &mut G,
     _glyph_cache: &mut C,
     world: &mut World,
+    camera: &mut [f64; 2],
 ) where
     G: graphics::Graphics,
     E: Debug,
@@ -274,6 +274,7 @@ pub fn render<G, C, E>(
     let projectile = world.read::<Projectile>();
     let particles = world.read::<Particle>();
     let blocky = world.read::<Blocky>();
+    let local = world.read::<LocalControl>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], g);
 
@@ -282,8 +283,28 @@ pub fn render<G, C, E>(
         .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
         .scale(viewport.scale, -viewport.scale);
 
+    // Update camera location
+    for (pos, _) in (&pos, &local).join() {
+        *camera = pos.pos;
+    }
+    let tr = tr.trans(-camera[0], -camera[1]);
+
     // Starry background
-    draw_background(&*viewport, tr, g);
+    draw_background(&*viewport, *camera, tr, g);
+
+    // Bounds
+    draw_line_loop(
+        [0.0, 1.0, 0.0, 1.0],
+        0.05,
+        &[
+            [-0.5 * VIEWPORT_SIZE, -0.5 * VIEWPORT_SIZE],
+            [0.5 * VIEWPORT_SIZE, -0.5 * VIEWPORT_SIZE],
+            [0.5 * VIEWPORT_SIZE, 0.5 * VIEWPORT_SIZE],
+            [-0.5 * VIEWPORT_SIZE, 0.5 * VIEWPORT_SIZE],
+        ],
+        tr,
+        g,
+    );
 
     // Draw blocks
     for (pos, blocky) in (&pos, &blocky).join() {

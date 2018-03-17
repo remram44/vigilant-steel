@@ -30,6 +30,7 @@ struct App {
     glyph_cache: GlyphCache<'static>,
     fps_counter: FpsCounter,
     game: Game,
+    camera: [f64; 2],
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -96,6 +97,7 @@ fn main() {
         glyph_cache: glyph_cache,
         fps_counter: FpsCounter::new(),
         game: game,
+        camera: [0.0, 0.0],
     };
     app.game.world.add_resource(Viewport::new([width, height]));
 
@@ -186,8 +188,9 @@ fn handle_event(
     if let Some(r) = event.render_args() {
         let world = &mut app.game.world;
         let glyph_cache = &mut app.glyph_cache;
+        let mut camera = &mut app.camera;
         app.gl.draw(r.viewport(), |c, g| {
-            render::render(c, g, glyph_cache, world);
+            render::render(c, g, glyph_cache, world, camera);
         });
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
