@@ -21,6 +21,7 @@ use piston::input::*;
 use piston::window::WindowSettings;
 use render::Viewport;
 use sdl2_window::Sdl2Window;
+use std::collections::HashMap;
 
 const MAX_TIME_STEP: f64 = 0.040;
 
@@ -31,6 +32,8 @@ struct App {
     fps_counter: FpsCounter,
     game: Game,
     camera: [f64; 2],
+    touches: HashMap<i64, [f64; 2]>,
+    touch_mode: bool,
 }
 
 #[cfg(not(target_os = "emscripten"))]
@@ -98,6 +101,8 @@ fn main() {
         fps_counter: FpsCounter::new(),
         game: game,
         camera: [0.0, 0.0],
+        touches: HashMap::new(),
+        touch_mode: false,
     };
     app.game.world.add_resource(Viewport::new([width, height]));
 
@@ -119,37 +124,41 @@ fn handle_event(
 
     // Keyboard input and buttons
     if let Some(button) = event.button_args() {
-        let mut input = app.game.world.write_resource::<Input>();
-        if let Button::Mouse(m) = button.button {
-            let pressed = match button.state {
-                ButtonState::Press => Press::PRESSED,
-                ButtonState::Release => Press::UP,
-            };
-            match m {
-                MouseButton::Left => input.buttons[0] = pressed,
-                MouseButton::Right => input.buttons[1] = pressed,
-                MouseButton::Middle => input.buttons[2] = pressed,
-                _ => {}
-            }
-        } else if let Some(scancode) = button.scancode {
-            if button.state == ButtonState::Press {
-                match scancode {
-                    22 => input.movement[0] = -1.0,
-                    26 => input.movement[0] = 1.0,
-                    20 => input.movement[1] = 1.0,
-                    8 => input.movement[1] = -1.0,
-                    4 => input.rotation = 1.0,
-                    7 => input.rotation = -1.0,
-                    44 => input.fire = Press::PRESSED,
+        if app.touches.is_empty() {
+            app.touch_mode = false;
+
+            let mut input = app.game.world.write_resource::<Input>();
+            if let Button::Mouse(m) = button.button {
+                let pressed = match button.state {
+                    ButtonState::Press => Press::PRESSED,
+                    ButtonState::Release => Press::UP,
+                };
+                match m {
+                    MouseButton::Left => input.buttons[0] = pressed,
+                    MouseButton::Right => input.buttons[1] = pressed,
+                    MouseButton::Middle => input.buttons[2] = pressed,
                     _ => {}
                 }
-            } else {
-                match scancode {
-                    22 | 26 => input.movement[0] = 0.0,
-                    8 | 20 => input.movement[1] = 0.0,
-                    4 | 7 => input.rotation = 0.0,
-                    44 => input.fire = Press::UP,
-                    _ => {}
+            } else if let Some(scancode) = button.scancode {
+                if button.state == ButtonState::Press {
+                    match scancode {
+                        22 => input.movement[0] = -1.0, // S
+                        26 => input.movement[0] = 1.0,  // W
+                        20 => input.movement[1] = 1.0,  // Q
+                        8 => input.movement[1] = -1.0,  // E
+                        4 => input.rotation = 1.0,      // A
+                        7 => input.rotation = -1.0,     // D
+                        44 => input.fire = Press::PRESSED,
+                        _ => {}
+                    }
+                } else {
+                    match scancode {
+                        22 | 26 => input.movement[0] = 0.0,
+                        8 | 20 => input.movement[1] = 0.0,
+                        4 | 7 => input.rotation = 0.0,
+                        44 => input.fire = Press::UP,
+                        _ => {}
+                    }
                 }
             }
         }
@@ -165,12 +174,52 @@ fn handle_event(
         ];
     }
 
+    // Touch
+    if let Some(touch) = event.touch_args() {
+        let mut input = app.game.world.write_resource::<Input>();
+        if !app.touch_mode {
+            *input = Input::new();
+            app.touch_mode = true;
+        }
+        match touch.touch {
+            Touch::Start | Touch::Move => {
+                app.touches.insert(touch.id, touch.position());
+            }
+            Touch::End | Touch::Cancel => {
+                app.touches.remove(&touch.id);
+            }
+        }
+    }
+
     // Update
     if let Some(u) = event.update_args() {
         let mut dt = u.dt;
         if dt > 0.5 {
             warn!("Clock jumped forward by {} seconds!", dt);
             dt = 5.0 * MAX_TIME_STEP;
+        }
+
+        if app.touch_mode {
+            let mut input = app.game.world.write_resource::<Input>();
+            input.movement = [0.0, 0.0];
+            input.rotation = 0.0;
+            let mut fire = false;
+            for (_, touch) in &app.touches {
+                if touch[1] < 0.3 {
+                    input.movement[0] = 1.0;
+                } else if touch[1] > 0.7 {
+                    fire = true;
+                } else if touch[0] < 0.3 {
+                    input.rotation = 1.0;
+                } else if touch[0] > 0.7 {
+                    input.rotation = -1.0;
+                }
+            }
+            if fire && input.fire == Press::UP {
+                input.fire = Press::PRESSED;
+            } else if !fire {
+                input.fire = Press::UP;
+            }
         }
 
         while dt > 0.0 {
