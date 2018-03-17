@@ -137,21 +137,19 @@ fn handle_event(
                     ButtonState::Release => Press::UP,
                 };
                 match m {
-                    MouseButton::Left => input.buttons[0] = pressed,
-                    MouseButton::Right => input.buttons[1] = pressed,
-                    MouseButton::Middle => input.buttons[2] = pressed,
+                    MouseButton::Left => input.tractor_beam = pressed,
                     _ => {}
                 }
             } else if let Some(scancode) = button.scancode {
                 if button.state == ButtonState::Press {
                     match scancode {
-                        22 => input.movement[0] = -1.0, // S
-                        26 => input.movement[0] = 1.0,  // W
-                        20 => input.movement[1] = 1.0,  // Q
-                        8 => input.movement[1] = -1.0,  // E
-                        4 => input.rotation = 1.0,      // A
-                        7 => input.rotation = -1.0,     // D
-                        44 => input.fire = Press::PRESSED,
+                        22 => input.movement[0] = -1.0,    // S
+                        26 => input.movement[0] = 1.0,     // W
+                        20 => input.movement[1] = 1.0,     // Q
+                        8 => input.movement[1] = -1.0,     // E
+                        4 => input.rotation = 1.0,         // A
+                        7 => input.rotation = -1.0,        // D
+                        44 => input.fire = Press::PRESSED, // Spacebar
                         _ => {}
                     }
                 } else {

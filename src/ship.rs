@@ -30,8 +30,10 @@ pub struct Ship {
     pub want_thrust: [f64; 2],
     pub want_thrust_rot: f64,
     pub want_target: [f64; 2],
+    pub want_tractor_beam: bool,
     pub thrust: [f64; 2],
     pub thrust_rot: f64,
+    pub tracted_block: Option<Entity>,
 }
 
 impl Ship {
@@ -41,8 +43,10 @@ impl Ship {
             want_thrust: [0.0, 0.0],
             want_thrust_rot: 0.0,
             want_target: [0.0, 0.0],
+            want_tractor_beam: false,
             thrust: [0.0, 0.0],
             thrust_rot: 0.0,
+            tracted_block: None,
         }
     }
 
@@ -365,6 +369,11 @@ impl<'a> System<'a> for SysShip {
                 Press::PRESSED => ship.want_fire = true,
                 _ => {}
             }
+            match input.tractor_beam {
+                Press::UP => ship.want_tractor_beam = false,
+                Press::PRESSED => ship.want_tractor_beam = true,
+                _ => {}
+            }
             #[cfg(feature = "network")]
             lazy.insert(ent, net::Dirty);
         }
@@ -492,6 +501,24 @@ impl<'a> System<'a> for SysShip {
                 vec2_scale(vel.vel, -0.04 * dt * vec2_len(vel.vel)),
             );
             vel.rot -= vel.rot * vel.rot.abs() * 2.0 * dt;
+
+            // Pick up blocks
+            if role.authoritative() {
+                // We are tracting a block already
+                if let Some(tracted_ent) = ship.tracted_block {
+                    // Move tracted block
+                    // TODO: Move tracted block
+
+                    // Drop tracted block
+                    if !ship.want_tractor_beam {
+                        // TODO: Drop tracted block
+                    }
+                } else {
+                    if ship.want_tractor_beam {
+                        // TODO: Pick up block with tractor beam
+                    }
+                }
+            }
 
             // Fire
             if role.authoritative() {

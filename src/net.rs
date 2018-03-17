@@ -775,8 +775,10 @@ impl<'a> System<'a> for SysNetClient {
                             read_float(&mut data),
                             read_float(&mut data),
                         ],
+                        want_tractor_beam: false,
                         thrust: [read_float(&mut data), read_float(&mut data)],
                         thrust_rot: read_float(&mut data),
+                        tracted_block: None,
                     };
                     assert_eq!(data.position(), 48);
 

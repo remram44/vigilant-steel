@@ -33,8 +33,8 @@ pub struct Input {
     pub movement: [f64; 2],
     pub rotation: f64,
     pub fire: Press,
+    pub tractor_beam: Press,
     pub mouse: [f64; 2],
-    pub buttons: [Press; 3],
 }
 
 impl Input {
@@ -43,16 +43,14 @@ impl Input {
             movement: [0.0, 0.0],
             rotation: 0.0,
             fire: Press::UP,
+            tractor_beam: Press::UP,
             mouse: [0.0; 2],
-            buttons: [Press::UP; 3],
         }
     }
 
     /// Update status of keys, called once per frame.
     pub fn update(&mut self) {
         self.fire.update();
-        self.buttons[0].update();
-        self.buttons[1].update();
-        self.buttons[2].update();
+        self.tractor_beam.update();
     }
 }
