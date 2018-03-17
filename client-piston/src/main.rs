@@ -7,6 +7,7 @@ extern crate graphics;
 extern crate log;
 extern crate opengl_graphics;
 extern crate piston;
+extern crate rand;
 extern crate sdl2_window;
 extern crate specs;
 

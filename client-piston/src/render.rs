@@ -7,6 +7,7 @@ use game::ship::{Projectile, ProjectileType};
 use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
+use rand::{Rng, SeedableRng, XorShiftRng};
 use specs::{Join, World};
 use std::fmt::Debug;
 
@@ -76,6 +77,91 @@ fn draw_line_loop<G>(
         tr,
         g,
     );
+}
+
+fn draw_background<G: graphics::Graphics>(
+    viewport: &Viewport,
+    tr: Matrix2d,
+    g: &mut G,
+) {
+    let pos = [0.0, 0.0];
+
+    // First layer: bright, almost move with world
+    draw_background_layer(
+        pos[0],
+        pos[1],
+        viewport,
+        0.6,
+        [1.0, 1.0, 1.0, 0.4],
+        50,
+        2,
+        tr,
+        g,
+    );
+
+    // Second layer: less bright, move much slower
+    draw_background_layer(
+        pos[0],
+        pos[1],
+        viewport,
+        0.4,
+        [1.0, 1.0, 1.0, 0.05],
+        30,
+        3,
+        tr,
+        g,
+    );
+}
+
+fn draw_background_layer<G: graphics::Graphics>(
+    xpos: f64,
+    ypos: f64,
+    viewport: &Viewport,
+    speed: f64,
+    color: [f32; 4],
+    nb: usize,
+    seed: i32,
+    tr: Matrix2d,
+    g: &mut G,
+) {
+    let xpos = xpos * speed;
+    let ypos = ypos * speed;
+
+    let width = viewport.width as f64 * 0.5 / viewport.scale;
+    let height = viewport.height as f64 * 0.5 / viewport.scale;
+
+    let xmin = ((xpos * speed - width) / 50.0).floor() as i32;
+    let xmax = ((xpos * speed + width) / 50.0).ceil() as i32;
+    let ymin = ((ypos * speed - height) / 50.0).floor() as i32;
+    let ymax = ((ypos * speed + height) / 50.0).ceil() as i32;
+
+    for x in xmin..xmax {
+        for y in ymin..ymax {
+            let seed = (seed * (1 + 2 * x + 1024 * y)) as u32;
+            let mut rng = XorShiftRng::from_seed([
+                seed,
+                seed >> 8,
+                seed >> 16,
+                seed >> 24,
+            ]);
+            let tr = tr.trans(
+                x as f64 * 50.0 - xpos + xpos / speed,
+                y as f64 * 50.0 - ypos + ypos / speed,
+            );
+            for _ in 0..nb {
+                let point =
+                    [rng.gen_range(0.0, 50.0), rng.gen_range(0.0, 50.0)];
+                graphics::rectangle(
+                    color,
+                    graphics::rectangle::centered([
+                        point[0], point[1], 0.05, 0.05
+                    ]),
+                    tr,
+                    g,
+                );
+            }
+        }
+    }
 }
 
 fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
@@ -195,6 +281,9 @@ pub fn render<G, C, E>(
         .transform
         .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
         .scale(viewport.scale, -viewport.scale);
+
+    // Starry background
+    draw_background(&*viewport, tr, g);
 
     // Draw blocks
     for (pos, blocky) in (&pos, &blocky).join() {
