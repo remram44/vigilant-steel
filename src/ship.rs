@@ -367,10 +367,9 @@ impl<'a> System<'a> for SysShip {
             }
 
             // Update blocks
-            let target_rel = vec2_sub(ship.want_target, pos.pos);
             let target_rel = [
-                target_rel[0] * c + target_rel[1] * s,
-                -target_rel[0] * s + target_rel[1] * c,
+                ship.want_target[0] * c + ship.want_target[1] * s,
+                -ship.want_target[0] * s + ship.want_target[1] * c,
             ];
             for &mut (rel, ref mut block) in &mut blocky.blocks {
                 match &mut block.inner {
