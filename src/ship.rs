@@ -322,9 +322,9 @@ impl<'a> System<'a> for SysShip {
             for (ent, pos, vel, _) in
                 (&*entities, &pos, &mut vel, &ship).join()
             {
-                if pos.pos[0] < -35.0 || pos.pos[0] > 35.0
-                    || pos.pos[1] < -35.0
-                    || pos.pos[1] > 35.0
+                if pos.pos[0] < -100.0 || pos.pos[0] > 100.0
+                    || pos.pos[1] < -100.0
+                    || pos.pos[1] > 100.0
                 {
                     vel.vel = vec2_sub([0.0, 0.0], pos.pos);
                     vel.vel =
@@ -680,8 +680,8 @@ impl<'a> System<'a> for SysProjectile {
         {
             // Remove projectiles gone from the screen
             let pos = pos.pos;
-            if pos[0] < -50.0 || pos[0] > 50.0 || pos[1] < -50.0
-                || pos[1] > 50.0
+            if pos[0] < -150.0 || pos[0] > 150.0 || pos[1] < -150.0
+                || pos[1] > 150.0
             {
                 delete_entity(*role, &entities, &lazy, entity);
             }
