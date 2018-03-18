@@ -16,7 +16,7 @@ use tree::Tree;
 use vecmath::*;
 
 /// Active component of the block.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockInner {
     /// This is what allows a ship to be controlled. Ships can't be operated
     /// without this.
@@ -81,7 +81,7 @@ impl BlockInner {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     /// Health of this blocks, starting at `inner.max_health()`.
     pub health: f64,

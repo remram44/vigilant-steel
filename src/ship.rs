@@ -47,65 +47,60 @@ impl Ship {
     }
 
     pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
-        let blocks = vec![
-            ([0.0, 0.0], Block::new(BlockInner::Cockpit)),
-            ([-2.0, -2.0], Block::new(BlockInner::Armor)),
+        use self::BlockInner::*;
+        let blocks = &[
+            ([0, 0], Cockpit),
+            ([-3, -2], Armor),
+            ([-3, -1], Thruster { angle: 0.0 }),
+            ([-3, 0], Thruster { angle: 0.0 }),
+            ([-3, 1], Thruster { angle: 0.0 }),
+            ([-3, 2], Armor),
+            ([-2, -2], Thruster { angle: 0.5 * PI }),
+            ([-2, -1], Armor),
+            ([-2, 0], Armor),
+            ([-2, 1], Armor),
+            ([-2, 2], Thruster { angle: -0.5 * PI }),
+            ([-1, -2], Thruster { angle: PI }),
+            ([-1, -1], Armor),
+            ([-1, 0], Armor),
+            ([-1, 1], Armor),
+            ([-1, 2], Thruster { angle: PI }),
+            ([-0, -1], Armor),
+            ([-0, 1], Armor),
+            ([1, -1], Armor),
+            ([1, 0], Armor),
+            ([1, 1], Armor),
+            ([2, -1], Thruster { angle: 0.5 * PI }),
+            ([2, 0], Armor),
+            ([2, 1], Thruster { angle: -0.5 * PI }),
             (
-                [-2.0, -1.0],
-                Block::new(BlockInner::Thruster { angle: 0.0 }),
-            ),
-            ([-2.0, 0.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
-            ([-2.0, 1.0], Block::new(BlockInner::Thruster { angle: 0.0 })),
-            ([-2.0, 2.0], Block::new(BlockInner::Armor)),
-            (
-                [-1.0, -2.0],
-                Block::new(BlockInner::Thruster { angle: 0.5 * PI }),
-            ),
-            ([-1.0, -1.0], Block::new(BlockInner::Armor)),
-            ([-1.0, 0.0], Block::new(BlockInner::Armor)),
-            ([-1.0, 1.0], Block::new(BlockInner::Armor)),
-            (
-                [-1.0, 2.0],
-                Block::new(BlockInner::Thruster { angle: -0.5 * PI }),
-            ),
-            (
-                [0.0, -2.0],
-                Block::new(BlockInner::PlasmaGun {
+                [3, -1],
+                PlasmaGun {
                     angle: 0.0,
                     cooldown: -1.0,
-                }),
+                },
             ),
-            ([0.0, -1.0], Block::new(BlockInner::Armor)),
-            ([0.0, 1.0], Block::new(BlockInner::Armor)),
             (
-                [0.0, 2.0],
-                Block::new(BlockInner::PlasmaGun {
+                [3, 0],
+                RailGun {
                     angle: 0.0,
                     cooldown: -1.0,
-                }),
+                },
             ),
-            ([1.0, -1.0], Block::new(BlockInner::Armor)),
-            ([1.0, 0.0], Block::new(BlockInner::Armor)),
-            ([1.0, 1.0], Block::new(BlockInner::Armor)),
             (
-                [2.0, -1.0],
-                Block::new(BlockInner::Thruster { angle: 0.5 * PI }),
-            ),
-            ([2.0, 0.0], Block::new(BlockInner::Armor)),
-            (
-                [2.0, 1.0],
-                Block::new(BlockInner::Thruster { angle: -0.5 * PI }),
-            ),
-            ([3.0, -1.0], Block::new(BlockInner::Armor)),
-            (
-                [3.0, 0.0],
-                Block::new(BlockInner::RailGun {
+                [3, 1],
+                PlasmaGun {
                     angle: 0.0,
                     cooldown: -1.0,
-                }),
+                },
             ),
-            ([3.0, 1.0], Block::new(BlockInner::Armor)),
         ];
+        let blocks = blocks
+            .iter()
+            .map(|&(ref p, ref b)| {
+                ([p[0] as f64, p[1] as f64], Block::new(b.clone()))
+            })
+            .collect();
         let (blocky, center) = Blocky::new(blocks);
         let entity = entities.create();
         let angle: f64 = 0.0;
