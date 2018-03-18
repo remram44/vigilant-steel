@@ -14,8 +14,8 @@ use particles::{Effect, EffectInner, Particle, ParticleType};
 use physics::{find_collision_tree_ray, DeltaTime, HitEffect, Hits,
               LocalControl, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
-            ReadStorage, System, VecStorage, WriteStorage};
+use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
+            LazyUpdate, ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
 use utils::angle_wrap;
 use vecmath::*;
@@ -184,6 +184,7 @@ impl<'a> System<'a> for SysShip {
         ReadStorage<'a, Hits>,
         WriteStorage<'a, Ship>,
         WriteStorage<'a, Blocky>,
+        ReadStorage<'a, TractedBlock>,
         ReadStorage<'a, Asteroid>,
         ReadStorage<'a, LocalControl>,
     );
@@ -197,11 +198,12 @@ impl<'a> System<'a> for SysShip {
             input,
             clock,
             entities,
-            mut pos,
+            mut position,
             mut vel,
             hits,
             mut ship,
             mut blocky,
+            tracted,
             asteroid,
             local,
         ): Self::SystemData,
@@ -212,7 +214,7 @@ impl<'a> System<'a> for SysShip {
         if role.authoritative() {
             // Handle collisions
             for (ent, mut pos, mut blk, hits) in
-                (&*entities, &mut pos, &mut blocky, &hits).join()
+                (&*entities, &mut position, &mut blocky, &hits).join()
             {
                 let (s, c) = pos.rot.sin_cos();
                 let mut deleted = false;
@@ -344,7 +346,7 @@ impl<'a> System<'a> for SysShip {
 
             // Prevent leaving the screen
             for (ent, pos, vel, _) in
-                (&*entities, &pos, &mut vel, &ship).join()
+                (&*entities, &position, &mut vel, &ship).join()
             {
                 if pos.pos[0] < -100.0 || pos.pos[0] > 100.0
                     || pos.pos[1] < -100.0
@@ -378,14 +380,10 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        for (ent, pos, mut vel, mut ship, mut blocky) in (
-            &*entities,
-            &pos,
-            &mut vel,
-            &mut ship,
-            &mut blocky,
-        ).join()
+        for (ent, mut vel, mut ship, mut blocky) in
+            (&*entities, &mut vel, &mut ship, &mut blocky).join()
         {
+            let pos = position.get(ent).unwrap().clone();
             let (s, c) = pos.rot.sin_cos();
 
             // Action thrusters from controls
@@ -503,20 +501,55 @@ impl<'a> System<'a> for SysShip {
             vel.rot -= vel.rot * vel.rot.abs() * 2.0 * dt;
 
             // Pick up blocks
-            if role.authoritative() {
-                // We are tracting a block already
-                if let Some(tracted_ent) = ship.tracted_block {
-                    // Move tracted block
-                    // TODO: Move tracted block
+            // We are tracting a block already
+            if let Some(tracted_ent) = ship.tracted_block {
+                // Move tracted block
+                {
+                    let tracted_pos = position.get_mut(tracted_ent).unwrap();
+                    tracted_pos.pos = vec2_add(pos.pos, ship.want_target);
+                }
 
-                    // Drop tracted block
-                    if !ship.want_tractor_beam {
-                        // TODO: Drop tracted block
+                // Drop tracted block
+                if !ship.want_tractor_beam && role.authoritative() {
+                    ship.tracted_block = None;
+                    // TODO: Connect block to entity if close
+                    let block =
+                        tracted.get(tracted_ent).unwrap().block.clone();
+                    lazy.remove::<TractedBlock>(tracted_ent);
+                    lazy.insert(
+                        tracted_ent,
+                        Velocity {
+                            vel: [0.0, 0.0],
+                            rot: 0.0,
+                        },
+                    );
+                    let (blocky, _) = Blocky::new(vec![([0.0, 0.0], block)]);
+                    lazy.insert(tracted_ent, blocky);
+                    #[cfg(feature = "network")]
+                    {
+                        lazy.insert(tracted_ent, net::Replicated::new());
+                        lazy.insert(tracted_ent, net::Dirty);
                     }
-                } else {
-                    if ship.want_tractor_beam {
-                        // TODO: Pick up block with tractor beam
-                    }
+                }
+            } else {
+                // Pick up block with tractor beam
+                if ship.want_tractor_beam && role.authoritative() {
+                    // TODO: Pick up block with tractor beam
+                    let tracted_ent = entities.create();
+                    lazy.insert(
+                        tracted_ent,
+                        Position {
+                            pos: vec2_add(pos.pos, ship.want_target),
+                            rot: pos.rot,
+                        },
+                    );
+                    lazy.insert(
+                        tracted_ent,
+                        TractedBlock {
+                            block: Block::new(BlockInner::Armor),
+                        },
+                    );
+                    ship.tracted_block = Some(tracted_ent);
                 }
             }
 
@@ -611,6 +644,17 @@ impl<'a> System<'a> for SysShip {
             }
         }
     }
+}
+
+/// A block being floated by a tractor beam.
+///
+/// Cannot collide.
+pub struct TractedBlock {
+    pub block: Block,
+}
+
+impl Component for TractedBlock {
+    type Storage = HashMapStorage<Self>;
 }
 
 /// Computes the thrust generated by thrusters.

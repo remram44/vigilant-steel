@@ -39,7 +39,7 @@ use input::Input;
 use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
-use ship::{Ship, SysShip};
+use ship::{Ship, SysShip, TractedBlock};
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World};
 use std::collections::HashMap;
 #[cfg(feature = "network")]
@@ -154,6 +154,7 @@ impl Game {
         world.register::<Hits>();
         world.register::<LocalControl>();
         world.register::<Ship>();
+        world.register::<TractedBlock>();
         world.register::<Projectile>();
         world.register::<Asteroid>();
         world.register::<Particle>();

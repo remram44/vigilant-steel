@@ -4,6 +4,7 @@ use game::blocks::{Block, BlockInner, Blocky};
 use game::guns::{Projectile, ProjectileType};
 use game::particles::{Particle, ParticleType};
 use game::physics::{LocalControl, Position};
+use game::ship::{Ship, TractedBlock};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use graphics::{self, Context, Graphics, Transformed};
@@ -303,10 +304,13 @@ pub fn render<G, C, E>(
     C: CharacterCache<Texture = <G as Graphics>::Texture, Error = E> + Sized,
 {
     let viewport = world.read_resource::<Viewport>();
-    let pos = world.read::<Position>();
+    let entities = world.entities();
+    let position = world.read::<Position>();
     let projectile = world.read::<Projectile>();
     let particles = world.read::<Particle>();
     let blocky = world.read::<Blocky>();
+    let ship = world.read::<Ship>();
+    let tracted = world.read::<TractedBlock>();
     let local = world.read::<LocalControl>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], g);
@@ -320,7 +324,7 @@ pub fn render<G, C, E>(
         .scale(viewport.scale, -viewport.scale);
 
     // Update camera location
-    for (pos, _) in (&pos, &local).join() {
+    for (pos, _) in (&position, &local).join() {
         *camera = pos.pos;
     }
     let tr = tr.trans(-camera[0], -camera[1]);
@@ -348,7 +352,7 @@ pub fn render<G, C, E>(
     );
 
     // Draw blocks
-    for (pos, blocky) in (&pos, &blocky).join() {
+    for (ent, pos, blocky) in (&*entities, &position, &blocky).join() {
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
@@ -357,10 +361,39 @@ pub fn render<G, C, E>(
         for &(rel, ref block) in &blocky.blocks {
             draw_block(&block, blocks_tr.trans(rel[0], rel[1]), g);
         }
+
+        // Tractor beam
+        if let Some(ship) = ship.get(ent) {
+            if let Some(tracted_ent) = ship.tracted_block {
+                if let (Some(tracted_pos), Some(blk)) = (
+                    position.get(tracted_ent),
+                    tracted.get(tracted_ent),
+                ) {
+                    graphics::line(
+                        [0.0, 0.0, 1.0, 0.5],
+                        0.05,
+                        [
+                            pos.pos[0],
+                            pos.pos[1],
+                            tracted_pos.pos[0],
+                            tracted_pos.pos[1],
+                        ],
+                        tr,
+                        g,
+                    );
+                    draw_block(
+                        &blk.block,
+                        tr.trans(tracted_pos.pos[0], tracted_pos.pos[1])
+                            .rot_rad(tracted_pos.rot),
+                        g,
+                    );
+                }
+            }
+        }
     }
 
     // Draw projectiles
-    for (pos, proj) in (&pos, &projectile).join() {
+    for (pos, proj) in (&position, &projectile).join() {
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
@@ -388,7 +421,7 @@ pub fn render<G, C, E>(
         }
     }
 
-    for (pos, particle) in (&pos, &particles).join() {
+    for (pos, particle) in (&position, &particles).join() {
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
