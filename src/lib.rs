@@ -38,7 +38,8 @@ use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Projectile, Ship, SysProjectile, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, LazyUpdate, World};
+use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World};
+use std::collections::HashMap;
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
 use std::ops::Deref;
@@ -229,6 +230,7 @@ impl Game {
         }
     }
 
+    /// Update the world using `specs`.
     pub fn update(&mut self, dt: f64) {
         {
             let mut r_dt = self.world.write_resource::<DeltaTime>();
@@ -241,5 +243,60 @@ impl Game {
 
         let mut input = self.world.write_resource::<Input>();
         input.update();
+    }
+
+    /// Print out entity counts as `INFO`.
+    pub fn profile(&self) {
+        macro_rules! component_check {
+            ( $x:ident ) => {
+                (
+                    stringify!($x),
+                    {
+                        let s = self.world.read::<$x>();
+                        Box::new(move |e| s.get(e).is_some())
+                            as Box<Fn(Entity) -> bool>
+                    }
+                )
+            }
+        }
+        let components = &[
+            component_check!(Position),
+            component_check!(Velocity),
+            component_check!(Blocky),
+            component_check!(DetectCollision),
+            component_check!(Hits),
+            component_check!(LocalControl),
+            component_check!(Ship),
+            component_check!(Projectile),
+            component_check!(Asteroid),
+            component_check!(Particle),
+            component_check!(Effect),
+        ];
+        let mut counts = HashMap::new();
+        for ent in (&*self.world.entities()).join() {
+            let mut i = 1;
+            let mut f = 0;
+            for &(_, ref comp) in components {
+                if comp(ent) {
+                    f |= i;
+                }
+                i = i << 1;
+            }
+            *counts.entry(f).or_insert(0) += 1;
+        }
+        for (f, c) in &counts {
+            let mut comp = String::new();
+            let mut i = 1;
+            for &(name, _) in components {
+                if f & i != 0 {
+                    if !comp.is_empty() {
+                        comp.push_str(", ");
+                    }
+                    comp.push_str(name);
+                }
+                i = i << 1;
+            }
+            info!("{:>4} | {}", c, comp);
+        }
     }
 }

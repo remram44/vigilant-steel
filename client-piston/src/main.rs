@@ -235,14 +235,17 @@ fn handle_event(
 
     // Draw
     if let Some(r) = event.render_args() {
-        let world = &mut app.game.world;
-        let glyph_cache = &mut app.glyph_cache;
-        let mut camera = &mut app.camera;
-        app.gl.draw(r.viewport(), |c, g| {
-            render::render(c, g, glyph_cache, world, camera);
-        });
+        {
+            let world = &mut app.game.world;
+            let glyph_cache = &mut app.glyph_cache;
+            let mut camera = &mut app.camera;
+            app.gl.draw(r.viewport(), |c, g| {
+                render::render(c, g, glyph_cache, world, camera);
+            });
+        }
         if app.fps_counter.rendered() {
             info!("fps = {}", app.fps_counter.value());
+            app.game.profile();
         }
     }
     true
