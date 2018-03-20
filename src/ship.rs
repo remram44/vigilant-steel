@@ -620,10 +620,13 @@ impl Projectile {
                 rot: 0.0,
             },
         );
+        let bounding_box = kind.bounds();
+        let radius = bounding_box.compute_sq_radius().sqrt();
         lazy.insert(
             entity,
             DetectCollision {
-                bounding_box: kind.bounds(),
+                bounding_box,
+                radius,
                 mass: kind.mass(),
                 ignore: None,
             },

@@ -119,6 +119,7 @@ impl Component for Velocity {
 /// Don't even mark the other object.
 pub struct DetectCollision {
     pub bounding_box: AABox,
+    pub radius: f64,
     pub mass: Option<f64>,
     pub ignore: Option<Entity>,
 }
@@ -253,6 +254,10 @@ impl<'a> System<'a> for SysCollision {
                 if blocky1.blocks.is_empty() || blocky2.blocks.is_empty() {
                     continue;
                 }
+                let rad = blocky1.radius + blocky2.radius;
+                if vec2_square_len(vec2_sub(pos1.pos, pos2.pos)) > rad * rad {
+                    continue;
+                }
                 // Detect collisions using tree
                 if let Some(hit) = find_collision_tree(
                     pos1,
@@ -288,6 +293,10 @@ impl<'a> System<'a> for SysCollision {
             }
             for (e1, pos1, col1) in (&*entities, &pos, &collision).join() {
                 if col1.ignore == Some(e2) {
+                    continue;
+                }
+                let rad = col1.radius + blocky2.radius;
+                if vec2_square_len(vec2_sub(pos1.pos, pos2.pos)) > rad * rad {
                     continue;
                 }
                 // Detect collisions using tree
