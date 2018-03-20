@@ -171,7 +171,7 @@ impl Game {
             DispatcherBuilder::new()
                 .add(SysSimu, "simu", &[])
                 .add(SysProjectile, "projectile", &[])
-                .add(SysAsteroid::new(), "asteroid", &[])
+                .add(SysAsteroid, "asteroid", &[])
                 .add(SysShip, "ship", &[])
                 .add(SysParticles, "particles", &[])
                 .add(
