@@ -10,6 +10,7 @@ use graphics::math::Matrix2d;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use specs::{Join, World};
 use std::fmt::Debug;
+use vecmath::*;
 
 const MAX_RATIO: f64 = 1.6;
 const VIEWPORT_SIZE: f64 = 80.0;
@@ -288,6 +289,11 @@ pub fn render<G, C, E>(
         *camera = pos.pos;
     }
     let tr = tr.trans(-camera[0], -camera[1]);
+    let sq_radius = {
+        let w = viewport.width as f64;
+        let h = viewport.height as f64;
+        (w * w + h * h) * 0.25
+    };
 
     // Starry background
     draw_background(&*viewport, *camera, tr, g);
@@ -308,6 +314,9 @@ pub fn render<G, C, E>(
 
     // Draw blocks
     for (pos, blocky) in (&pos, &blocky).join() {
+        if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
+            continue;
+        }
         let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         for &(rel, ref block) in &blocky.blocks {
             draw_block(&block, blocks_tr.trans(rel[0], rel[1]), g);
@@ -316,6 +325,9 @@ pub fn render<G, C, E>(
 
     // Draw projectiles
     for (pos, proj) in (&pos, &projectile).join() {
+        if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
+            continue;
+        }
         let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         match proj.kind {
             ProjectileType::Plasma => {
@@ -340,6 +352,9 @@ pub fn render<G, C, E>(
     }
 
     for (pos, particle) in (&pos, &particles).join() {
+        if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
+            continue;
+        }
         let part_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
         match particle.which {
             ParticleType::Spark => {

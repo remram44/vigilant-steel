@@ -10,6 +10,7 @@ extern crate piston;
 extern crate rand;
 extern crate sdl2_window;
 extern crate specs;
+extern crate vecmath;
 
 mod render;
 
