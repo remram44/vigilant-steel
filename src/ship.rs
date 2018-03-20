@@ -677,22 +677,30 @@ impl<'a> System<'a> for SysProjectile {
         for (entity, pos, proj) in (&*entities, &position, &projectile).join()
         {
             // Remove projectiles gone from the screen
-            let pos = pos.pos;
-            if pos[0] < -150.0 || pos[0] > 150.0 || pos[1] < -150.0
-                || pos[1] > 150.0
+            if pos.pos[0] < -150.0 || pos.pos[0] > 150.0 || pos.pos[1] < -150.0
+                || pos.pos[1] > 150.0
             {
                 delete_entity(*role, &entities, &lazy, entity);
             }
 
             // Hit projectiles go off and affect an area
-            let (mut delete, mut go_off) = (false, false);
+            let (mut delete, mut hit_loc) = (false, None);
             match hits.get(entity) {
                 Some(v) => for h in &**v {
                     match h.effect {
                         HitEffect::Collision(_, e) => {
                             delete = true;
                             if e != proj.shooter {
-                                go_off = true;
+                                let (s, c) = pos.rot.sin_cos();
+                                hit_loc = Some(vec2_add(
+                                    pos.pos,
+                                    [
+                                        c * h.rel_location[0]
+                                            - s * h.rel_location[1],
+                                        s * h.rel_location[0]
+                                            + s * h.rel_location[1],
+                                    ],
+                                ));
                                 break;
                             }
                         }
@@ -704,9 +712,10 @@ impl<'a> System<'a> for SysProjectile {
             if delete {
                 delete_entity(*role, &entities, &lazy, entity);
             }
-            if !go_off {
-                continue;
-            }
+            let hit_loc = match hit_loc {
+                None => continue,
+                Some(l) => l,
+            };
 
             match proj.kind {
                 ProjectileType::Plasma => {
@@ -716,13 +725,19 @@ impl<'a> System<'a> for SysProjectile {
                         &position,
                         &blocky,
                         &mut hits,
-                        pos,
+                        hit_loc,
                         3.0,
                         HitEffect::Explosion(3.0),
                     );
 
                     let new_effect = entities.create();
-                    lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                    lazy.insert(
+                        new_effect,
+                        Position {
+                            pos: pos.pos,
+                            rot: 0.0,
+                        },
+                    );
                     lazy.insert(
                         new_effect,
                         Effect {
@@ -735,7 +750,13 @@ impl<'a> System<'a> for SysProjectile {
                 }
                 ProjectileType::Rail => {
                     let new_effect = entities.create();
-                    lazy.insert(new_effect, Position { pos: pos, rot: 0.0 });
+                    lazy.insert(
+                        new_effect,
+                        Position {
+                            pos: pos.pos,
+                            rot: 0.0,
+                        },
+                    );
                     lazy.insert(
                         new_effect,
                         Effect {
