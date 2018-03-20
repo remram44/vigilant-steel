@@ -32,7 +32,7 @@ impl Viewport {
             "Window is {}x{}, computed scale = {}",
             size[0],
             size[1],
-            VIEWPORT_SIZE / maxsize
+            maxsize / VIEWPORT_SIZE
         );
         Viewport {
             width: size[0],
@@ -129,10 +129,10 @@ fn draw_background_layer<G: graphics::Graphics>(
     let width = viewport.width as f64 * 0.5 / viewport.scale;
     let height = viewport.height as f64 * 0.5 / viewport.scale;
 
-    let xmin = ((xpos * speed - width) / 50.0).floor() as i32;
-    let xmax = ((xpos * speed + width) / 50.0).ceil() as i32;
-    let ymin = ((ypos * speed - height) / 50.0).floor() as i32;
-    let ymax = ((ypos * speed + height) / 50.0).ceil() as i32;
+    let xmin = ((xpos - width) / 50.0).floor() as i32;
+    let xmax = ((xpos + width) / 50.0).ceil() as i32;
+    let ymin = ((ypos - height) / 50.0).floor() as i32;
+    let ymax = ((ypos + height) / 50.0).ceil() as i32;
 
     for x in xmin..xmax {
         for y in ymin..ymax {
