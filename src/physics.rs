@@ -49,7 +49,7 @@ impl AABox {
 
     /// The square of the maximum radius from (0, 0) containing the whole
     /// box.
-    pub fn sq_radius(&self) -> f64 {
+    pub fn compute_sq_radius(&self) -> f64 {
         self.corners()
             .iter()
             .map(|&c| vec2_square_len(c))
@@ -302,7 +302,7 @@ impl<'a> System<'a> for SysCollision {
                     let vel2 = vel.get(e2).unwrap().vel;
                     let momentum = vec2_sub(vel1, vel2);
                     let momentum = vec2_len(momentum) * blocky2.mass;
-                    // Store collision on for the DetectCollision entity
+                    // Store collision on the DetectCollision entity
                     store_collision(
                         pos1,
                         hit.location,
@@ -601,11 +601,11 @@ pub fn affect_area<'a>(
     radius: f64,
     effect: HitEffect,
 ) {
-    let sq_radius = radius * radius;
     for (ent, pos, blk) in (&**entities, &*pos, &*blocky).join() {
-        let entity_sq_radius = blk.tree.0[0].bounds.sq_radius();
+        let entity_radius = blk.radius;
         let dist = vec2_square_len(vec2_sub(pos.pos, center));
-        if dist < sq_radius + entity_sq_radius {
+        let rad = radius + entity_radius;
+        if dist < rad * rad {
             store_collision(pos, center, effect.clone(), ent, hits);
         }
     }

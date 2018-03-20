@@ -104,47 +104,57 @@ impl Block {
 pub struct Blocky {
     pub blocks: Vec<([f64; 2], Block)>,
     pub tree: Tree,
+    pub radius: f64,
     pub mass: f64,
     pub inertia: f64,
 }
 
 impl Blocky {
-    pub fn new(mut blocks: Vec<([f64; 2], Block)>) -> (Blocky, [f64; 2]) {
-        let (mass, inertia, center, tree) = Self::compute_stats(&mut blocks);
-
-        let blocky = Blocky {
+    pub fn new(blocks: Vec<([f64; 2], Block)>) -> (Blocky, [f64; 2]) {
+        let mut blocky = Blocky {
             blocks: blocks,
-            tree: tree,
-            mass: mass,
-            inertia: inertia,
+            tree: Tree(vec![]),
+            radius: 0.0,
+            mass: 0.0,
+            inertia: 0.0,
         };
+        let center = blocky.compute_stats();
         (blocky, center)
     }
 
-    fn compute_stats(
-        blocks: &mut Vec<([f64; 2], Block)>,
-    ) -> (f64, f64, [f64; 2], Tree) {
-        let mut mass = 0.0;
+    fn compute_stats(&mut self) -> [f64; 2] {
         let mut center = [0.0, 0.0];
-        for &(ref loc, ref block) in &*blocks {
+        self.mass = 0.0;
+        for &(ref loc, ref block) in &self.blocks {
             center = vec2_scale(
                 vec2_add(
-                    vec2_scale(center, mass),
+                    vec2_scale(center, self.mass),
                     vec2_scale(*loc, block.inner.mass()),
                 ),
-                1.0 / (mass + block.inner.mass()),
+                1.0 / (self.mass + block.inner.mass()),
             );
-            mass += block.inner.mass();
+            self.mass += block.inner.mass();
         }
-        let mut inertia = 0.0;
-        for &mut (ref mut loc, ref block) in blocks.iter_mut() {
+        self.inertia = 0.0;
+        for &mut (ref mut loc, ref block) in self.blocks.iter_mut() {
             *loc = vec2_sub(*loc, center);
-            inertia += (0.5 + vec2_square_len(*loc)) * block.inner.mass();
+            self.inertia += (0.5 + vec2_square_len(*loc)) * block.inner.mass();
         }
 
-        let tree = Tree::new_(blocks);
+        self.tree = Tree::new_(&self.blocks);
+        self.radius = 0.0;
+        if !self.blocks.is_empty() {
+            self.radius = self.tree.0[0]
+                .bounds
+                .corners()
+                .iter()
+                .map(|&c| vec2_square_len(c))
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap()
+                .sqrt();
+        }
 
-        (mass, inertia, center, tree)
+        center
     }
 
     /// Called when some blocks are added or reach 0 health.
@@ -212,11 +222,7 @@ impl Blocky {
         }
 
         // Recompute mass, center, inertia
-        let (mass, inertia, center, tree) =
-            Self::compute_stats(&mut self.blocks);
-        self.mass = mass;
-        self.inertia = inertia;
-        self.tree = tree;
+        let center = self.compute_stats();
 
         // Make Blocky components for the broken off pieces
         let pieces = pieces
