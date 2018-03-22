@@ -8,6 +8,7 @@ build_game:
   script:
     - cargo build
     - cargo test
+    - cargo bench
     - (cd client-piston && EMMAKEN_CFLAGS='-s USE_SDL=2 --preload-file assets' cargo build --release --target=asmjs-unknown-emscripten --no-default-features)
     - mkdir output &&
       cp target/asmjs-unknown-emscripten/release/client.js output/ &&
