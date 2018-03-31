@@ -8,10 +8,8 @@ pub trait IteratorExt<T>: Iterator<Item = T> {
     fn minmax(self) -> Option<(T, T)>;
 }
 
-impl<
-    T: Clone + PartialOrd + Sized,
-    I: Iterator<Item = T> + Sized,
-> IteratorExt<T> for I
+impl<T: Clone + PartialOrd + Sized, I: Iterator<Item = T> + Sized>
+    IteratorExt<T> for I
 {
     fn minmax(mut self) -> Option<(T, T)> {
         let min = |a, b| if a <= b { a } else { b };

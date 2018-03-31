@@ -103,7 +103,9 @@ pub struct Clock {
 
 impl Clock {
     fn new() -> Clock {
-        Clock { time_wrapping: 0.0 }
+        Clock {
+            time_wrapping: 0.0,
+        }
     }
 
     /// Called by `Game` to move to the next frame.
@@ -196,7 +198,9 @@ impl Game {
             &world.entities(),
             &world.read_resource::<LazyUpdate>(),
         );
-        world.write::<LocalControl>().insert(ship, LocalControl);
+        world
+            .write::<LocalControl>()
+            .insert(ship, LocalControl);
 
         Game {
             world: world,
@@ -221,8 +225,11 @@ impl Game {
     pub fn new_client(address: SocketAddr) -> Game {
         let (world, mut dispatcher) = Self::new_common(Role::Client);
 
-        dispatcher =
-            dispatcher.add(net::SysNetClient::new(address), "netclient", &[]);
+        dispatcher = dispatcher.add(
+            net::SysNetClient::new(address),
+            "netclient",
+            &[],
+        );
 
         Game {
             world: world,
@@ -248,16 +255,13 @@ impl Game {
     /// Print out entity counts as `INFO`.
     pub fn profile(&self) {
         macro_rules! component_check {
-            ( $x:ident ) => {
-                (
-                    stringify!($x),
-                    {
-                        let s = self.world.read::<$x>();
-                        Box::new(move |e| s.get(e).is_some())
-                            as Box<Fn(Entity) -> bool>
-                    }
-                )
-            }
+            ($x:ident) => {
+                (stringify!($x), {
+                    let s = self.world.read::<$x>();
+                    Box::new(move |e| s.get(e).is_some())
+                        as Box<Fn(Entity) -> bool>
+                })
+            };
         }
         let components = &[
             component_check!(Position),

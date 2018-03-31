@@ -105,7 +105,9 @@ fn main() {
         touches: HashMap::new(),
         touch_mode: false,
     };
-    app.game.world.add_resource(Viewport::new([width, height]));
+    app.game
+        .world
+        .add_resource(Viewport::new([width, height]));
 
     // Use the event_loop module to handle SDL/Emscripten differences
     event_loop::run(window, handle_event, app);

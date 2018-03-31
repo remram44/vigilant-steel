@@ -50,7 +50,10 @@ fn check_sat_collision_dir(
             // Compute corner coordinates
             let corner = vec2_add(
                 pos1.pos,
-                [corner[0] * c - corner[1] * s, corner[0] * s + corner[1] * c],
+                [
+                    corner[0] * c - corner[1] * s,
+                    corner[0] * s + corner[1] * c,
+                ],
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {
@@ -69,7 +72,10 @@ fn check_sat_collision_dir(
             // Compute corner coordinates
             let corner = vec2_add(
                 pos2.pos,
-                [corner[0] * c - corner[1] * s, corner[0] * s + corner[1] * c],
+                [
+                    corner[0] * c - corner[1] * s,
+                    corner[0] * s + corner[1] * c,
+                ],
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {

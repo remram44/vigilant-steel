@@ -47,8 +47,12 @@ impl Log for StderrLogger {
             stderr
                 .set_color(ColorSpec::new().set_fg(Some(color)))
                 .unwrap();
-            writeln!(stderr, "{} - {}", record.target(), record.args())
-                .unwrap();
+            writeln!(
+                stderr,
+                "{} - {}",
+                record.target(),
+                record.args()
+            ).unwrap();
             stderr.reset().unwrap();
             stderr.flush().unwrap();
         }

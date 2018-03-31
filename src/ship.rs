@@ -4,7 +4,6 @@
 //! gets tacked on to store control and thruster state.
 // TODO: Take some behavior out of SysShip and into blocks.rs
 
-use {Clock, Role};
 use asteroid::Asteroid;
 use blocks::{Block, BlockInner, Blocky};
 use input::{Input, Press};
@@ -20,6 +19,7 @@ use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
 use std::f64::consts::PI;
 use utils::angle_wrap;
 use vecmath::*;
+use {Clock, Role};
 
 /// A ship.
 ///
@@ -55,11 +55,21 @@ impl Ship {
             ([-3, 0], Thruster { angle: 0.0 }),
             ([-3, 1], Thruster { angle: 0.0 }),
             ([-3, 2], Armor),
-            ([-2, -2], Thruster { angle: 0.5 * PI }),
+            (
+                [-2, -2],
+                Thruster {
+                    angle: 0.5 * PI,
+                },
+            ),
             ([-2, -1], Armor),
             ([-2, 0], Armor),
             ([-2, 1], Armor),
-            ([-2, 2], Thruster { angle: -0.5 * PI }),
+            (
+                [-2, 2],
+                Thruster {
+                    angle: -0.5 * PI,
+                },
+            ),
             ([-1, -2], Thruster { angle: PI }),
             ([-1, -1], Armor),
             ([-1, 0], Armor),
@@ -70,9 +80,19 @@ impl Ship {
             ([1, -1], Armor),
             ([1, 0], Armor),
             ([1, 1], Armor),
-            ([2, -1], Thruster { angle: 0.5 * PI }),
+            (
+                [2, -1],
+                Thruster {
+                    angle: 0.5 * PI,
+                },
+            ),
             ([2, 0], Armor),
-            ([2, 1], Thruster { angle: -0.5 * PI }),
+            (
+                [2, 1],
+                Thruster {
+                    angle: -0.5 * PI,
+                },
+            ),
             (
                 [3, -1],
                 PlasmaGun {
@@ -98,15 +118,20 @@ impl Ship {
         let blocks = blocks
             .iter()
             .map(|&(ref p, ref b)| {
-                ([p[0] as f64, p[1] as f64], Block::new(b.clone()))
+                (
+                    [p[0] as f64, p[1] as f64],
+                    Block::new(b.clone()),
+                )
             })
             .collect();
         let (blocky, center) = Blocky::new(blocks);
         let entity = entities.create();
         let angle: f64 = 0.0;
         let (s, c) = angle.sin_cos();
-        let center =
-            [center[0] * c - center[1] * s, center[0] * s + center[1] * s];
+        let center = [
+            center[0] * c - center[1] * s,
+            center[0] * s + center[1] * s,
+        ];
         lazy.insert(
             entity,
             Position {
@@ -344,8 +369,13 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        for (ent, pos, mut vel, mut ship, mut blocky) in
-            (&*entities, &pos, &mut vel, &mut ship, &mut blocky).join()
+        for (ent, pos, mut vel, mut ship, mut blocky) in (
+            &*entities,
+            &pos,
+            &mut vel,
+            &mut ship,
+            &mut blocky,
+        ).join()
         {
             let (s, c) = pos.rot.sin_cos();
 
@@ -368,7 +398,9 @@ impl<'a> System<'a> for SysShip {
             ];
             for &mut (rel, ref mut block) in &mut blocky.blocks {
                 match &mut block.inner {
-                    &mut BlockInner::PlasmaGun { ref mut angle, .. } => {
+                    &mut BlockInner::PlasmaGun {
+                        ref mut angle, ..
+                    } => {
                         let target_rel = vec2_sub(target_rel, rel);
                         let bearing = target_rel[1].atan2(target_rel[0]);
                         let chg = angle_wrap(bearing - *angle);
@@ -612,7 +644,13 @@ impl Projectile {
     ) -> Entity {
         let entity = entities.create();
         let (s, c) = rot.sin_cos();
-        lazy.insert(entity, Position { pos: pos, rot: rot });
+        lazy.insert(
+            entity,
+            Position {
+                pos: pos,
+                rot: rot,
+            },
+        );
         lazy.insert(
             entity,
             Velocity {

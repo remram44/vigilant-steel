@@ -4,9 +4,9 @@ use game::blocks::{Block, BlockInner, Blocky};
 use game::particles::{Particle, ParticleType};
 use game::physics::{LocalControl, Position};
 use game::ship::{Projectile, ProjectileType};
-use graphics::{self, Context, Graphics, Transformed};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
+use graphics::{self, Context, Graphics, Transformed};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use specs::{Join, World};
 use std::fmt::Debug;
@@ -149,8 +149,10 @@ fn draw_background_layer<G: graphics::Graphics>(
                 y as f64 * 50.0 - ypos + ypos / speed,
             );
             for _ in 0..nb {
-                let point =
-                    [rng.gen_range(0.0, 50.0), rng.gen_range(0.0, 50.0)];
+                let point = [
+                    rng.gen_range(0.0, 50.0),
+                    rng.gen_range(0.0, 50.0),
+                ];
                 graphics::rectangle(
                     color,
                     graphics::rectangle::centered([
@@ -170,7 +172,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             draw_line_loop(
                 [1.0, 0.0, 0.0, 1.0],
                 0.05,
-                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                &[
+                    [-0.45, -0.45],
+                    [0.45, -0.45],
+                    [0.45, 0.45],
+                    [-0.45, 0.45],
+                ],
                 tr,
                 g,
             );
@@ -185,7 +192,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         BlockInner::Thruster { angle } => for i in &[-0.4, 0.0] {
             graphics::polygon(
                 [0.4, 0.4, 0.4, 1.0],
-                &[[0.45, 0.25], [0.05, 0.45], [0.05, -0.45], [0.45, -0.25]],
+                &[
+                    [0.45, 0.25],
+                    [0.05, 0.45],
+                    [0.05, -0.45],
+                    [0.45, -0.25],
+                ],
                 tr.rot_rad(angle).trans(*i, 0.0),
                 g,
             );
@@ -209,7 +221,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             );
             graphics::polygon(
                 [0.7, 0.7, 1.0, 1.0],
-                &[[-0.0, -0.15], [0.6, -0.15], [0.6, 0.15], [-0.0, 0.15]],
+                &[
+                    [-0.0, -0.15],
+                    [0.6, -0.15],
+                    [0.6, 0.15],
+                    [-0.0, 0.15],
+                ],
                 tr.rot_rad(angle),
                 g,
             );
@@ -233,7 +250,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             );
             graphics::polygon(
                 [0.7, 0.7, 1.0, 1.0],
-                &[[-0.25, -0.25], [0.6, -0.25], [0.6, 0.25], [-0.25, 0.25]],
+                &[
+                    [-0.25, -0.25],
+                    [0.6, -0.25],
+                    [0.6, 0.25],
+                    [-0.25, 0.25],
+                ],
                 tr.rot_rad(angle),
                 g,
             );
@@ -242,7 +264,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             draw_line_loop(
                 [0.7, 0.7, 0.7, 1.0],
                 0.05,
-                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                &[
+                    [-0.45, -0.45],
+                    [0.45, -0.45],
+                    [0.45, 0.45],
+                    [-0.45, 0.45],
+                ],
                 tr,
                 g,
             );
@@ -251,7 +278,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             draw_line_loop(
                 [0.45, 0.45, 0.45, 1.0],
                 0.05,
-                &[[-0.45, -0.45], [0.45, -0.45], [0.45, 0.45], [-0.45, 0.45]],
+                &[
+                    [-0.45, -0.45],
+                    [0.45, -0.45],
+                    [0.45, 0.45],
+                    [-0.45, 0.45],
+                ],
                 tr,
                 g,
             );
@@ -281,7 +313,10 @@ pub fn render<G, C, E>(
 
     let tr = context
         .transform
-        .trans(viewport.width as f64 / 2.0, viewport.height as f64 / 2.0)
+        .trans(
+            viewport.width as f64 / 2.0,
+            viewport.height as f64 / 2.0,
+        )
         .scale(viewport.scale, -viewport.scale);
 
     // Update camera location
@@ -317,7 +352,8 @@ pub fn render<G, C, E>(
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
-        let blocks_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        let blocks_tr = tr.trans(pos.pos[0], pos.pos[1])
+            .rot_rad(pos.rot);
         for &(rel, ref block) in &blocky.blocks {
             draw_block(&block, blocks_tr.trans(rel[0], rel[1]), g);
         }
@@ -328,7 +364,8 @@ pub fn render<G, C, E>(
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
-        let projectile_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        let projectile_tr = tr.trans(pos.pos[0], pos.pos[1])
+            .rot_rad(pos.rot);
         match proj.kind {
             ProjectileType::Plasma => {
                 graphics::line(
@@ -355,7 +392,8 @@ pub fn render<G, C, E>(
         if vec2_square_len(vec2_sub(*camera, pos.pos)) > sq_radius {
             continue;
         }
-        let part_tr = tr.trans(pos.pos[0], pos.pos[1]).rot_rad(pos.rot);
+        let part_tr = tr.trans(pos.pos[0], pos.pos[1])
+            .rot_rad(pos.rot);
         match particle.which {
             ParticleType::Spark => {
                 let alpha = (particle.lifetime as f32) / 0.2;
@@ -367,7 +405,12 @@ pub fn render<G, C, E>(
                 );
             }
             ParticleType::Exhaust => graphics::rectangle(
-                [1.0, 1.0, 1.0, (particle.lifetime as f32).min(0.5)],
+                [
+                    1.0,
+                    1.0,
+                    1.0,
+                    (particle.lifetime as f32).min(0.5),
+                ],
                 graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
                 part_tr,
                 g,

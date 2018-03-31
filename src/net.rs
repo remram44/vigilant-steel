@@ -535,8 +535,11 @@ impl<'a> System<'a> for SysNetServer {
                             0x04 => -1.0,
                             _ => 0.0,
                         };
-                        ship.want_thrust[1] =
-                            if flags & 0x08 == 0x08 { 1.0 } else { 0.0 };
+                        ship.want_thrust[1] = if flags & 0x08 == 0x08 {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         ship.want_thrust_rot = match flags & 0x30 {
                             0x10 => 1.0,
                             0x20 => -1.0,
@@ -591,9 +594,12 @@ impl SysNetClient {
     /// Sends a message
     fn send(&self, msg: &Message) -> io::Result<usize> {
         let mut bytes = Vec::new();
-        bytes.write_u64::<ORDER>(self.client_id).unwrap();
+        bytes
+            .write_u64::<ORDER>(self.client_id)
+            .unwrap();
         msg.to_bytes(&mut bytes);
-        self.socket.send_to(&bytes, &self.server_address)
+        self.socket
+            .send_to(&bytes, &self.server_address)
     }
 }
 
@@ -673,8 +679,12 @@ impl<'a> System<'a> for SysNetClient {
         }
 
         // Update entities from messages
-        for (ent, repli, mut pos, mut vel) in
-            (&*entities, &replicated, &mut position, &mut velocity).join()
+        for (ent, repli, mut pos, mut vel) in (
+            &*entities,
+            &replicated,
+            &mut position,
+            &mut velocity,
+        ).join()
         {
             for &mut (ref msg, ref mut handled) in &mut messages {
                 if let Message::EntityUpdate(id, ref data) = *msg {

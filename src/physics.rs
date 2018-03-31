@@ -465,7 +465,10 @@ fn find_collision_tree_ray_(
             (Some(r1), Some(r2)) => Some(if r1.0 < r2.0 { r1 } else { r2 }),
         }
     } else {
-        Some((tmin, [pos[0] + tmin * dir[0], pos[1] + tmin * dir[1]]))
+        Some((
+            tmin,
+            [pos[0] + tmin * dir[0], pos[1] + tmin * dir[1]],
+        ))
     }
 }
 
@@ -563,8 +566,10 @@ fn handle_collision<'a>(
 
         // Update velocity
         let vel = velocity.get_mut(ent).unwrap();
-        vel.vel =
-            vec2_add(vel.vel, vec2_scale(hit.direction, impulse / blk.mass));
+        vel.vel = vec2_add(
+            vel.vel,
+            vec2_scale(hit.direction, impulse / blk.mass),
+        );
         vel.rot += impulse
             * (rap[0] * hit.direction[1] - rap[1] * hit.direction[0])
             / blk.inertia;

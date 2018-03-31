@@ -45,7 +45,8 @@ impl BlockInner {
     ) {
         match *self {
             BlockInner::PlasmaGun {
-                ref mut cooldown, ..
+                ref mut cooldown,
+                ..
             } => {
                 if *cooldown > 0.0 {
                     *cooldown -= dt;
@@ -166,7 +167,11 @@ impl Blocky {
     /// pieces.
     pub fn maintain(
         &mut self,
-    ) -> (Vec<([f64; 2], Block)>, [f64; 2], Vec<(Blocky, [f64; 2])>) {
+    ) -> (
+        Vec<([f64; 2], Block)>,
+        [f64; 2],
+        Vec<(Blocky, [f64; 2])>,
+    ) {
         // Drop blocks with no health
         let mut i = 0;
         let mut dead_blocks = Vec::new();
@@ -186,8 +191,9 @@ impl Blocky {
         }
 
         // Compute adjacency of blocks
-        let mut blocks =
-            (0..self.blocks.len()).into_iter().collect::<Vec<usize>>();
+        let mut blocks = (0..self.blocks.len())
+            .into_iter()
+            .collect::<Vec<usize>>();
         for (mut i, &(loc, _)) in self.blocks.iter().enumerate() {
             for v in &[[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]] {
                 let pos = vec2_add(loc, *v);
