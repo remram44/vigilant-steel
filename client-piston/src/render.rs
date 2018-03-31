@@ -1,9 +1,9 @@
 //! Rendering code, using Piston.
 
 use game::blocks::{Block, BlockInner, Blocky};
+use game::guns::{Projectile, ProjectileType};
 use game::particles::{Particle, ParticleType};
 use game::physics::{LocalControl, Position};
-use game::ship::{Projectile, ProjectileType};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use graphics::{self, Context, Graphics, Transformed};

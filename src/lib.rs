@@ -21,6 +21,7 @@ extern crate vecmath;
 
 pub mod asteroid;
 pub mod blocks;
+pub mod guns;
 pub mod input;
 #[cfg(feature = "network")]
 pub mod net;
@@ -33,11 +34,12 @@ pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};
 use blocks::Blocky;
+use guns::{Projectile, SysProjectile};
 use input::Input;
 use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
-use ship::{Projectile, Ship, SysProjectile, SysShip};
+use ship::{Ship, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World};
 use std::collections::HashMap;
 #[cfg(feature = "network")]

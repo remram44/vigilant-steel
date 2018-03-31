@@ -2,9 +2,10 @@
 
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
+use guns::{Projectile, ProjectileType};
 use particles::Effect;
 use physics::{LocalControl, Position, Velocity};
-use ship::{Projectile, ProjectileType, Ship};
+use ship::Ship;
 use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
