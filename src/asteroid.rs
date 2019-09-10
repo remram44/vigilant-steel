@@ -9,7 +9,7 @@ use blocks::{Block, BlockInner, Blocky};
 #[cfg(feature = "network")]
 use net;
 use physics::{delete_entity, Position, Velocity};
-use rand::{self, Rng};
+use rand::prelude::*;
 use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
 use std::f64::consts::PI;
@@ -60,12 +60,12 @@ impl<'a> System<'a> for SysAsteroid {
         if count < 60 {
             // Choose position
             let mut rng = rand::thread_rng();
-            let &(xpos, ypos) = rng.choose(&[
+            let &(xpos, ypos) = [
                 (-1.0, 0.0), // left
                 (1.0, 0.0),  // right
                 (0.0, -1.0), // bottom
                 (0.0, 1.0),  // top
-            ]).unwrap();
+            ].choose(&mut rng).unwrap();
             // Generate blocks in an ellipse
             let mut blocks = Vec::new();
             let a = rng.gen_range(3.0, 4.0);

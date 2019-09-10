@@ -8,4 +8,4 @@ description = "Simple log output with colors"
 
 [dependencies]
 log = { version = "0.4", features = ["std"] }
-termcolor = "0.3"
+termcolor = "1.0"

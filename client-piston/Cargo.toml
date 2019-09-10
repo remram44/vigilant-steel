@@ -18,9 +18,9 @@ game = { path = ".." }
 color-logger = { path = "../color-logger" }
 
 log = "0.4"
-rand = "0.4"
+rand = "0.7"
 specs = "0.10"
-vecmath = "0.3"
+vecmath = "1.0"
 
 # Abstract graphics
 conrod = { version = "0.56", features = ["piston"] }
