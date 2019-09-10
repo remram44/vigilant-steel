@@ -54,7 +54,7 @@ fn main() {
     // Create an SDL2 window.
     let window: Sdl2Window =
         WindowSettings::new("vigilant-engine", [width, height])
-            .opengl(OPENGL)
+            .graphics_api(OPENGL)
             .srgb(false)
             .resizable(true)
             .build()
@@ -121,9 +121,9 @@ fn handle_event(
     app: &mut App,
 ) -> bool {
     // Window resize
-    if let Some(newsize) = event.resize_args() {
+    if let Some(resize) = event.resize_args() {
         let mut viewport = app.game.world.write_resource::<Viewport>();
-        *viewport = Viewport::new(newsize);
+        *viewport = Viewport::new(resize.draw_size);
     }
 
     // Keyboard input and buttons
