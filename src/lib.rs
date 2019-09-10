@@ -263,7 +263,7 @@ impl Game {
                 (stringify!($x), {
                     let s = self.world.read_component::<$x>();
                     Box::new(move |e| s.get(e).is_some())
-                        as Box<Fn(Entity) -> bool>
+                        as Box<dyn Fn(Entity) -> bool>
                 })
             };
         }

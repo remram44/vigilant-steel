@@ -242,7 +242,7 @@ fn handle_event(
         {
             let world = &mut app.game.world;
             let glyph_cache = &mut app.glyph_cache;
-            let mut camera = &mut app.camera;
+            let camera = &mut app.camera;
             app.gl.draw(r.viewport(), |c, g| {
                 render::render(c, g, glyph_cache, world, camera);
             });

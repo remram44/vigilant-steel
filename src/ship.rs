@@ -207,7 +207,7 @@ impl<'a> System<'a> for SysShip {
 
         if role.authoritative() {
             // Handle collisions
-            for (ent, mut pos, mut blk, hits) in
+            for (ent, mut pos, blk, hits) in
                 (&*entities, &mut pos, &mut blocky, &hits).join()
             {
                 let (s, c) = pos.rot.sin_cos();
@@ -369,7 +369,7 @@ impl<'a> System<'a> for SysShip {
             lazy.insert(ent, net::Dirty);
         }
 
-        for (ent, pos, mut vel, mut ship, mut blocky) in (
+        for (ent, pos, mut vel, mut ship, blocky) in (
             &*entities,
             &pos,
             &mut vel,
@@ -427,7 +427,7 @@ impl<'a> System<'a> for SysShip {
 
             // Spawn Exhaust particles
             if role.graphical() {
-                let mut spawn_thrust_exhaust = |idx, thrust| {
+                let spawn_thrust_exhaust = |idx, thrust| {
                     let &(rel, ref block): &(
                         [f64; 2],
                         Block,
@@ -509,7 +509,12 @@ impl<'a> System<'a> for SysShip {
                         } => (angle, cooldown),
                         _ => continue,
                     };
-                    if ship.want_fire && *cooldown <= 0.0 {
+                    if *cooldown > 0.0 {
+                        *cooldown -= dt;
+                        continue;
+                    }
+                    let cooldown = *cooldown;
+                    if ship.want_fire && cooldown <= 0.0 {
                         let fire_dir = {
                             let (fs, fc) = (pos.rot + angle).sin_cos();
                             [fc, fs]
@@ -519,7 +524,10 @@ impl<'a> System<'a> for SysShip {
                             [rel[0] * c - rel[1] * s, rel[0] * s + rel[1] * c],
                         );
                         match block.inner {
-                            BlockInner::PlasmaGun { .. } => {
+                            BlockInner::PlasmaGun {
+                                ref mut cooldown,
+                                ..
+                            } => {
                                 let fire_dir_loc = {
                                     let (ps, pc) = angle.sin_cos();
                                     [pc, ps]
@@ -549,7 +557,10 @@ impl<'a> System<'a> for SysShip {
                                 );
                                 *cooldown = rng.gen_range(0.3, 0.4);
                             }
-                            BlockInner::RailGun { .. } => {
+                            BlockInner::RailGun {
+                                ref mut cooldown,
+                                ..
+                            } => {
                                 Projectile::create(
                                     &entities,
                                     &lazy,
@@ -571,8 +582,6 @@ impl<'a> System<'a> for SysShip {
                             vec2_scale(fire_dir, -10.0 / mass),
                         );
                         fired = true;
-                    } else if *cooldown > 0.0 {
-                        *cooldown -= dt;
                     }
                 }
                 #[cfg(feature = "network")]
