@@ -8,7 +8,7 @@
 //! * `lib.rs`: this file. Contains the `Game` structure, and the constructors
 //! that initialize the game.
 //! * `physics.rs`: base components and logic for the physic simulation:
-//! `Position`, `Velocity`, `Hits`... Integrates positions, finds collisions.
+//! `Position`, `Velocity`, `Hit`... Integrates positions, finds collisions.
 //! * `asteroid.rs`: system spawning asteroids, deleting them when they fall
 //! off.
 
@@ -16,6 +16,7 @@ extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate rand;
+extern crate shrev;
 extern crate specs;
 extern crate vecmath;
 
@@ -153,7 +154,6 @@ impl Game {
         world.register::<Velocity>();
         world.register::<Blocky>();
         world.register::<DetectCollision>();
-        world.register::<Hits>();
         world.register::<LocalControl>();
         world.register::<Ship>();
         world.register::<Projectile>();
@@ -164,13 +164,13 @@ impl Game {
         {
             world.register::<net::Replicated>();
             world.register::<net::Dirty>();
-            world.register::<net::Delete>();
             world.register::<net::ClientControlled>();
         }
 
         world.insert::<DeltaTime>(Default::default());
         world.insert::<Clock>(Default::default());
         world.insert::<Input>(Default::default());
+        world.insert::<Hits>(Default::default());
         world.insert(role);
 
         let dispatcher = if role.authoritative() {
@@ -272,7 +272,6 @@ impl Game {
             component_check!(Velocity),
             component_check!(Blocky),
             component_check!(DetectCollision),
-            component_check!(Hits),
             component_check!(LocalControl),
             component_check!(Ship),
             component_check!(Projectile),

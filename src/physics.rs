@@ -7,10 +7,10 @@ use Role;
 use blocks::Blocky;
 #[cfg(feature = "network")]
 use net;
+use shrev::EventChannel;
 use sat;
-use specs::{Component, Entities, Entity, Read, HashMapStorage, Join,
-            LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
-            WriteStorage};
+use specs::{Component, Entities, Entity, Read, Join, LazyUpdate, NullStorage,
+            ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
 use std::ops::Deref;
 use tree;
@@ -139,47 +139,14 @@ pub enum HitEffect {
 
 /// A single collision, stored in the Hits component.
 pub struct Hit {
+     pub entity: Entity,
     /// Location of the hit, in this entity's coordinate system.
     pub rel_location: [f64; 2],
     pub effect: HitEffect,
 }
 
 /// Collision information: this flags an entity as having collided.
-pub struct Hits {
-    hits_vec: Vec<Hit>,
-}
-
-impl Hits {
-    /// Record a `Hit`, possibly creating a new `Hits` component.
-    pub fn record<'a>(
-        hits: &mut WriteStorage<'a, Hits>,
-        ent: Entity,
-        hit: Hit,
-    ) {
-        if let Some(hits) = hits.get_mut(ent) {
-            hits.hits_vec.push(hit);
-            return;
-        }
-        hits.insert(
-            ent,
-            Hits {
-                hits_vec: vec![hit],
-            },
-        ).unwrap();
-    }
-}
-
-impl Component for Hits {
-    type Storage = HashMapStorage<Self>;
-}
-
-impl Deref for Hits {
-    type Target = [Hit];
-
-    fn deref(&self) -> &[Hit] {
-        &self.hits_vec
-    }
-}
+pub type Hits = EventChannel<Hit>;
 
 /// Marks that this entity is controlled by the local player.
 #[derive(Default)]
