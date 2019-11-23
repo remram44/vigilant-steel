@@ -329,7 +329,7 @@ mod event_loop {
             handler(window, e, arg);
 
             while let Some(e) = window.poll_event() {
-                handler(window, Event::Input(e), arg);
+                handler(window, e, arg);
             }
 
             if window.should_close() {
@@ -348,10 +348,8 @@ mod event_loop {
             let draw_size = window.draw_size();
             let e = Event::Loop(Loop::Render(RenderArgs {
                 ext_dt: dt,
-                width: size.width,
-                height: size.height,
-                draw_width: draw_size.width,
-                draw_height: draw_size.height,
+                window_size: [size.width, size.height],
+                draw_size: [draw_size.width as u32, draw_size.height as u32],
             }));
             handler(window, e, arg);
         }
