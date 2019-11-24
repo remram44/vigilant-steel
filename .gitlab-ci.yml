@@ -4,12 +4,11 @@ stages:
 
 build_game:
   stage: build
-  image: remram/emscripten-rust-sdl
+  image: remram/rust-cargo-web
   script:
     - cargo build
     - cargo test
-    - cargo bench
-    - (cd client-piston && EMMAKEN_CFLAGS='-s USE_SDL=2 --preload-file assets' cargo build --release --target=asmjs-unknown-emscripten --no-default-features)
+    - (cd client-piston && cargo web build --release)
     - mkdir output &&
       cp target/asmjs-unknown-emscripten/release/client.js output/ &&
       cp target/asmjs-unknown-emscripten/release/deps/client-*.data output/ &&
