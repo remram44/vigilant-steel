@@ -63,8 +63,8 @@ fn main() {
     let gl = GlGraphics::new(OPENGL);
     info!("OpenGL initialized");
 
-    let glyph_cache = GlyphCache::new(
-        "assets/FiraSans-Regular.ttf",
+    let glyph_cache = GlyphCache::from_bytes(
+        include_bytes!("../../assets/FiraSans-Regular.ttf"),
         (),
         TextureSettings::new(),
     ).unwrap();
