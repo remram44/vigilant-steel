@@ -32,9 +32,6 @@ piston2d-opengl_graphics = "0.69"
 pistoncore-sdl2_window = "0.63"
 sdl2 = "0.32"
 
-[target.'cfg(target_os = "emscripten")'.dependencies]
-emscripten-sys = "0.3"
-
 [features]
 default = ["sdl2/use_mac_framework", "network"]
 use_sdl2_mac_framework = ["sdl2/use_mac_framework"]

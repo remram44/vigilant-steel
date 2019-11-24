@@ -255,7 +255,6 @@ fn handle_event(
 }
 
 /// Event loop, factored out for SDL and Emscripten support.
-#[cfg(not(target_os = "emscripten"))]
 mod event_loop {
     use piston::event_loop::{EventSettings, Events};
     use piston::input::Event;
@@ -271,86 +270,6 @@ mod event_loop {
             if !handler(&mut window, e, &mut arg) {
                 break;
             }
-        }
-    }
-}
-
-/// Event loop, factored out for SDL and Emscripten support.
-#[cfg(target_os = "emscripten")]
-mod event_loop {
-    extern crate emscripten_sys;
-
-    use piston::input::{AfterRenderArgs, Event, Loop, RenderArgs, UpdateArgs};
-    use piston::window::Window;
-    use sdl2_window::Sdl2Window;
-    use std::mem;
-    use std::os::raw::c_void;
-
-    struct EventLoop<T> {
-        last_updated: f64,
-        window: Sdl2Window,
-        handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
-        arg: T,
-    }
-
-    pub fn run<T>(
-        window: Sdl2Window,
-        handler: fn(&mut Sdl2Window, Event, &mut T) -> bool,
-        arg: T,
-    ) {
-        unsafe {
-            let mut events = Box::new(EventLoop {
-                last_updated: emscripten_sys::emscripten_get_now() as f64,
-                window: window,
-                handler: handler,
-                arg: arg,
-            });
-            let events_ptr = &mut *events as *mut EventLoop<_> as *mut c_void;
-            emscripten_sys::emscripten_set_main_loop_arg(
-                Some(main_loop_c::<T>),
-                events_ptr,
-                0,
-                1,
-            );
-            mem::forget(events);
-        }
-    }
-
-    extern "C" fn main_loop_c<T>(arg: *mut c_void) {
-        unsafe {
-            let events: &mut EventLoop<T> = mem::transmute(arg);
-            let window = &mut events.window;
-            let handler = events.handler;
-            let arg = &mut events.arg;
-            window.swap_buffers();
-
-            let e = Event::Loop(Loop::AfterRender(AfterRenderArgs));
-            handler(window, e, arg);
-
-            while let Some(e) = window.poll_event() {
-                handler(window, e, arg);
-            }
-
-            if window.should_close() {
-                emscripten_sys::emscripten_cancel_main_loop();
-                return;
-            }
-
-            let now = emscripten_sys::emscripten_get_now() as f64;
-            let dt = (now - events.last_updated) / 1000.0;
-            events.last_updated = now;
-
-            let e = Event::Loop(Loop::Update(UpdateArgs { dt: dt }));
-            handler(window, e, arg);
-
-            let size = window.size();
-            let draw_size = window.draw_size();
-            let e = Event::Loop(Loop::Render(RenderArgs {
-                ext_dt: dt,
-                window_size: [size.width, size.height],
-                draw_size: [draw_size.width as u32, draw_size.height as u32],
-            }));
-            handler(window, e, arg);
         }
     }
 }
