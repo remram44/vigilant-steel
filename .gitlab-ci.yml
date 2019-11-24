@@ -8,11 +8,8 @@ build_game:
   script:
     - cargo build
     - cargo test
-    - (cd client-piston && cargo web build --release)
-    - mkdir output &&
-      cp target/asmjs-unknown-emscripten/release/client.js output/ &&
-      cp target/asmjs-unknown-emscripten/release/deps/client-*.data output/ &&
-      sed 's/"target\/asmjs-unknown-emscripten\/release\/client.js"/"client.js?'$(git rev-parse HEAD)'"/' <index.html >output/index.html
+    - (cd client-piston && cargo web deploy --release)
+    - cp -r target/deploy output
   artifacts:
     paths:
       - output
