@@ -7,7 +7,7 @@ use game::physics::{LocalControl, Position};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use graphics::{self, Context, Graphics, Transformed};
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::prelude::*;
 use specs::{Join, World, WorldExt};
 use std::fmt::Debug;
 use vecmath::*;
@@ -137,13 +137,8 @@ fn draw_background_layer<G: graphics::Graphics>(
 
     for x in xmin..xmax {
         for y in ymin..ymax {
-            let seed = (seed * (1 + 2 * x + 1024 * y)) as u32;
-            let mut rng = XorShiftRng::from_seed([
-                seed,
-                seed >> 8,
-                seed >> 16,
-                seed >> 24,
-            ]);
+            let seed = (seed * (1 + 2 * x + 1024 * y)) as u64;
+            let mut rng = StdRng::seed_from_u64(seed);
             let tr = tr.trans(
                 x as f64 * 50.0 - xpos + xpos / speed,
                 y as f64 * 50.0 - ypos + ypos / speed,

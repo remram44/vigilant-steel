@@ -18,7 +18,7 @@ game = { path = ".." }
 color-logger = { path = "../color-logger" }
 
 log = "0.4"
-rand = "0.4"
+rand = "0.7"
 specs = "0.15"
 vecmath = "1.0"
 
