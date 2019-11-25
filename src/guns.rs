@@ -7,7 +7,7 @@ use net;
 use particles::{Effect, EffectInner};
 use physics::{affect_area, delete_entity, AABox, DetectCollision, HitEffect,
               Hits, Position, Velocity};
-use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
 
@@ -61,7 +61,7 @@ pub struct Projectile {
 impl Projectile {
     pub fn create(
         entities: &Entities,
-        lazy: &Read<LazyUpdate>,
+        lazy: &Fetch<LazyUpdate>,
         pos: [f64; 2],
         rot: f64,
         kind: ProjectileType,
@@ -113,8 +113,8 @@ pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
-        Read<'a, Role>,
-        Read<'a, LazyUpdate>,
+        Fetch<'a, Role>,
+        Fetch<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Hits>,
         ReadStorage<'a, Position>,

@@ -6,7 +6,7 @@ use guns::{Projectile, ProjectileType};
 use particles::Effect;
 use physics::{LocalControl, Position, Velocity};
 use ship::Ship;
-use specs::{Component, Entities, Read, HashMapStorage, Join, LazyUpdate,
+use specs::{Component, Entities, Fetch, HashMapStorage, Join, LazyUpdate,
             NullStorage, ReadStorage, System, VecStorage, WriteStorage};
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Cursor, Write};
@@ -286,7 +286,7 @@ impl SysNetServer {
 
 impl<'a> System<'a> for SysNetServer {
     type SystemData = (
-        Read<'a, LazyUpdate>,
+        Fetch<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, ClientControlled>,
         WriteStorage<'a, Replicated>,
@@ -607,7 +607,7 @@ impl SysNetClient {
 impl<'a> System<'a> for SysNetClient {
     type SystemData = (
         Entities<'a>,
-        Read<'a, LazyUpdate>,
+        Fetch<'a, LazyUpdate>,
         ReadStorage<'a, Replicated>,
         WriteStorage<'a, Dirty>,
         WriteStorage<'a, Position>,

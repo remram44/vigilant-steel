@@ -40,8 +40,7 @@ use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Ship, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World,
-            WorldExt};
+use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World};
 use std::collections::HashMap;
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
@@ -56,12 +55,6 @@ pub enum Role {
     Standalone,
     Server,
     Client,
-}
-
-impl Default for Role {
-    fn default() -> Role {
-        Role::Standalone
-    }
 }
 
 impl Role {
@@ -106,12 +99,17 @@ impl Role {
 /// This is used to trigger and time things around the game. It wraps so as to
 /// preserve resolution, be aware of it when doing computations (or use
 /// `seconds_since()`).
-#[derive(Default)]
 pub struct Clock {
     time_wrapping: f64,
 }
 
 impl Clock {
+    fn new() -> Clock {
+        Clock {
+            time_wrapping: 0.0,
+        }
+    }
+
     /// Called by `Game` to move to the next frame.
     fn advance_frame(&mut self, dt: f64) {
         self.time_wrapping += dt;
@@ -168,28 +166,28 @@ impl Game {
             world.register::<net::ClientControlled>();
         }
 
-        world.insert::<DeltaTime>(Default::default());
-        world.insert::<Clock>(Default::default());
-        world.insert::<Input>(Default::default());
-        world.insert(role);
+        world.add_resource(DeltaTime(0.0));
+        world.add_resource(Clock::new());
+        world.add_resource(Input::new());
+        world.add_resource(role);
 
         let dispatcher = if role.authoritative() {
             DispatcherBuilder::new()
-                .with(SysSimu, "simu", &[])
-                .with(SysProjectile, "projectile", &[])
-                .with(SysAsteroid, "asteroid", &[])
-                .with(SysShip, "ship", &[])
-                .with(SysParticles, "particles", &[])
-                .with(
+                .add(SysSimu, "simu", &[])
+                .add(SysProjectile, "projectile", &[])
+                .add(SysAsteroid, "asteroid", &[])
+                .add(SysShip, "ship", &[])
+                .add(SysParticles, "particles", &[])
+                .add(
                     SysCollision,
                     "collision",
                     &["projectile", "asteroid", "ship"],
                 )
         } else {
             DispatcherBuilder::new()
-                .with(SysSimu, "simu", &[])
-                .with(SysShip, "ship", &[])
-                .with(SysParticles, "particles", &[])
+                .add(SysSimu, "simu", &[])
+                .add(SysShip, "ship", &[])
+                .add(SysParticles, "particles", &[])
         };
 
         (world, dispatcher)
@@ -200,11 +198,11 @@ impl Game {
 
         let ship = Ship::create(
             &world.entities(),
-            &world.read_resource::<LazyUpdate>().into(),
+            &world.read_resource::<LazyUpdate>(),
         );
         world
-            .write_component::<LocalControl>()
-            .insert(ship, LocalControl).unwrap();
+            .write::<LocalControl>()
+            .insert(ship, LocalControl);
 
         Game {
             world: world,
@@ -217,7 +215,7 @@ impl Game {
         let (world, mut dispatcher) = Self::new_common(Role::Server);
 
         dispatcher =
-            dispatcher.with(net::SysNetServer::new(port), "netserver", &[]);
+            dispatcher.add(net::SysNetServer::new(port), "netserver", &[]);
 
         Game {
             world: world,
@@ -229,7 +227,7 @@ impl Game {
     pub fn new_client(address: SocketAddr) -> Game {
         let (world, mut dispatcher) = Self::new_common(Role::Client);
 
-        dispatcher = dispatcher.with(
+        dispatcher = dispatcher.add(
             net::SysNetClient::new(address),
             "netclient",
             &[],
@@ -249,7 +247,7 @@ impl Game {
             let mut r_clock = self.world.write_resource::<Clock>();
             r_clock.advance_frame(dt);
         }
-        self.dispatcher.dispatch(&self.world);
+        self.dispatcher.dispatch(&self.world.res);
         self.world.maintain();
 
         let mut input = self.world.write_resource::<Input>();
@@ -261,7 +259,7 @@ impl Game {
         macro_rules! component_check {
             ($x:ident) => {
                 (stringify!($x), {
-                    let s = self.world.read_component::<$x>();
+                    let s = self.world.read::<$x>();
                     Box::new(move |e| s.get(e).is_some())
                         as Box<dyn Fn(Entity) -> bool>
                 })

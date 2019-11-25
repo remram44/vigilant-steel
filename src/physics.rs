@@ -8,7 +8,7 @@ use blocks::Blocky;
 #[cfg(feature = "network")]
 use net;
 use sat;
-use specs::{Component, Entities, Entity, Read, HashMapStorage, Join,
+use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
 use std::f64::consts::PI;
@@ -72,7 +72,7 @@ impl AABox {
 pub fn delete_entity(
     role: Role,
     entities: &Entities,
-    lazy: &Read<LazyUpdate>,
+    lazy: &Fetch<LazyUpdate>,
     entity: Entity,
 ) {
     #[cfg(feature = "network")]
@@ -165,7 +165,7 @@ impl Hits {
             Hits {
                 hits_vec: vec![hit],
             },
-        ).unwrap();
+        );
     }
 }
 
@@ -190,7 +190,6 @@ impl Component for LocalControl {
 }
 
 /// Delta resource, stores the simulation step.
-#[derive(Default)]
 pub struct DeltaTime(pub f64);
 
 /// Simulation system, updates positions from velocities.
@@ -198,7 +197,7 @@ pub struct SysSimu;
 
 impl<'a> System<'a> for SysSimu {
     type SystemData = (
-        Read<'a, DeltaTime>,
+        Fetch<'a, DeltaTime>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
     );
@@ -218,8 +217,8 @@ pub struct SysCollision;
 
 impl<'a> System<'a> for SysCollision {
     type SystemData = (
-        Read<'a, Role>,
-        Read<'a, LazyUpdate>,
+        Fetch<'a, Role>,
+        Fetch<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -516,7 +515,7 @@ fn handle_collision<'a>(
     blocky: &ReadStorage<'a, Blocky>,
     hits: &mut WriteStorage<'a, Hits>,
     hit: &sat::Collision,
-    lazy: &Read<'a, LazyUpdate>,
+    lazy: &Fetch<'a, LazyUpdate>,
 ) {
     let blk = blocky.get(ent).unwrap();
     let o_blk = blocky.get(o_ent).unwrap();
