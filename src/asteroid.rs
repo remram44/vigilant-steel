@@ -10,7 +10,7 @@ use blocks::{Block, BlockInner, Blocky};
 use net;
 use physics::{delete_entity, Position, Velocity};
 use rand::prelude::*;
-use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
+use specs::{Component, Entities, Read, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
 use std::f64::consts::PI;
 
@@ -30,8 +30,8 @@ pub struct SysAsteroid;
 
 impl<'a> System<'a> for SysAsteroid {
     type SystemData = (
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Asteroid>,
