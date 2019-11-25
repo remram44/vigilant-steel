@@ -20,12 +20,6 @@ pub enum Press {
     KEPT,
 }
 
-impl Default for Press {
-    fn default() -> Press {
-        Press::UP
-    }
-}
-
 impl Press {
     fn update(&mut self) {
         if let Press::PRESSED = *self {
@@ -35,7 +29,6 @@ impl Press {
 }
 
 /// Input resource, stores the local user's controls.
-#[derive(Default)]
 pub struct Input {
     pub movement: [f64; 2],
     pub rotation: f64,
@@ -45,6 +38,16 @@ pub struct Input {
 }
 
 impl Input {
+    pub fn new() -> Input {
+        Input {
+            movement: [0.0, 0.0],
+            rotation: 0.0,
+            fire: Press::UP,
+            mouse: [0.0; 2],
+            buttons: [Press::UP; 3],
+        }
+    }
+
     /// Update status of keys, called once per frame.
     pub fn update(&mut self) {
         self.fire.update();

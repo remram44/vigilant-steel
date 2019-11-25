@@ -11,7 +11,7 @@
 //! functionality is factored in `SysShip` right now.
 // TODO: Refactor some blocky behavior out of SysShip, into a blocky system?
 
-use specs::{Component, Entities, Read, LazyUpdate, VecStorage};
+use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
 use tree::Tree;
 use vecmath::*;
 
@@ -41,7 +41,7 @@ impl BlockInner {
         &mut self,
         dt: f64,
         _entities: &Entities,
-        _lazy: &Read<LazyUpdate>,
+        _lazy: &Fetch<LazyUpdate>,
     ) {
         match *self {
             BlockInner::PlasmaGun {
