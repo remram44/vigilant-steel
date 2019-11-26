@@ -456,7 +456,7 @@ impl<'a> System<'a> for SysShip {
                             p,
                             Position {
                                 pos: thrust_pos,
-                                rot: 0.0,
+                                rot: pos.rot + angle,
                             },
                         );
                         lazy.insert(
