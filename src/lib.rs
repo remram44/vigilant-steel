@@ -40,8 +40,7 @@ use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Ship, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World,
-            WorldExt};
+use specs::{Dispatcher, DispatcherBuilder, Entity, Join, LazyUpdate, World};
 use std::collections::HashMap;
 #[cfg(feature = "network")]
 use std::net::SocketAddr;
@@ -168,10 +167,10 @@ impl Game {
             world.register::<net::ClientControlled>();
         }
 
-        world.insert::<DeltaTime>(Default::default());
-        world.insert::<Clock>(Default::default());
-        world.insert::<Input>(Default::default());
-        world.insert(role);
+        world.add_resource::<DeltaTime>(Default::default());
+        world.add_resource::<Clock>(Default::default());
+        world.add_resource::<Input>(Default::default());
+        world.add_resource(role);
 
         let dispatcher = if role.authoritative() {
             DispatcherBuilder::new()
@@ -203,7 +202,7 @@ impl Game {
             &world.read_resource::<LazyUpdate>().into(),
         );
         world
-            .write_component::<LocalControl>()
+            .write_storage::<LocalControl>()
             .insert(ship, LocalControl).unwrap();
 
         Game {
@@ -249,7 +248,7 @@ impl Game {
             let mut r_clock = self.world.write_resource::<Clock>();
             r_clock.advance_frame(dt);
         }
-        self.dispatcher.dispatch(&self.world);
+        self.dispatcher.dispatch(&self.world.res);
         self.world.maintain();
 
         let mut input = self.world.write_resource::<Input>();
@@ -261,7 +260,7 @@ impl Game {
         macro_rules! component_check {
             ($x:ident) => {
                 (stringify!($x), {
-                    let s = self.world.read_component::<$x>();
+                    let s = self.world.read_storage::<$x>();
                     Box::new(move |e| s.get(e).is_some())
                         as Box<dyn Fn(Entity) -> bool>
                 })
