@@ -7,6 +7,8 @@ use game::physics::{LocalControl, Position};
 use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use graphics::{self, Context, Graphics, Transformed};
+#[cfg(not(target_os = "emscripten"))]
+use graphics::color::gamma_srgb_to_linear;
 use rand::prelude::*;
 use specs::{Join, World};
 use std::fmt::Debug;
@@ -14,6 +16,17 @@ use vecmath::*;
 
 const MAX_RATIO: f64 = 1.6;
 const VIEWPORT_SIZE: f64 = 80.0;
+
+fn color(c: [f32; 4]) -> [f32; 4] {
+    #[cfg(not(target_os = "emscripten"))]
+    {
+        gamma_srgb_to_linear(c)
+    }
+    #[cfg(target_os = "emscripten")]
+    {
+        c
+    }
+}
 
 pub struct Viewport {
     pub width: u32,
@@ -92,7 +105,7 @@ fn draw_background<G: graphics::Graphics>(
         pos[1],
         viewport,
         0.6,
-        [1.0, 1.0, 1.0, 0.4],
+        color([1.0, 1.0, 1.0, 0.4]),
         50,
         2,
         tr,
@@ -105,7 +118,7 @@ fn draw_background<G: graphics::Graphics>(
         pos[1],
         viewport,
         0.4,
-        [1.0, 1.0, 1.0, 0.05],
+        color([1.0, 1.0, 1.0, 0.05]),
         30,
         3,
         tr,
@@ -165,7 +178,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
     match block.inner {
         BlockInner::Cockpit => {
             draw_line_loop(
-                [1.0, 0.0, 0.0, 1.0],
+                color([1.0, 0.0, 0.0, 1.0]),
                 0.05,
                 &[
                     [-0.45, -0.45],
@@ -177,7 +190,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
                 g,
             );
             draw_line_loop(
-                [1.0, 0.0, 0.0, 1.0],
+                color([1.0, 0.0, 0.0, 1.0]),
                 0.02,
                 &[[-0.2, -0.3], [0.2, 0.0], [-0.2, 0.3]],
                 tr,
@@ -186,7 +199,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         }
         BlockInner::Thruster { angle } => for i in &[-0.4, 0.0] {
             graphics::polygon(
-                [0.4, 0.4, 0.4, 1.0],
+                color([0.8, 0.8, 0.8, 1.0]),
                 &[
                     [0.45, 0.25],
                     [0.05, 0.45],
@@ -199,7 +212,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         },
         BlockInner::PlasmaGun { angle, .. } => {
             draw_line_loop(
-                [0.7, 0.7, 1.0, 1.0],
+                color([0.8, 0.8, 1.0, 1.0]),
                 0.05,
                 &[
                     [-0.35, -0.35],
@@ -215,7 +228,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
                 g,
             );
             graphics::rectangle(
-                [0.7, 0.7, 1.0, 1.0],
+                color([0.8, 0.8, 1.0, 1.0]),
                 [0.0, -0.15, 0.6, 0.3],
                 tr.rot_rad(angle),
                 g,
@@ -223,7 +236,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         }
         BlockInner::RailGun { angle, .. } => {
             draw_line_loop(
-                [0.7, 0.7, 1.0, 1.0],
+                color([0.8, 0.8, 1.0, 1.0]),
                 0.05,
                 &[
                     [-0.35, -0.35],
@@ -239,7 +252,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
                 g,
             );
             graphics::rectangle(
-                [0.7, 0.7, 1.0, 1.0],
+                color([0.8, 0.8, 1.0, 1.0]),
                 [-0.25, -0.25, 0.85, 0.5],
                 tr.rot_rad(angle),
                 g,
@@ -247,7 +260,7 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         }
         BlockInner::Armor => {
             draw_line_loop(
-                [0.7, 0.7, 0.7, 1.0],
+                color([0.8, 0.8, 0.8, 1.0]),
                 0.05,
                 &[
                     [-0.45, -0.45],
@@ -261,13 +274,13 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
         }
         BlockInner::Rock => {
             graphics::rectangle(
-                [0.55, 0.39, 0.30, 1.0],
+                color([0.8, 0.7, 0.6, 1.0]),
                 [-0.45, -0.45, 0.9, 0.9],
                 tr,
                 g,
             );
             draw_line_loop(
-                [0.45, 0.45, 0.45, 1.0],
+                color([0.9, 0.9, 0.9, 1.0]),
                 0.05,
                 &[
                     [-0.45, -0.45],
@@ -300,7 +313,7 @@ pub fn render<G, C, E>(
     let blocky = world.read::<Blocky>();
     let local = world.read::<LocalControl>();
 
-    graphics::clear([0.0, 0.0, 0.1, 1.0], g);
+    graphics::clear(color([0.0, 0.0, 0.3, 1.0]), g);
 
     let tr = context
         .transform
@@ -326,7 +339,7 @@ pub fn render<G, C, E>(
 
     // Bounds
     draw_line_loop(
-        [0.8, 0.8, 0.8, 1.0],
+        color([0.9, 0.9, 0.9, 1.0]),
         5.0,
         &[
             [-105.0, -105.0],
@@ -360,7 +373,7 @@ pub fn render<G, C, E>(
         match proj.kind {
             ProjectileType::Plasma => {
                 graphics::line(
-                    [0.0, 1.0, 0.0, 1.0],
+                    color([0.0, 1.0, 0.0, 1.0]),
                     0.1,
                     [-0.8, 0.0, 0.8, 0.0],
                     projectile_tr,
@@ -369,7 +382,7 @@ pub fn render<G, C, E>(
             }
             ProjectileType::Rail => {
                 graphics::line(
-                    [1.0, 1.0, 1.0, 1.0],
+                    color([1.0, 1.0, 1.0, 1.0]),
                     0.6,
                     [-0.8, 0.0, 0.8, 0.0],
                     projectile_tr,
@@ -389,19 +402,19 @@ pub fn render<G, C, E>(
             ParticleType::Spark => {
                 let alpha = (particle.lifetime as f32) / 0.2;
                 graphics::rectangle(
-                    [1.0, 1.0, 1.0, alpha],
+                    color([1.0, 1.0, 1.0, alpha]),
                     graphics::rectangle::centered([0.0, 0.0, 0.05, 0.05]),
                     part_tr,
                     g,
                 );
             }
             ParticleType::Exhaust => graphics::rectangle(
-                [
+                color([
                     1.0,
                     1.0,
                     1.0,
                     (particle.lifetime as f32).min(0.5),
-                ],
+                ]),
                 graphics::rectangle::centered([0.0, 0.0, 0.3, 0.3]),
                 part_tr,
                 g,
@@ -409,7 +422,7 @@ pub fn render<G, C, E>(
             ParticleType::Explosion => {
                 let alpha = (particle.lifetime as f32 * 1.6).min(0.8);
                 graphics::rectangle(
-                    [1.0, particle.lifetime as f32 / 0.6, 0.0, alpha],
+                    color([1.0, particle.lifetime as f32 / 0.6, 0.0, alpha]),
                     graphics::rectangle::centered([0.0, 0.0, 1.2, 1.2]),
                     part_tr,
                     g,
@@ -419,7 +432,7 @@ pub fn render<G, C, E>(
                 let alpha = (particle.lifetime as f32 * 4.0).min(0.6);
                 let size = (0.2 - particle.lifetime) * 15.0;
                 graphics::ellipse(
-                    [0.0, 1.0, 0.0, alpha],
+                    color([0.0, 1.0, 0.0, alpha]),
                     graphics::rectangle::centered([0.0, 0.0, size, size]),
                     part_tr,
                     g,
