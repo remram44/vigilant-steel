@@ -214,14 +214,9 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
                 tr,
                 g,
             );
-            graphics::polygon(
+            graphics::rectangle(
                 [0.7, 0.7, 1.0, 1.0],
-                &[
-                    [-0.0, -0.15],
-                    [0.6, -0.15],
-                    [0.6, 0.15],
-                    [-0.0, 0.15],
-                ],
+                [0.0, -0.15, 0.6, 0.3],
                 tr.rot_rad(angle),
                 g,
             );
@@ -243,14 +238,9 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
                 tr,
                 g,
             );
-            graphics::polygon(
+            graphics::rectangle(
                 [0.7, 0.7, 1.0, 1.0],
-                &[
-                    [-0.25, -0.25],
-                    [0.6, -0.25],
-                    [0.6, 0.25],
-                    [-0.25, 0.25],
-                ],
+                [-0.25, -0.25, 0.85, 0.5],
                 tr.rot_rad(angle),
                 g,
             );
