@@ -1,2 +1,10 @@
-.DS_Store
+# Rust
 target
+
+# Editors
+.*.swp
+\#*#
+
+# OS files
+.DS_Store
+desktop.ini
