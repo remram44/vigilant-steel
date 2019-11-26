@@ -260,6 +260,12 @@ fn draw_block<G: graphics::Graphics>(block: &Block, tr: Matrix2d, g: &mut G) {
             );
         }
         BlockInner::Rock => {
+            graphics::rectangle(
+                [0.55, 0.39, 0.30, 1.0],
+                [-0.45, -0.45, 0.9, 0.9],
+                tr,
+                g,
+            );
             draw_line_loop(
                 [0.45, 0.45, 0.45, 1.0],
                 0.05,
