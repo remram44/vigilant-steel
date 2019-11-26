@@ -8,7 +8,7 @@ use graphics::character::CharacterCache;
 use graphics::math::Matrix2d;
 use graphics::{self, Context, Graphics, Transformed};
 use rand::prelude::*;
-use specs::{Join, World, WorldExt};
+use specs::{Join, World};
 use std::fmt::Debug;
 use vecmath::*;
 
@@ -298,11 +298,11 @@ pub fn render<G, C, E>(
     C: CharacterCache<Texture = <G as Graphics>::Texture, Error = E> + Sized,
 {
     let viewport = world.read_resource::<Viewport>();
-    let pos = world.read_component::<Position>();
-    let projectile = world.read_component::<Projectile>();
-    let particles = world.read_component::<Particle>();
-    let blocky = world.read_component::<Blocky>();
-    let local = world.read_component::<LocalControl>();
+    let pos = world.read_storage::<Position>();
+    let projectile = world.read_storage::<Projectile>();
+    let particles = world.read_storage::<Particle>();
+    let blocky = world.read_storage::<Blocky>();
+    let local = world.read_storage::<LocalControl>();
 
     graphics::clear([0.0, 0.0, 0.1, 1.0], g);
 

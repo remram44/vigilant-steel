@@ -22,7 +22,6 @@ use piston::input::*;
 use piston::window::WindowSettings;
 use render::Viewport;
 use sdl2_window::Sdl2Window;
-use specs::WorldExt;
 use std::collections::HashMap;
 
 const MAX_TIME_STEP: f64 = 0.040;
@@ -108,7 +107,7 @@ fn main() {
     };
     app.game
         .world
-        .insert(Viewport::new([width, height]));
+        .add_resource(Viewport::new([width, height]));
 
     // Use the event_loop module to handle SDL/Emscripten differences
     event_loop::run(window, handle_event, app);
