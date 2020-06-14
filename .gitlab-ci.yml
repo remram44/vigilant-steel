@@ -8,8 +8,6 @@ build_game:
   script:
     - cargo build
     - cargo test
-    - (cd client-piston && cargo web deploy --release)
-    - cp -r target/deploy output
   artifacts:
     paths:
       - output
