@@ -106,7 +106,7 @@ impl Role {
 /// preserve resolution, be aware of it when doing computations (or use
 /// `seconds_since()`).
 pub struct Clock {
-    time_wrapping: f64,
+    time_wrapping: f32,
 }
 
 impl Default for Clock {
@@ -119,7 +119,7 @@ impl Default for Clock {
 
 impl Clock {
     /// Called by `Game` to move to the next frame.
-    fn advance_frame(&mut self, dt: f64) {
+    fn advance_frame(&mut self, dt: f32) {
         self.time_wrapping += dt;
         if self.time_wrapping > 1024.0 {
             self.time_wrapping -= 1024.0;
@@ -128,7 +128,7 @@ impl Clock {
 
     /// Compute the difference between two points in time, aware of
     /// wrapping.
-    pub fn seconds_since(&self, past: &Clock) -> f64 {
+    pub fn seconds_since(&self, past: &Clock) -> f32 {
         let d = self.time_wrapping - past.time_wrapping;
         if d < 0.0 {
             d + 1024.0
@@ -139,9 +139,9 @@ impl Clock {
 }
 
 impl Deref for Clock {
-    type Target = f64;
+    type Target = f32;
 
-    fn deref(&self) -> &f64 {
+    fn deref(&self) -> &f32 {
         &self.time_wrapping
     }
 }
@@ -248,7 +248,7 @@ impl Game {
     }
 
     /// Update the world using `specs`.
-    pub fn update(&mut self, dt: f64) {
+    pub fn update(&mut self, dt: f32) {
         {
             let mut r_dt = self.world.write_resource::<DeltaTime>();
             *r_dt = DeltaTime(dt);

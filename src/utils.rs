@@ -1,6 +1,6 @@
 //! General utility functions.
 
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 use std::time::SystemTime;
 
 pub trait IteratorExt<T>: Iterator<Item = T> {
@@ -49,7 +49,7 @@ impl<T: Clone + PartialOrd + Sized, I: Iterator<Item = T> + Sized>
 }
 
 pub struct FpsCounter {
-    value: f64,
+    value: f32,
     last_report: SystemTime,
     frames_since_report: u32,
 }
@@ -83,8 +83,8 @@ impl FpsCounter {
         };
         if dt.as_secs() >= 10 {
             let duration =
-                dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 0.000_000_001;
-            self.value = self.frames_since_report as f64 / duration;
+                dt.as_secs() as f32 + dt.subsec_nanos() as f32 * 0.000_000_001;
+            self.value = self.frames_since_report as f32 / duration;
             self.frames_since_report = 0;
             self.last_report = now;
             true
@@ -95,12 +95,12 @@ impl FpsCounter {
     }
 
     /// Current average of frames per second (updated every 10 seconds).
-    pub fn value(&self) -> f64 {
+    pub fn value(&self) -> f32 {
         self.value
     }
 }
 
-pub fn angle_wrap(a: f64) -> f64 {
+pub fn angle_wrap(a: f32) -> f32 {
     (a + 9.0 * PI) % (2.0 * PI) - PI
 }
 

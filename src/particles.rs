@@ -12,7 +12,7 @@ use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Read, Join, LazyUpdate, ReadStorage,
             System, VecStorage, WriteStorage};
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 /// Types of particles, that determine lifetime and render model.
 #[derive(Clone, Copy, Debug)]
@@ -32,7 +32,7 @@ pub enum ParticleType {
 /// Those are only created on graphical clients, don't get replicated, and
 /// disappear after a moment.
 pub struct Particle {
-    pub lifetime: f64,
+    pub lifetime: f32,
     pub which: ParticleType,
 }
 
@@ -48,14 +48,14 @@ impl Component for Particle {
 /// replication of the effect is needed (the ship is replicated).
 #[derive(Debug, Clone)]
 pub enum EffectInner {
-    Explosion(f64),
+    Explosion(f32),
     MetalHit,
     LaserHit,
 }
 
 pub struct Effect {
     pub effect: EffectInner,
-    pub lifetime: f64,
+    pub lifetime: f32,
 }
 
 impl Component for Effect {

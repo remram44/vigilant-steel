@@ -9,10 +9,10 @@ use game::Game;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
-const TIME_STEP: f64 = 0.080;
+const TIME_STEP: f32 = 0.080;
 
-fn to_secs(dt: Duration) -> f64 {
-    dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 0.000_000_001
+fn to_secs(dt: Duration) -> f32 {
+    dt.as_secs() as f32 + dt.subsec_nanos() as f32 * 0.000_000_001
 }
 
 /// Entrypoint for server.

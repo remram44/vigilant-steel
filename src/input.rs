@@ -30,10 +30,10 @@ impl Press {
 
 /// Input resource, stores the local user's controls.
 pub struct Input {
-    pub movement: [f64; 2],
-    pub rotation: f64,
+    pub movement: [f32; 2],
+    pub rotation: f32,
     pub fire: Press,
-    pub mouse: [f64; 2],
+    pub mouse: [f32; 2],
     pub buttons: [Press; 3],
 }
 

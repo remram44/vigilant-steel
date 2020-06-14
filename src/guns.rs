@@ -17,14 +17,14 @@ pub enum ProjectileType {
 }
 
 impl ProjectileType {
-    pub fn speed(&self) -> f64 {
+    pub fn speed(&self) -> f32 {
         match *self {
             ProjectileType::Plasma => 60.0,
             ProjectileType::Rail => 35.0,
         }
     }
 
-    pub fn mass(&self) -> Option<f64> {
+    pub fn mass(&self) -> Option<f32> {
         match *self {
             ProjectileType::Plasma => None,
             ProjectileType::Rail => Some(5.0),
@@ -62,8 +62,8 @@ impl Projectile {
     pub fn create(
         entities: &Entities,
         lazy: &Read<LazyUpdate>,
-        pos: [f64; 2],
-        rot: f64,
+        pos: [f32; 2],
+        rot: f32,
         kind: ProjectileType,
         shooter: Entity,
     ) -> Entity {

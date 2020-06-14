@@ -23,7 +23,7 @@ pub struct Tree(pub Vec<Node>);
 impl Tree {
     /// Builds the tree from a slice of coordinates, centers of size 1
     /// squares.
-    pub fn new(input: &[[f64; 2]]) -> Tree {
+    pub fn new(input: &[[f32; 2]]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
             tree.build(&mut input
@@ -37,7 +37,7 @@ impl Tree {
 
     /// Builds the tree from coordinates + something. Used for
     /// `Blocky.blocks`.
-    pub fn new_<T>(input: &[([f64; 2], T)]) -> Tree {
+    pub fn new_<T>(input: &[([f32; 2], T)]) -> Tree {
         let mut tree = Tree(Vec::new());
         if !input.is_empty() {
             tree.build(&mut input
@@ -50,7 +50,7 @@ impl Tree {
     }
 
     /// Actually build the tree.
-    fn build(&mut self, points: &mut [(usize, [f64; 2])]) -> usize {
+    fn build(&mut self, points: &mut [(usize, [f32; 2])]) -> usize {
         if points.len() == 1 {
             let p = points[0].1;
             self.0.push(Node {
@@ -119,11 +119,11 @@ impl Tree {
         idx
     }
 
-    pub fn find(&self, pos: [f64; 2]) -> Option<usize> {
+    pub fn find(&self, pos: [f32; 2]) -> Option<usize> {
         self.find_(pos, 0)
     }
 
-    fn find_(&self, pos: [f64; 2], idx: usize) -> Option<usize> {
+    fn find_(&self, pos: [f32; 2], idx: usize) -> Option<usize> {
         let n = &self.0[idx];
         if n.bounds.xmin > pos[0] || n.bounds.xmax < pos[0]
             || n.bounds.ymin > pos[1] || n.bounds.ymax < pos[1]

@@ -25,7 +25,7 @@ fn time_decode(b: u32) -> Duration {
     Duration::new(secs, nanos)
 }
 
-fn write_float<W: io::Write>(mut writer: W, v: f64) {
+fn write_float<W: io::Write>(mut writer: W, v: f32) {
     let v = v as f32;
     assert_eq!(
         writer
@@ -35,11 +35,11 @@ fn write_float<W: io::Write>(mut writer: W, v: f64) {
     );
 }
 
-fn read_float<R: io::Read>(mut reader: R) -> f64 {
+fn read_float<R: io::Read>(mut reader: R) -> f32 {
     let mut v = [0u8; 4];
     assert_eq!(reader.read(&mut v).unwrap(), 4);
     let v = unsafe { ::std::mem::transmute::<[u8; 4], f32>(v) };
-    v as f64
+    v as f32
 }
 
 /// The message exchanged by server and clients.
@@ -234,7 +234,7 @@ impl Component for Dirty {
 pub struct ConnectedClient {
     address: SocketAddr,
     client_id: u64,
-    ping: f64,
+    ping: f32,
     last_pong: SystemTime,
 }
 
@@ -416,8 +416,8 @@ impl<'a> System<'a> for SysNetServer {
                     let now_d = now.duration_since(UNIX_EPOCH).unwrap();
                     if let Some(d) = now_d.checked_sub(d) {
                         client.last_pong = now;
-                        client.ping = d.as_secs() as f64
-                            + d.subsec_nanos() as f64 / 0.000_000_001;
+                        client.ping = d.as_secs() as f32
+                            + d.subsec_nanos() as f32 / 0.000_000_001;
                     }
                 }
             }
@@ -565,7 +565,7 @@ pub struct SysNetClient {
     server_address: SocketAddr,
     client_id: u64,
     last_pong: SystemTime,
-    ping: f64,
+    ping: f32,
     controlled_entities: HashSet<u64>,
 }
 
@@ -662,8 +662,8 @@ impl<'a> System<'a> for SysNetClient {
                         let now_d = now.duration_since(UNIX_EPOCH).unwrap();
                         if let Some(d) = now_d.checked_sub(d) {
                             self.last_pong = now;
-                            self.ping = d.as_secs() as f64
-                                + d.subsec_nanos() as f64 / 0.000_000_001;
+                            self.ping = d.as_secs() as f32
+                                + d.subsec_nanos() as f32 / 0.000_000_001;
                         }
                     }
                     Message::StartEntityControl(id) => {
