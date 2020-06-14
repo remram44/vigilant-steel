@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "color-logger"]
+members = ["client-web", "server", "color-logger"]
 
 [package]
 name = "game"
@@ -20,3 +20,7 @@ vecmath = "1.0"
 
 [features]
 network = []
+
+[profile.release]
+lto = true
+opt-level = "s"

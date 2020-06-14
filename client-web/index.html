@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  </head>
+  <body>
+    <script>
+var _wasm_instance;
+
+function _wasm_log(s_ptr, s_len) {
+  var mem = _wasm_instance.exports.memory;
+  var strBuffer = new Uint8Array(mem.buffer, s_ptr, s_len);
+  var s = '';
+  for(var i = 0; i < s_len; ++i) {
+    s += String.fromCharCode(strBuffer[i]);
+  }
+  console.log(s);
+}
+
+var imports = {
+  mod: {
+    log_str: _wasm_log,
+  },
+};
+WebAssembly.instantiateStreaming(fetch('client_web.wasm'), imports)
+.then(function(obj) {
+  _wasm_instance = obj.instance;
+  obj.instance.exports.init();
+  obj.instance.exports.update();
+});
+    </script>
+  </body>
+</html>

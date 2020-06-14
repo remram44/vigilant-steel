@@ -38,6 +38,15 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "client-web"
+version = "0.1.0"
+dependencies = [
+ "game 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "color-logger"
 version = "0.2.0"
 dependencies = [

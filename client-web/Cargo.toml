@@ -1,0 +1,20 @@
+[package]
+workspace = ".."
+name = "client-web"
+version = "0.1.0"
+authors = ["Remi Rampin <r@remirampin.com>"]
+license = "GPL-3.0"
+repository = "https://gitlab.com/remram44/vigilant-steel"
+description = "Space game with WebAssembly"
+keywords = ["game"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+game = { path = ".." }
+log = "0.4"
+rand = "0.7"
+
+[features]
+default = ["game/network"]
