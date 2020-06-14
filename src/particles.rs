@@ -10,7 +10,7 @@
 use Role;
 use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Fetch, Join, LazyUpdate, ReadStorage,
+use specs::{Component, Entities, Read, Join, LazyUpdate, ReadStorage,
             System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
 
@@ -67,9 +67,9 @@ pub struct SysParticles;
 
 impl<'a> System<'a> for SysParticles {
     type SystemData = (
-        Fetch<'a, DeltaTime>,
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, DeltaTime>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Effect>,
@@ -133,7 +133,7 @@ impl<'a> System<'a> for SysParticles {
                                 lifetime: lifetime * rng.gen_range(0.7, 1.4),
                                 which: ParticleType::Explosion,
                             },
-                        );
+                        ).unwrap();
                     }
                 }
                 EffectInner::MetalHit => for _ in 0..8 as usize {
@@ -164,7 +164,7 @@ impl<'a> System<'a> for SysParticles {
                             lifetime: rng.gen_range(0.4, 0.6),
                             which: ParticleType::Spark,
                         },
-                    );
+                    ).unwrap();
                 },
                 EffectInner::LaserHit => {
                     let ent = entities.create();

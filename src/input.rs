@@ -37,8 +37,8 @@ pub struct Input {
     pub buttons: [Press; 3],
 }
 
-impl Input {
-    pub fn new() -> Input {
+impl Default for Input {
+    fn default() -> Input {
         Input {
             movement: [0.0, 0.0],
             rotation: 0.0,
@@ -47,7 +47,9 @@ impl Input {
             buttons: [Press::UP; 3],
         }
     }
+}
 
+impl Input {
     /// Update status of keys, called once per frame.
     pub fn update(&mut self) {
         self.fire.update();

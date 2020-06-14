@@ -14,7 +14,7 @@ use particles::{Effect, EffectInner, Particle, ParticleType};
 use physics::{find_collision_tree_ray, DeltaTime, HitEffect, Hits,
               LocalControl, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use std::f64::consts::PI;
 use utils::angle_wrap;
@@ -46,7 +46,7 @@ impl Ship {
         }
     }
 
-    pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
+    pub fn create(entities: &Entities, lazy: &Read<LazyUpdate>) -> Entity {
         use self::BlockInner::*;
         let blocks = &[
             ([0, 0], Cockpit),
@@ -169,11 +169,11 @@ pub struct SysShip;
 
 impl<'a> System<'a> for SysShip {
     type SystemData = (
-        Fetch<'a, DeltaTime>,
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
-        Fetch<'a, Input>,
-        Fetch<'a, Clock>,
+        Read<'a, DeltaTime>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
+        Read<'a, Input>,
+        Read<'a, Clock>,
         Entities<'a>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
