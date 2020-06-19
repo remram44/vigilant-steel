@@ -11,7 +11,8 @@
 //! functionality is factored in `SysShip` right now.
 // TODO: Refactor some blocky behavior out of SysShip, into a blocky system?
 
-use specs::{Component, Entities, Fetch, LazyUpdate, VecStorage};
+use specs::{Component, Entities, Read, LazyUpdate, VecStorage};
+use std::num::Wrapping;
 use tree::Tree;
 use vecmath::*;
 
@@ -23,11 +24,11 @@ pub enum BlockInner {
     Cockpit,
     /// Allows a ship to move. A ship needs multiple of this to be able to
     /// move and rotate.
-    Thruster { angle: f64 },
+    Thruster { angle: f32 },
     /// This shoots explosive energy projectiles.
-    PlasmaGun { angle: f64, cooldown: f64 },
+    PlasmaGun { angle: f32, cooldown: f32 },
     /// This shoots heavy projectiles.
-    RailGun { angle: f64, cooldown: f64 },
+    RailGun { angle: f32, cooldown: f32 },
     /// An armor block does nothing, it is only there to take damage (and
     /// weigh you down).
     Armor,
@@ -39,9 +40,9 @@ impl BlockInner {
     /// Updates this block each frame.
     pub fn update(
         &mut self,
-        dt: f64,
+        dt: f32,
         _entities: &Entities,
-        _lazy: &Fetch<LazyUpdate>,
+        _lazy: &Read<LazyUpdate>,
     ) {
         match *self {
             BlockInner::PlasmaGun {
@@ -58,7 +59,7 @@ impl BlockInner {
 
     /// The mass of this block. Must be constant, queried on structure
     /// changes.
-    pub fn mass(&self) -> f64 {
+    pub fn mass(&self) -> f32 {
         match *self {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.8,
@@ -70,7 +71,7 @@ impl BlockInner {
     }
 
     /// The starting health of this block.
-    pub fn max_health(&self) -> f64 {
+    pub fn max_health(&self) -> f32 {
         match *self {
             BlockInner::Cockpit => 1.0,
             BlockInner::Thruster { .. } => 0.6,
@@ -85,7 +86,7 @@ impl BlockInner {
 #[derive(Debug, Clone)]
 pub struct Block {
     /// Health of this blocks, starting at `inner.max_health()`.
-    pub health: f64,
+    pub health: f32,
     /// The state and behavior of this block, depending on its concrete
     /// type.
     pub inner: BlockInner,
@@ -103,27 +104,29 @@ impl Block {
 
 // Entity is made of blocks
 pub struct Blocky {
-    pub blocks: Vec<([f64; 2], Block)>,
+    pub blocks: Vec<([f32; 2], Block)>,
     pub tree: Tree,
-    pub radius: f64,
-    pub mass: f64,
-    pub inertia: f64,
+    pub radius: f32,
+    pub mass: f32,
+    pub inertia: f32,
+    pub revision: Wrapping<u32>,
 }
 
 impl Blocky {
-    pub fn new(blocks: Vec<([f64; 2], Block)>) -> (Blocky, [f64; 2]) {
+    pub fn new(blocks: Vec<([f32; 2], Block)>) -> (Blocky, [f32; 2]) {
         let mut blocky = Blocky {
             blocks: blocks,
             tree: Tree(vec![]),
             radius: 0.0,
             mass: 0.0,
             inertia: 0.0,
+            revision: Wrapping(0),
         };
         let center = blocky.compute_stats();
         (blocky, center)
     }
 
-    fn compute_stats(&mut self) -> [f64; 2] {
+    fn compute_stats(&mut self) -> [f32; 2] {
         let mut center = [0.0, 0.0];
         self.mass = 0.0;
         for &(ref loc, ref block) in &self.blocks {
@@ -168,10 +171,13 @@ impl Blocky {
     pub fn maintain(
         &mut self,
     ) -> (
-        Vec<([f64; 2], Block)>,
-        [f64; 2],
-        Vec<(Blocky, [f64; 2])>,
+        Vec<([f32; 2], Block)>,
+        [f32; 2],
+        Vec<(Blocky, [f32; 2])>,
     ) {
+        // Change revision so UI knows to re-draw
+        self.revision += Wrapping(1);
+
         // Drop blocks with no health
         let mut i = 0;
         let mut dead_blocks = Vec::new();
@@ -212,7 +218,7 @@ impl Blocky {
         }
 
         // Find broken off blocks
-        let mut pieces: Vec<Vec<([f64; 2], Block)>> =
+        let mut pieces: Vec<Vec<([f32; 2], Block)>> =
             Vec::with_capacity(self.blocks.len() - 1);
         for _ in 0..self.blocks.len() - 1 {
             pieces.push(Vec::new());

@@ -8,10 +8,10 @@ use blocks::Blocky;
 #[cfg(feature = "network")]
 use net;
 use sat;
-use specs::{Component, Entities, Entity, Fetch, HashMapStorage, Join,
+use specs::{Component, Entities, Entity, Read, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 use std::ops::Deref;
 use tree;
 use vecmath::*;
@@ -19,10 +19,10 @@ use vecmath::*;
 /// Bounding-box.
 #[derive(Debug, Clone)]
 pub struct AABox {
-    pub xmin: f64,
-    pub xmax: f64,
-    pub ymin: f64,
-    pub ymax: f64,
+    pub xmin: f32,
+    pub xmax: f32,
+    pub ymin: f32,
+    pub ymax: f32,
 }
 
 /// A rectangle bounding box.
@@ -30,15 +30,15 @@ impl AABox {
     /// Creates a box that doesn't contain anything.
     pub fn empty() -> AABox {
         AABox {
-            xmin: ::std::f64::INFINITY,
-            xmax: -::std::f64::INFINITY,
-            ymin: ::std::f64::INFINITY,
-            ymax: -::std::f64::INFINITY,
+            xmin: ::std::f32::INFINITY,
+            xmax: -::std::f32::INFINITY,
+            ymin: ::std::f32::INFINITY,
+            ymax: -::std::f32::INFINITY,
         }
     }
 
     /// Returns an array of the 4 corners' coordinates.
-    pub fn corners(&self) -> [[f64; 2]; 4] {
+    pub fn corners(&self) -> [[f32; 2]; 4] {
         [
             [self.xmin, self.ymin],
             [self.xmax, self.ymin],
@@ -49,7 +49,7 @@ impl AABox {
 
     /// The square of the maximum radius from (0, 0) containing the whole
     /// box.
-    pub fn compute_sq_radius(&self) -> f64 {
+    pub fn compute_sq_radius(&self) -> f32 {
         self.corners()
             .iter()
             .map(|&c| vec2_square_len(c))
@@ -58,7 +58,7 @@ impl AABox {
     }
 
     /// Add a square of size 1 by the location of its center.
-    pub fn add_square1(&mut self, point: [f64; 2]) {
+    pub fn add_square1(&mut self, point: [f32; 2]) {
         *self = AABox {
             xmin: self.xmin.min(point[0] - 0.5),
             xmax: self.xmax.max(point[0] + 0.5),
@@ -72,7 +72,7 @@ impl AABox {
 pub fn delete_entity(
     role: Role,
     entities: &Entities,
-    lazy: &Fetch<LazyUpdate>,
+    lazy: &Read<LazyUpdate>,
     entity: Entity,
 ) {
     #[cfg(feature = "network")]
@@ -94,8 +94,8 @@ pub fn delete_entity(
 /// Position component, for entities that are somewhere in the world.
 #[derive(Debug, Clone)]
 pub struct Position {
-    pub pos: [f64; 2],
-    pub rot: f64,
+    pub pos: [f32; 2],
+    pub rot: f32,
 }
 
 impl Component for Position {
@@ -105,8 +105,8 @@ impl Component for Position {
 /// Velocity component, for entities that move.
 #[derive(Debug, Clone)]
 pub struct Velocity {
-    pub vel: [f64; 2],
-    pub rot: f64,
+    pub vel: [f32; 2],
+    pub rot: f32,
 }
 
 impl Component for Velocity {
@@ -119,8 +119,8 @@ impl Component for Velocity {
 /// Don't even mark the other object.
 pub struct DetectCollision {
     pub bounding_box: AABox,
-    pub radius: f64,
-    pub mass: Option<f64>,
+    pub radius: f32,
+    pub mass: Option<f32>,
     pub ignore: Option<Entity>,
 }
 
@@ -132,15 +132,15 @@ impl Component for DetectCollision {
 #[derive(Clone)]
 pub enum HitEffect {
     /// Material collision, such as between blocky objects.
-    Collision(f64, Entity),
+    Collision(f32, Entity),
     /// Caught in an explosion.
-    Explosion(f64),
+    Explosion(f32),
 }
 
 /// A single collision, stored in the Hits component.
 pub struct Hit {
     /// Location of the hit, in this entity's coordinate system.
-    pub rel_location: [f64; 2],
+    pub rel_location: [f32; 2],
     pub effect: HitEffect,
 }
 
@@ -165,7 +165,7 @@ impl Hits {
             Hits {
                 hits_vec: vec![hit],
             },
-        );
+        ).unwrap();
     }
 }
 
@@ -190,14 +190,20 @@ impl Component for LocalControl {
 }
 
 /// Delta resource, stores the simulation step.
-pub struct DeltaTime(pub f64);
+pub struct DeltaTime(pub f32);
+
+impl Default for DeltaTime {
+    fn default() -> DeltaTime {
+        DeltaTime(0.0)
+    }
+}
 
 /// Simulation system, updates positions from velocities.
 pub struct SysSimu;
 
 impl<'a> System<'a> for SysSimu {
     type SystemData = (
-        Fetch<'a, DeltaTime>,
+        Read<'a, DeltaTime>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
     );
@@ -217,8 +223,8 @@ pub struct SysCollision;
 
 impl<'a> System<'a> for SysCollision {
     type SystemData = (
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -394,21 +400,21 @@ fn find_collision_tree_box(
 }
 
 pub fn find_collision_tree_ray(
-    pos: [f64; 2],
-    dir: [f64; 2],
+    pos: [f32; 2],
+    dir: [f32; 2],
     tree: &tree::Tree,
-) -> Option<(f64, [f64; 2])> {
+) -> Option<(f32, [f32; 2])> {
     find_collision_tree_ray_(pos, dir, tree, 0)
 }
 
 fn find_collision_tree_ray_(
-    pos: [f64; 2],
-    dir: [f64; 2],
+    pos: [f32; 2],
+    dir: [f32; 2],
     tree: &tree::Tree,
     idx: usize,
-) -> Option<(f64, [f64; 2])> {
+) -> Option<(f32, [f32; 2])> {
     let n = &tree.0[idx];
-    let mut tmin: Option<f64> = None;
+    let mut tmin: Option<f32> = None;
     // Left side
     let t = (n.bounds.xmin - pos[0]) / dir[0];
     if t > 0.0 && n.bounds.ymin <= pos[1] + dir[1] * t
@@ -474,7 +480,7 @@ fn find_collision_tree_ray_(
 
 fn store_collision<'a>(
     pos: &Position,
-    hit: [f64; 2],
+    hit: [f32; 2],
     effect: HitEffect,
     ent: Entity,
     hits: &mut WriteStorage<'a, Hits>,
@@ -494,15 +500,15 @@ fn store_collision<'a>(
     );
 }
 
-const ELASTICITY: f64 = 0.6;
+const ELASTICITY: f32 = 0.6;
 
 /// Cross-product of planar vector with orthogonal vector.
-fn cross(a: [f64; 2], b: f64) -> [f64; 2] {
+fn cross(a: [f32; 2], b: f32) -> [f32; 2] {
     [a[1] * b, -a[0] * b]
 }
 
 /// Compute cross product of planar vectors and take dot with itself.
-fn cross_dot2(a: [f64; 2], b: [f64; 2]) -> f64 {
+fn cross_dot2(a: [f32; 2], b: [f32; 2]) -> f32 {
     let c = a[0] * b[1] - a[1] * b[0];
     c * c
 }
@@ -515,7 +521,7 @@ fn handle_collision<'a>(
     blocky: &ReadStorage<'a, Blocky>,
     hits: &mut WriteStorage<'a, Hits>,
     hit: &sat::Collision,
-    lazy: &Fetch<'a, LazyUpdate>,
+    lazy: &Read<'a, LazyUpdate>,
 ) {
     let blk = blocky.get(ent).unwrap();
     let o_blk = blocky.get(o_ent).unwrap();
@@ -611,8 +617,8 @@ pub fn affect_area<'a>(
     pos: &ReadStorage<'a, Position>,
     blocky: &ReadStorage<'a, Blocky>,
     hits: &mut WriteStorage<'a, Hits>,
-    center: [f64; 2],
-    radius: f64,
+    center: [f32; 2],
+    radius: f32,
     effect: HitEffect,
 ) {
     for (ent, pos, blk) in (&**entities, &*pos, &*blocky).join() {

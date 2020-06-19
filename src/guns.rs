@@ -7,7 +7,7 @@ use net;
 use particles::{Effect, EffectInner};
 use physics::{affect_area, delete_entity, AABox, DetectCollision, HitEffect,
               Hits, Position, Velocity};
-use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
 
@@ -17,14 +17,14 @@ pub enum ProjectileType {
 }
 
 impl ProjectileType {
-    pub fn speed(&self) -> f64 {
+    pub fn speed(&self) -> f32 {
         match *self {
             ProjectileType::Plasma => 60.0,
             ProjectileType::Rail => 35.0,
         }
     }
 
-    pub fn mass(&self) -> Option<f64> {
+    pub fn mass(&self) -> Option<f32> {
         match *self {
             ProjectileType::Plasma => None,
             ProjectileType::Rail => Some(5.0),
@@ -61,9 +61,9 @@ pub struct Projectile {
 impl Projectile {
     pub fn create(
         entities: &Entities,
-        lazy: &Fetch<LazyUpdate>,
-        pos: [f64; 2],
-        rot: f64,
+        lazy: &Read<LazyUpdate>,
+        pos: [f32; 2],
+        rot: f32,
         kind: ProjectileType,
         shooter: Entity,
     ) -> Entity {
@@ -113,8 +113,8 @@ pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Hits>,
         ReadStorage<'a, Position>,

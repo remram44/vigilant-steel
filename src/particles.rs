@@ -10,9 +10,9 @@
 use Role;
 use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Fetch, Join, LazyUpdate, ReadStorage,
+use specs::{Component, Entities, Read, Join, LazyUpdate, ReadStorage,
             System, VecStorage, WriteStorage};
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 /// Types of particles, that determine lifetime and render model.
 #[derive(Clone, Copy, Debug)]
@@ -32,7 +32,7 @@ pub enum ParticleType {
 /// Those are only created on graphical clients, don't get replicated, and
 /// disappear after a moment.
 pub struct Particle {
-    pub lifetime: f64,
+    pub lifetime: f32,
     pub which: ParticleType,
 }
 
@@ -48,14 +48,14 @@ impl Component for Particle {
 /// replication of the effect is needed (the ship is replicated).
 #[derive(Debug, Clone)]
 pub enum EffectInner {
-    Explosion(f64),
+    Explosion(f32),
     MetalHit,
     LaserHit,
 }
 
 pub struct Effect {
     pub effect: EffectInner,
-    pub lifetime: f64,
+    pub lifetime: f32,
 }
 
 impl Component for Effect {
@@ -67,9 +67,9 @@ pub struct SysParticles;
 
 impl<'a> System<'a> for SysParticles {
     type SystemData = (
-        Fetch<'a, DeltaTime>,
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, DeltaTime>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Effect>,
@@ -133,7 +133,7 @@ impl<'a> System<'a> for SysParticles {
                                 lifetime: lifetime * rng.gen_range(0.7, 1.4),
                                 which: ParticleType::Explosion,
                             },
-                        );
+                        ).unwrap();
                     }
                 }
                 EffectInner::MetalHit => for _ in 0..8 as usize {
@@ -164,7 +164,7 @@ impl<'a> System<'a> for SysParticles {
                             lifetime: rng.gen_range(0.4, 0.6),
                             which: ParticleType::Spark,
                         },
-                    );
+                    ).unwrap();
                 },
                 EffectInner::LaserHit => {
                     let ent = entities.create();

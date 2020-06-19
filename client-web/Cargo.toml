@@ -1,26 +1,23 @@
-[workspace]
-members = ["client-web", "server", "color-logger"]
-
 [package]
-name = "game"
+workspace = ".."
+name = "client-web"
 version = "0.1.0"
-authors = ["Remi Rampin <remirampin@gmail.com>"]
+authors = ["Remi Rampin <r@remirampin.com>"]
 license = "GPL-3.0"
 repository = "https://gitlab.com/remram44/vigilant-steel"
-description = "Space game with Piston"
-readme = "README.md"
+description = "Space game with WebAssembly"
 keywords = ["game"]
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
-byteorder = "1.3"
+game = { path = ".." }
+wasm-bindgen = "0.2.63"
 log = "0.4"
 rand = "0.7"
 specs = { version = "0.16", default-features = false, features = ["wasm-bindgen"] }
 vecmath = "1.0"
 
 [features]
-network = []
-
-[profile.release]
-lto = true
-opt-level = "s"
+default = ["game/network"]

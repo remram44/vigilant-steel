@@ -11,8 +11,8 @@ use vecmath::*;
 
 #[derive(Clone, PartialEq)]
 struct Projection {
-    proj: f64,
-    orig: [f64; 2],
+    proj: f32,
+    orig: [f32; 2],
 }
 
 impl PartialOrd for Projection {
@@ -23,9 +23,9 @@ impl PartialOrd for Projection {
 
 /// Little structure returned by `find()`.
 pub struct Collision {
-    pub direction: [f64; 2],
-    pub depth: f64,
-    pub location: [f64; 2],
+    pub direction: [f32; 2],
+    pub depth: f32,
+    pub location: [f32; 2],
 }
 
 /// Checks if two rectangles collide when projected on a specific axis.
@@ -36,7 +36,7 @@ fn check_sat_collision_dir(
     size1: &AABox,
     pos2: &Position,
     size2: &AABox,
-    dir: [f64; 2],
+    dir: [f32; 2],
 ) -> Option<Collision> {
     // This is called for each normal of each rectangle
     // It checks whether there is collision of the shape projected along it
@@ -57,7 +57,7 @@ fn check_sat_collision_dir(
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {
-                proj: vec2_dot(corner, dir) as f64,
+                proj: vec2_dot(corner, dir) as f32,
                 orig: corner,
             }
         })
@@ -79,7 +79,7 @@ fn check_sat_collision_dir(
             );
             // Dot product with dir vector gives the distance along that vector
             Projection {
-                proj: vec2_dot(corner, dir) as f64,
+                proj: vec2_dot(corner, dir) as f32,
                 orig: corner,
             }
         })

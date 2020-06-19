@@ -10,9 +10,9 @@ use blocks::{Block, BlockInner, Blocky};
 use net;
 use physics::{delete_entity, Position, Velocity};
 use rand::prelude::*;
-use specs::{Component, Entities, Fetch, Join, LazyUpdate, NullStorage,
+use specs::{Component, Entities, Read, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 /// An asteroid
 #[derive(Default)]
@@ -30,8 +30,8 @@ pub struct SysAsteroid;
 
 impl<'a> System<'a> for SysAsteroid {
     type SystemData = (
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Asteroid>,
@@ -74,8 +74,8 @@ impl<'a> System<'a> for SysAsteroid {
             let bi = b as i32 + 1;
             for y in -ai..ai {
                 for x in -bi..bi {
-                    let x = x as f64;
-                    let y = y as f64;
+                    let x = x as f32;
+                    let y = y as f32;
                     if x * x * a * a + y * y * b * b <= a * a * b * b {
                         blocks.push(([x, y], Block::new(BlockInner::Rock)));
                     }

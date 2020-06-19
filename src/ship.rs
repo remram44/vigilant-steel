@@ -14,9 +14,9 @@ use particles::{Effect, EffectInner, Particle, ParticleType};
 use physics::{find_collision_tree_ray, DeltaTime, HitEffect, Hits,
               LocalControl, Position, Velocity};
 use rand::{self, Rng};
-use specs::{Component, Entities, Entity, Fetch, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 use utils::angle_wrap;
 use vecmath::*;
 use {Clock, Role};
@@ -27,11 +27,11 @@ use {Clock, Role};
 /// projectiles.
 pub struct Ship {
     pub want_fire: bool,
-    pub want_thrust: [f64; 2],
-    pub want_thrust_rot: f64,
-    pub want_target: [f64; 2],
-    pub thrust: [f64; 2],
-    pub thrust_rot: f64,
+    pub want_thrust: [f32; 2],
+    pub want_thrust_rot: f32,
+    pub want_target: [f32; 2],
+    pub thrust: [f32; 2],
+    pub thrust_rot: f32,
 }
 
 impl Ship {
@@ -46,7 +46,7 @@ impl Ship {
         }
     }
 
-    pub fn create(entities: &Entities, lazy: &Fetch<LazyUpdate>) -> Entity {
+    pub fn create(entities: &Entities, lazy: &Read<LazyUpdate>) -> Entity {
         use self::BlockInner::*;
         let blocks = &[
             ([0, 0], Cockpit),
@@ -119,14 +119,14 @@ impl Ship {
             .iter()
             .map(|&(ref p, ref b)| {
                 (
-                    [p[0] as f64, p[1] as f64],
+                    [p[0] as f32, p[1] as f32],
                     Block::new(b.clone()),
                 )
             })
             .collect();
         let (blocky, center) = Blocky::new(blocks);
         let entity = entities.create();
-        let angle: f64 = 0.0;
+        let angle: f32 = 0.0;
         let (s, c) = angle.sin_cos();
         let center = [
             center[0] * c - center[1] * s,
@@ -169,11 +169,11 @@ pub struct SysShip;
 
 impl<'a> System<'a> for SysShip {
     type SystemData = (
-        Fetch<'a, DeltaTime>,
-        Fetch<'a, Role>,
-        Fetch<'a, LazyUpdate>,
-        Fetch<'a, Input>,
-        Fetch<'a, Clock>,
+        Read<'a, DeltaTime>,
+        Read<'a, Role>,
+        Read<'a, LazyUpdate>,
+        Read<'a, Input>,
+        Read<'a, Clock>,
         Entities<'a>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Velocity>,
@@ -429,7 +429,7 @@ impl<'a> System<'a> for SysShip {
             if role.graphical() {
                 let spawn_thrust_exhaust = |idx, thrust| {
                     let &(rel, ref block): &(
-                        [f64; 2],
+                        [f32; 2],
                         Block,
                     ) = &blocky.blocks[idx];
                     let angle = match block.inner {
@@ -603,13 +603,13 @@ impl<'a> System<'a> for SysShip {
 fn compute_thrust<'a, T, B, F>(
     blocks: B,
     mut cb: F,
-    dir: [f64; 2],
-    rot: f64,
-) -> ([f64; 2], f64)
+    dir: [f32; 2],
+    rot: f32,
+) -> ([f32; 2], f32)
 where
     T: Clone,
-    B: Iterator<Item = (T, &'a ([f64; 2], Block))>,
-    F: FnMut(T, f64),
+    B: Iterator<Item = (T, &'a ([f32; 2], Block))>,
+    F: FnMut(T, f32),
 {
     let dir = {
         let len = vec2_len(dir);
