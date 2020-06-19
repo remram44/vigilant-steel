@@ -2,10 +2,11 @@ use log::{
     Level, LevelFilter, Log, Metadata, Record, SetLoggerError, set_logger,
     set_max_level,
 };
+use wasm_bindgen::prelude::*;
 
-#[link(wasm_import_module = "mod")]
-extern {
-    fn log_str(a: *const u8, len: usize);
+#[wasm_bindgen]
+extern "C" {
+    fn log_str(s: &str);
 }
 
 struct JsLogger;
@@ -18,9 +19,7 @@ impl Log for JsLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let s = format!("{} - {}", record.target(), record.args());
-            unsafe {
-                log_str(s.as_ptr(), s.len());
-            }
+            log_str(&s);
         }
     }
 

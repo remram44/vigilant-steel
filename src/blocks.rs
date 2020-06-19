@@ -12,6 +12,7 @@
 // TODO: Refactor some blocky behavior out of SysShip, into a blocky system?
 
 use specs::{Component, Entities, Read, LazyUpdate, VecStorage};
+use std::num::Wrapping;
 use tree::Tree;
 use vecmath::*;
 
@@ -108,6 +109,7 @@ pub struct Blocky {
     pub radius: f32,
     pub mass: f32,
     pub inertia: f32,
+    pub revision: Wrapping<u32>,
 }
 
 impl Blocky {
@@ -118,6 +120,7 @@ impl Blocky {
             radius: 0.0,
             mass: 0.0,
             inertia: 0.0,
+            revision: Wrapping(0),
         };
         let center = blocky.compute_stats();
         (blocky, center)
@@ -172,6 +175,9 @@ impl Blocky {
         [f32; 2],
         Vec<(Blocky, [f32; 2])>,
     ) {
+        // Change revision so UI knows to re-draw
+        self.revision += Wrapping(1);
+
         // Drop blocks with no health
         let mut i = 0;
         let mut dead_blocks = Vec::new();

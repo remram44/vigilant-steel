@@ -9,12 +9,14 @@ build_game:
   image: rust:1.43.1
   before_script:
     - rustup target add wasm32-unknown-unknown
+    - cargo install --version 0.2.63 wasm-bindgen-cli
   script:
     - cargo build
     - cargo test
     - sh -c "cd client-web && cargo build --release --target wasm32-unknown-unknown"
+    - wasm-bindgen target/wasm32-unknown-unknown/release/client_web.wasm --out-dir client-web --browser --no-typescript --no-modules --no-modules-global client_web
     - mkdir output
-    - cp target/wasm32-unknown-unknown/release/client_web.wasm output/
+    - cp client-web/client_web_bg.wasm client-web/client_web.js output/
     - cp client-web/index.html client-web/index.js output/
   artifacts:
     paths:

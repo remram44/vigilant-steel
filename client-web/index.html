@@ -2,32 +2,25 @@
 <html>
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-  </head>
-  <body>
-    <script>
-var _wasm_instance;
-
-function _wasm_log(s_ptr, s_len) {
-  var mem = _wasm_instance.exports.memory;
-  var strBuffer = new Uint8Array(mem.buffer, s_ptr, s_len);
-  var s = '';
-  for(var i = 0; i < s_len; ++i) {
-    s += String.fromCharCode(strBuffer[i]);
-  }
-  console.log(s);
+    <style type="text/css">
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
 }
 
-var imports = {
-  mod: {
-    log_str: _wasm_log,
-  },
-};
-WebAssembly.instantiateStreaming(fetch('client_web.wasm'), imports)
-.then(function(obj) {
-  _wasm_instance = obj.instance;
-  obj.instance.exports.init();
-  obj.instance.exports.update();
-});
-    </script>
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <p id="fps" style="position: absolute; top: 0; right: 0; margin: 0; color: white;"></p>
+    <script src="client_web.js"></script>
+    <script src="index.js"></script>
   </body>
 </html>
