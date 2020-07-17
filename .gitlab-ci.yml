@@ -4,9 +4,7 @@ stages:
 
 build_game:
   stage: build
-  # 1.44.0 doesn't work because of https://github.com/rust-lang/rust/issues/72758
-  # 1.46 nightly 2020-06-09 works
-  image: rust:1.43.1
+  image: rust:1.45.0
   before_script:
     - rustup target add wasm32-unknown-unknown
     - cargo install --version 0.2.63 wasm-bindgen-cli
