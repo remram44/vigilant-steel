@@ -170,6 +170,7 @@ function render(now) {
       Object.getOwnPropertyNames(buffers).length, " buffers exist",
     );
     buffers_set = 0;
+    _wasm_instance.profile();
   }
   if(lastFrame === undefined) {
     delta = 0.02;

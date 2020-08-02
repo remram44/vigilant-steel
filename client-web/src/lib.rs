@@ -92,3 +92,10 @@ pub extern "C" fn update(
     }
     render::render(&mut app, [width, height]);
 }
+
+#[wasm_bindgen]
+pub extern "C" fn profile() {
+    if let Some(app) = get_app() {
+        app.game.profile();
+    }
+}
