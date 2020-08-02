@@ -11,7 +11,7 @@ pub const SECTOR_SIZE: f32 = 50.0;
 
 /// Identifies a sector
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SectorId(u32);
+pub struct SectorId(pub u32);
 
 impl fmt::Debug for SectorId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

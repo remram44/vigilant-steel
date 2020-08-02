@@ -10,6 +10,7 @@ use blocks::{Block, BlockInner, Blocky};
 use net;
 use physics::{delete_entity, Position, Velocity};
 use rand::prelude::*;
+use sector::SectorId;
 use specs::{Component, Entities, Read, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
 use std::f32::consts::PI;
@@ -104,6 +105,7 @@ impl<'a> System<'a> for SysAsteroid {
                     rot: rng.gen_range(-2.0, 2.0),
                 },
             );
+            lazy.insert(entity, SectorId(1));
             lazy.insert(entity, Asteroid);
             lazy.insert(entity, blocky);
             #[cfg(feature = "network")]
