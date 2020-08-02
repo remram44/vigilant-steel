@@ -49,7 +49,7 @@ impl<'a> System<'a> for SysAsteroid {
             count += 1;
 
             let pos = pos.pos;
-            if pos[0] < -150.0 || pos[0] > 150.0 || pos[1] < -150.0
+            if pos[0] < -50.0 || pos[0] > 200.0 || pos[1] < -50.0
                 || pos[1] > 150.0
             {
                 delete_entity(*role, &entities, &lazy, entity);
@@ -88,8 +88,8 @@ impl<'a> System<'a> for SysAsteroid {
                 entity,
                 Position {
                     pos: [
-                        xpos * 145.0 + ypos * rng.gen_range(-140.0, 140.0),
-                        ypos * 145.0 + xpos * rng.gen_range(-140.0, 140.0),
+                        75.0 + xpos * 115.0 + ypos * rng.gen_range(-75.0, 75.0),
+                        50.0 + ypos * 95.0 + xpos * rng.gen_range(-50.0, 50.0),
                     ],
                     rot: rng.gen_range(0.0, 2.0 * PI),
                 },

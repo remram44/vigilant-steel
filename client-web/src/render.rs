@@ -99,8 +99,8 @@ impl RenderApp {
 pub fn init() {
     let mut bounds = VertexVecs::default();
     bounds.hollow_rect(
-        [-105.0, -105.0],
-        [105.0, 105.0],
+        [-5.0, -5.0],
+        [155.0, 105.0],
         10.0,
         [0.8, 0.8, 0.8, 1.0],
     );

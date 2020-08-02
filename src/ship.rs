@@ -135,7 +135,7 @@ impl Ship {
         lazy.insert(
             entity,
             Position {
-                pos: center,
+                pos: [center[0] + 30.0, center[1] + 30.0],
                 rot: angle,
             },
         );
@@ -342,11 +342,11 @@ impl<'a> System<'a> for SysShip {
             for (ent, pos, vel, _) in
                 (&*entities, &pos, &mut vel, &ship).join()
             {
-                if pos.pos[0] < -100.0 || pos.pos[0] > 100.0
-                    || pos.pos[1] < -100.0
+                if pos.pos[0] < 0.0 || pos.pos[0] > 150.0
+                    || pos.pos[1] < 0.0
                     || pos.pos[1] > 100.0
                 {
-                    vel.vel = vec2_sub([0.0, 0.0], pos.pos);
+                    vel.vel = vec2_sub([75.0, 50.0], pos.pos);
                     vel.vel =
                         vec2_scale(vel.vel, 60.0 * vec2_inv_len(vel.vel));
                     #[cfg(feature = "network")]
