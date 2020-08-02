@@ -30,6 +30,7 @@ pub mod physics;
 mod sat;
 pub mod ship;
 mod tree;
+pub mod sector;
 pub mod utils;
 
 use asteroid::{Asteroid, SysAsteroid};
@@ -39,6 +40,7 @@ use input::Input;
 use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
+use sector::{SectorId, SectorManager, SysSector};
 use ship::{Ship, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt};
 use std::collections::HashMap;
@@ -157,6 +159,7 @@ impl Game {
         let mut world = World::new();
         world.register::<Position>();
         world.register::<Velocity>();
+        world.register::<SectorId>();
         world.register::<Blocky>();
         world.register::<DetectCollision>();
         world.register::<Hits>();
@@ -177,6 +180,7 @@ impl Game {
         world.insert(DeltaTime(0.02));
         world.insert(<Clock as Default>::default());
         world.insert(<Input as Default>::default());
+        world.insert(<SectorManager as Default>::default());
         world.insert(role);
 
         let dispatcher = if role.authoritative() {
@@ -191,11 +195,13 @@ impl Game {
                     "collision",
                     &["projectile", "asteroid", "ship"],
                 )
+                .with(SysSector, "sectors", &[])
         } else {
             DispatcherBuilder::new()
                 .with(SysSimu, "simu", &[])
                 .with(SysShip, "ship", &[])
                 .with(SysParticles, "particles", &[])
+                .with(SysSector, "sectors", &[])
         };
 
         (world, dispatcher)
