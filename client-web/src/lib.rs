@@ -4,12 +4,19 @@ mod render;
 
 use game::Game;
 use game::input::{Input, Press};
+use game::particles::{Effect, EffectInner};
 use log::{error, info, warn};
 use specs::WorldExt;
 use std::cell::{RefCell, RefMut};
+use specs::Join;
 use wasm_bindgen::prelude::*;
 
 const MAX_TIME_STEP: f32 = 0.040;
+
+#[wasm_bindgen]
+extern "C" {
+    fn play_sound(sound: i32);
+}
 
 pub struct App {
     game: Game,
@@ -75,6 +82,7 @@ pub extern "C" fn update(
         input.mouse = app.render_app.project_cursor([mouse_x, mouse_y]);
     }
 
+    // Update game simulation
     while delta > 0.0 {
         if delta > MAX_TIME_STEP {
             app.game.update(MAX_TIME_STEP);
@@ -84,5 +92,18 @@ pub extern "C" fn update(
             break;
         }
     }
+
+    // Render
     render::render(&mut app, [width, height]);
+
+    // Play sounds
+    let effects = app.game.world.read_component::<Effect>();
+    for effect in effects.join() {
+        match effect.effect {
+            EffectInner::LaserFire => play_sound(1),
+            EffectInner::Explosion(_) => {/* TODO */}
+            EffectInner::MetalHit => {/* TODO */}
+            EffectInner::LaserHit => {/* TODO */}
+        }
+    }
 }

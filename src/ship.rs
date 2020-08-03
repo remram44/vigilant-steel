@@ -556,6 +556,23 @@ impl<'a> System<'a> for SysShip {
                                     ProjectileType::Plasma,
                                     ent,
                                 );
+                                {
+                                    let fire_effect = entities.create();
+                                    lazy.insert(
+                                        fire_effect,
+                                        Position {
+                                            pos: fire_pos,
+                                            rot: 0.0,
+                                        },
+                                    );
+                                    lazy.insert(
+                                        fire_effect,
+                                        Effect {
+                                            effect: EffectInner::LaserFire,
+                                            lifetime: -1.0,
+                                        },
+                                    );
+                                }
                                 *cooldown = rng.gen_range(0.3, 0.4);
                             }
                             BlockInner::RailGun {

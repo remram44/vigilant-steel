@@ -49,6 +49,7 @@ impl Component for Particle {
 /// replication of the effect is needed (the ship is replicated).
 #[derive(Debug, Clone)]
 pub enum EffectInner {
+    LaserFire,
     Explosion(f32),
     MetalHit,
     LaserHit,
@@ -178,6 +179,7 @@ impl<'a> System<'a> for SysParticles {
                         },
                     );
                 }
+                _ => {}
             }
 
             effect.lifetime -= dt;

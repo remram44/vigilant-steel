@@ -113,6 +113,34 @@ var sndNoise = (function() {
   });
 })();
 
+function loadSound(name) {
+  return fetch('assets/' + name).then(function(response) {
+    if(response.status !== 200) {
+      throw new Error("HTTP status ", response.status);
+    }
+    return response.arrayBuffer();
+  }).then(function(buffer) {
+    return audio.decodeAudioData(buffer);
+  }).then(function(buffer) {
+    console.log("Loaded sound ", name);
+    return new Sound(function() {
+      var sound = audio.createBufferSource();
+      sound.buffer = buffer;
+      sound.loop = false;
+
+      sound.connect(audio.destination);
+      sound.start();
+      return sound;
+    });
+  }).catch(function(err) {
+    console.error("Error loading sound ", name, ": ", err);
+  });
+}
+
+var sndLaser = sndNoise;
+loadSound('laser.wav').then(function(snd) {
+  sndLaser = snd;
+});
 
 /*
  * Input
@@ -274,6 +302,18 @@ function draw(position_x, position_y, angle, scale, color, buffer_id) {
   gl.enableVertexAttribArray(aColor);
   gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, buffer.length);
+}
+
+// Play a sound from WebAssembly
+function play_sound(sound) {
+  if(sound === 0) {
+    sndNoise.start();
+  } else if(sound === 1) {
+    sndLaser.start();
+  } else {
+    console.error("Unknown sound ", sound);
+    sndNoise.start();
+  }
 }
 
 // Load module
