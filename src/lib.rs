@@ -42,8 +42,6 @@ use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
 use ship::{Ship, SysShip};
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt};
 use std::collections::HashMap;
-#[cfg(feature = "network")]
-use std::net::SocketAddr;
 use std::ops::Deref;
 
 /// This describes the role of the local machine in the game.
@@ -219,11 +217,14 @@ impl Game {
     }
 
     #[cfg(feature = "network")]
-    pub fn new_server(port: u16) -> Game {
+    pub fn new_server<S: net::Server>(server: S) -> Game {
         let (world, mut dispatcher) = Self::new_common(Role::Server);
 
-        dispatcher =
-            dispatcher.with(net::SysNetServer::new(port), "netserver", &[]);
+        dispatcher = dispatcher.with(
+            net::SysNetServer::new(server),
+            "netserver",
+            &[],
+        );
 
         Game {
             world: world,
@@ -232,11 +233,11 @@ impl Game {
     }
 
     #[cfg(feature = "network")]
-    pub fn new_client(address: SocketAddr) -> Game {
+    pub fn new_client<C: net::Client>(client: C) -> Game {
         let (world, mut dispatcher) = Self::new_common(Role::Client);
 
         dispatcher = dispatcher.with(
-            net::SysNetClient::new(address),
+            net::SysNetClient::new(client),
             "netclient",
             &[],
         );

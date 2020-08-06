@@ -6,6 +6,7 @@ extern crate game;
 extern crate log;
 
 use game::Game;
+use game::net::udp::UdpServer;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
@@ -20,7 +21,7 @@ fn main() {
     color_logger::init(log::Level::Info).unwrap();
     info!("Starting up");
 
-    let mut game = Game::new_server(34244);
+    let mut game = Game::new_server(UdpServer::new(34244));
 
     let mut previous = SystemTime::now();
     let mut timer = 0.0;

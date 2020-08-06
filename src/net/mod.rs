@@ -1,17 +1,22 @@
 //! Network code.
 
+mod base;
+pub mod udp;
+
 use asteroid::Asteroid;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use guns::{Projectile, ProjectileType};
 use particles::Effect;
 use physics::{LocalControl, Position, Velocity};
 use ship::Ship;
-use specs::{Component, Entities, Read, HashMapStorage, Join, LazyUpdate,
-            NullStorage, ReadStorage, System, VecStorage, WriteStorage};
+use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
+            WriteStorage};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::io::{self, Cursor, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+pub use self::base::{Replicated, Delete, Dirty, ClientControlled};
 
 type ORDER = byteorder::BigEndian;
 
@@ -196,82 +201,40 @@ fn chk<T>(res: Result<T, io::Error>) {
     }
 }
 
-/// Replicated entities have an id to match them on multiple machines.
-pub struct Replicated {
-    id: u64,
-    last_update: u32,
+pub trait Server: Send + 'static {
+    type Address: Clone + Display + Eq + Send;
+
+    fn send(&self, msg: &[u8], addr: &Self::Address) -> io::Result<usize>;
+    fn recv(&self, buffer: &mut [u8]) -> io::Result<(usize, Self::Address)>;
 }
 
-impl Replicated {
-    pub fn new() -> Replicated {
-        Replicated {
-            id: 0,
-            last_update: 0,
-        }
-    }
+pub trait Client: Send + 'static {
+    fn send(&self, msg: &[u8]) -> io::Result<usize>;
+    fn recv(&self, buffer: &mut [u8]) -> io::Result<usize>;
 }
 
-impl Component for Replicated {
-    type Storage = VecStorage<Self>;
-}
-
-/// Mark an entity to be deleted everywhere.
-#[derive(Default)]
-pub struct Delete;
-
-impl Component for Delete {
-    type Storage = NullStorage<Self>;
-}
-
-/// Flag that marks an entity as dirty, eg needs to be sent to clients.
-#[derive(Default)]
-pub struct Dirty;
-
-impl Component for Dirty {
-    type Storage = NullStorage<Self>;
-}
-
-pub struct ConnectedClient {
-    address: SocketAddr,
+pub struct ConnectedClient<A: Eq> {
+    address: A,
     client_id: u64,
     ping: f32,
     last_pong: SystemTime,
 }
 
-/// Server component attached to entities controlled by clients.
-///
-/// Multiple entities can be controlled by the same client, and that's fine.
-pub struct ClientControlled {
-    client_id: u64,
-}
-
-impl Component for ClientControlled {
-    type Storage = HashMapStorage<Self>;
-}
-
 /// Network server system.
 ///
 /// Gets controls from clients and sends game updates.
-pub struct SysNetServer {
-    socket: UdpSocket,
+pub struct SysNetServer<S: Server> {
+    server: S,
     frame: u32,
     next_client: u64,
-    clients: HashMap<u64, ConnectedClient>,
+    clients: HashMap<u64, ConnectedClient<S::Address>>,
 }
 
-impl SysNetServer {
+impl<S: Server> SysNetServer<S> {
     /// Create a server, listening on the given port.
-    pub fn new(port: u16) -> SysNetServer {
-        let unspec = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-        let socket = match UdpSocket::bind(SocketAddr::new(unspec, port)) {
-            Ok(s) => s,
-            Err(e) => panic!("Couldn't listen on port {}: {}", port, e),
-        };
-        socket
-            .set_nonblocking(true)
-            .expect("Couldn't set socket nonblocking");
+    pub fn new(server: S) -> SysNetServer<S> {
         SysNetServer {
-            socket: socket,
+            server,
             frame: 0,
             next_client: 1,
             clients: HashMap::new(),
@@ -279,12 +242,12 @@ impl SysNetServer {
     }
 
     /// Sends a message.
-    fn send(&self, msg: &Message, addr: &SocketAddr) -> io::Result<usize> {
-        self.socket.send_to(&msg.bytes(), addr)
+    fn send(&self, msg: &Message, addr: &S::Address) -> io::Result<usize> {
+        self.server.send(&msg.bytes(), addr)
     }
 }
 
-impl<'a> System<'a> for SysNetServer {
+impl<'a, S: Server> System<'a> for SysNetServer<S> {
     type SystemData = (
         Read<'a, LazyUpdate>,
         Entities<'a>,
@@ -323,7 +286,7 @@ impl<'a> System<'a> for SysNetServer {
         let mut messages = Vec::new();
         let mut buffer = [0; 1024];
         loop {
-            let (len, src) = match self.socket.recv_from(&mut buffer) {
+            let (len, src) = match self.server.recv(&mut buffer) {
                 Ok(r) => r,
                 Err(e) => {
                     if e.kind() != io::ErrorKind::WouldBlock {
@@ -350,7 +313,7 @@ impl<'a> System<'a> for SysNetServer {
                         self.clients.insert(
                             client_id,
                             ConnectedClient {
-                                address: src,
+                                address: src.clone(),
                                 client_id: client_id,
                                 ping: 0.0,
                                 last_pong: now,
@@ -436,7 +399,7 @@ impl<'a> System<'a> for SysNetServer {
             if delete.get(ent).is_some() {
                 let message = Message::EntityDelete(repli.id).bytes();
                 for client in self.clients.values_mut() {
-                    chk(self.socket.send_to(&message, &client.address));
+                    chk(self.server.send(&message, &client.address));
                 }
                 entities.delete(ent).unwrap();
                 continue;
@@ -502,7 +465,7 @@ impl<'a> System<'a> for SysNetServer {
             }
             let update = Message::EntityUpdate(repli.id, data).bytes();
             for client in self.clients.values_mut() {
-                chk(self.socket.send_to(&update, &client.address));
+                chk(self.server.send(&update, &client.address));
             }
 
             repli.last_update = self.frame;
@@ -560,29 +523,19 @@ impl<'a> System<'a> for SysNetServer {
 /// Network client system.
 ///
 /// Sends controls to server and gets game updates.
-pub struct SysNetClient {
-    socket: UdpSocket,
-    server_address: SocketAddr,
+pub struct SysNetClient<C: Client> {
+    client: C,
     client_id: u64,
     last_pong: SystemTime,
     ping: f32,
     controlled_entities: HashSet<u64>,
 }
 
-impl SysNetClient {
+impl<C: Client> SysNetClient<C> {
     /// Create a client, connected to the specified server.
-    pub fn new(address: SocketAddr) -> SysNetClient {
-        let unspec = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-        let socket = match UdpSocket::bind(SocketAddr::new(unspec, 0)) {
-            Ok(s) => s,
-            Err(e) => panic!("Couldn't create a socket: {}", e),
-        };
-        socket
-            .set_nonblocking(true)
-            .expect("Couldn't set socket nonblocking");
+    pub fn new(client: C) -> SysNetClient<C> {
         let client = SysNetClient {
-            socket: socket,
-            server_address: address,
+            client,
             client_id: 0,
             last_pong: SystemTime::now(),
             ping: 0.0,
@@ -599,12 +552,12 @@ impl SysNetClient {
             .write_u64::<ORDER>(self.client_id)
             .unwrap();
         msg.to_bytes(&mut bytes);
-        self.socket
-            .send_to(&bytes, &self.server_address)
+        self.client
+            .send(&bytes)
     }
 }
 
-impl<'a> System<'a> for SysNetClient {
+impl<'a, C: Client> System<'a> for SysNetClient<C> {
     type SystemData = (
         Entities<'a>,
         Read<'a, LazyUpdate>,
@@ -635,7 +588,7 @@ impl<'a> System<'a> for SysNetClient {
         let mut messages = Vec::new();
         let mut buffer = [0; 1024];
         loop {
-            let (len, src) = match self.socket.recv_from(&mut buffer) {
+            let len = match self.client.recv(&mut buffer) {
                 Ok(r) => r,
                 Err(e) => {
                     if e.kind() != io::ErrorKind::WouldBlock {
@@ -644,10 +597,6 @@ impl<'a> System<'a> for SysNetClient {
                     break;
                 }
             };
-            if src != self.server_address {
-                info!("Got message from invalid source {}", src);
-                continue;
-            }
 
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
