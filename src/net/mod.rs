@@ -9,6 +9,7 @@ use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
             WriteStorage};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use std::hash::Hash;
 use std::io::{self, Cursor, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -55,9 +56,8 @@ enum Message {
     ///
     /// The server will reply with ServerHello.
     ClientHello,
-    /// Message sent by the server to accept a client, and assign it a client
-    /// ID.
-    ServerHello(u64),
+    /// Message sent by the server to accept a client.
+    ServerHello,
     /// Ping request, other side should send bytes back as Pong.
     Ping(u32),
     /// Pong reply, with the bytes from the Ping request.
@@ -68,7 +68,7 @@ enum Message {
     /// Entity update, from either side.
     ///
     /// The server sends full entity updates that the client applies. The
-    /// client sends update to the controls, preceded by its secret.
+    /// client sends update to the controls.
     EntityUpdate(u64, Vec<u8>),
     /// Entity deleted, from server.
     EntityDelete(u64),
@@ -91,13 +91,11 @@ impl Message {
                 }
             }
             b"hs" => {
-                if msg.len() != 8 + 8 {
+                if msg.len() != 8 {
                     info!("Invalid ServerHello length");
                     None
                 } else {
-                    Some(Message::ServerHello(
-                        rdr.read_u64::<ORDER>().unwrap(),
-                    ))
+                    Some(Message::ServerHello)
                 }
             }
             b"pi" => {
@@ -158,10 +156,9 @@ impl Message {
         msg.extend_from_slice(b"SPAC\x00\x01");
         match *self {
             Message::ClientHello => msg.extend_from_slice(b"hc"),
-            Message::ServerHello(id) => {
+            Message::ServerHello => {
                 msg.extend_from_slice(b"hs");
-                msg.write_u64::<ORDER>(id).unwrap();
-                assert_eq!(msg.len(), 8 + 8);
+                assert_eq!(msg.len(), 8);
             }
             Message::Ping(buf) => {
                 msg.extend_from_slice(b"pi");
@@ -204,7 +201,7 @@ fn chk<T>(res: Result<T, io::Error>) {
 }
 
 pub trait Server: Send + 'static {
-    type Address: Clone + Display + Eq + Send;
+    type Address: Clone + Display + Eq + Hash + Send;
 
     fn send(&self, msg: &[u8], addr: &Self::Address) -> io::Result<usize>;
     fn recv(&self, buffer: &mut [u8]) -> io::Result<(usize, Self::Address)>;
@@ -229,7 +226,7 @@ pub struct SysNetServer<S: Server> {
     server: S,
     frame: u32,
     next_client: u64,
-    clients: HashMap<u64, ConnectedClient<S::Address>>,
+    clients: HashMap<S::Address, ConnectedClient<S::Address>>,
 }
 
 impl<S: Server> SysNetServer<S> {
@@ -297,13 +294,12 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     break;
                 }
             };
-            if len < 8 + 8 {
+            if len < 8 {
                 info!("Invalid message from {}", src);
                 continue;
             }
-            let client_id = (&buffer[0..]).read_u64::<ORDER>().unwrap();
 
-            if let Some(msg) = Message::parse(&buffer[8..len]) {
+            if let Some(msg) = Message::parse(&buffer[0..len]) {
                 match msg {
                     Message::ClientHello => {
                         warn!("Got ClientHello from {}", src);
@@ -313,7 +309,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                         self.next_client += 1;
                         let now = SystemTime::now();
                         self.clients.insert(
-                            client_id,
+                            src.clone(),
                             ConnectedClient {
                                 address: src.clone(),
                                 client_id: client_id,
@@ -323,7 +319,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                         );
 
                         // Send ServerHello
-                        chk(self.send(&Message::ServerHello(client_id), &src));
+                        chk(self.send(&Message::ServerHello, &src));
 
                         // Create a ship for the new player
                         let newship = Ship::create(&entities, &lazy);
@@ -353,10 +349,26 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     Message::Ping(buf) => {
                         chk(self.send(&Message::Pong(buf), &src))
                     }
-                    Message::Pong(_) | Message::EntityUpdate(_, _) => {
-                        messages.push((client_id, msg))
+                    Message::Pong(_) => {
+                        if let Some(client) = self.clients.get_mut(&src) {
+                            if let Message::Pong(d) = msg {
+                                let d = time_decode(d);
+                                let now = SystemTime::now();
+                                let now_d = now.duration_since(UNIX_EPOCH).unwrap();
+                                if let Some(d) = now_d.checked_sub(d) {
+                                    client.last_pong = now;
+                                    client.ping = d.as_secs() as f32
+                                        + d.subsec_nanos() as f32 / 0.000_000_001;
+                                }
+                            }
+                        }
                     }
-                    Message::ServerHello(_)
+                    Message::EntityUpdate(_, _) => {
+                        if let Some(client) = self.clients.get(&src) {
+                            messages.push((client.client_id, msg));
+                        }
+                    }
+                    Message::ServerHello
                     | Message::StartEntityControl(_)
                     | Message::EntityDelete(_) => {
                         info!("Invalid message from {}", src)
@@ -368,27 +380,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
             }
         }
 
-        // Handle Pong from clients
-        for client in self.clients.values_mut() {
-            for &(ref client_id, ref msg) in &messages {
-                if client_id != &client.client_id {
-                    continue;
-                }
-
-                if let Message::Pong(d) = *msg {
-                    let d = time_decode(d);
-                    let now = SystemTime::now();
-                    let now_d = now.duration_since(UNIX_EPOCH).unwrap();
-                    if let Some(d) = now_d.checked_sub(d) {
-                        client.last_pong = now;
-                        client.ping = d.as_secs() as f32
-                            + d.subsec_nanos() as f32 / 0.000_000_001;
-                    }
-                }
-            }
-
-            // TODO: Drop old clients
-        }
+        // TODO: Drop old clients
 
         // Go over entities, send updates
         for (ent, mut repli) in (&*entities, &mut replicated).join() {
@@ -527,7 +519,6 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
 /// Sends controls to server and gets game updates.
 pub struct SysNetClient<C: Client> {
     client: C,
-    client_id: u64,
     last_pong: SystemTime,
     ping: f32,
     controlled_entities: HashSet<u64>,
@@ -538,7 +529,6 @@ impl<C: Client> SysNetClient<C> {
     pub fn new(client: C) -> SysNetClient<C> {
         let client = SysNetClient {
             client,
-            client_id: 0,
             last_pong: SystemTime::now(),
             ping: 0.0,
             controlled_entities: HashSet::new(),
@@ -550,12 +540,8 @@ impl<C: Client> SysNetClient<C> {
     /// Sends a message
     fn send(&self, msg: &Message) -> io::Result<usize> {
         let mut bytes = Vec::new();
-        bytes
-            .write_u64::<ORDER>(self.client_id)
-            .unwrap();
         msg.to_bytes(&mut bytes);
-        self.client
-            .send(&bytes)
+        self.client.send(&bytes)
     }
 }
 
@@ -602,10 +588,7 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
 
             if let Some(msg) = Message::parse(&buffer[..len]) {
                 match msg {
-                    Message::ServerHello(client_id) => {
-                        warn!("Got ServerHello, our ID is {}", client_id);
-                        self.client_id = client_id;
-                    }
+                    Message::ServerHello => warn!("Got ServerHello"),
                     Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
                     Message::Pong(d) => {
                         let d = time_decode(d);
