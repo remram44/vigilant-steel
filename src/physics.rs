@@ -3,18 +3,19 @@
 //! This contains `Position`, `Velocity`, `Hits`, ... `SysSimu` integrates
 //! positions, finds collisions.
 
-use Role;
-use blocks::Blocky;
-#[cfg(feature = "network")]
-use net;
-use sat;
 use specs::{Component, Entities, Entity, Read, HashMapStorage, Join,
             LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
 use std::f32::consts::PI;
 use std::ops::Deref;
-use tree;
 use vecmath::*;
+
+use crate::Role;
+use crate::blocks::Blocky;
+#[cfg(feature = "network")]
+use crate::net;
+use crate::sat;
+use crate::tree;
 
 /// Bounding-box.
 #[derive(Debug, Clone)]

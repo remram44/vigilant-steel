@@ -1,15 +1,16 @@
 //! Guns and projectiles.
 
-use Role;
-use blocks::Blocky;
-#[cfg(feature = "network")]
-use net;
-use particles::{Effect, EffectInner};
-use physics::{affect_area, delete_entity, AABox, DetectCollision, HitEffect,
-              Hits, Position, Velocity};
 use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
+
+use crate::Role;
+use crate::blocks::Blocky;
+#[cfg(feature = "network")]
+use crate::net;
+use crate::particles::{Effect, EffectInner};
+use crate::physics::{affect_area, delete_entity, AABox, DetectCollision,
+                     HitEffect, Hits, Position, Velocity};
 
 pub enum ProjectileType {
     Plasma,

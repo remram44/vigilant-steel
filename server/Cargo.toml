@@ -2,6 +2,7 @@
 workspace = ".."
 name = "server"
 version = "0.1.0"
+edition = "2018"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
 license = "GPL-3.0"
 repository = "https://gitlab.com/remram44/vigilant-steel"

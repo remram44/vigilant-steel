@@ -7,12 +7,13 @@
 //! explosions are an `Effect`, that is turned into particles by `SysParticles`
 //! once we got to replicate it to the clients.
 
-use Role;
-use physics::{DeltaTime, Position, Velocity};
 use rand::{self, Rng};
 use specs::{Component, Entities, Read, Join, LazyUpdate, ReadStorage,
             System, VecStorage, WriteStorage};
 use std::f32::consts::PI;
+
+use crate::Role;
+use crate::physics::{DeltaTime, Position, Velocity};
 
 /// Types of particles, that determine lifetime and render model.
 #[derive(Clone, Copy, Debug)]

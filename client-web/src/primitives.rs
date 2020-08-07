@@ -1,3 +1,4 @@
+use log::error;
 use vecmath::*;
 use wasm_bindgen::prelude::*;
 

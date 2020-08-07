@@ -2,6 +2,7 @@ use game::blocks::{BlockInner, Blocky};
 use game::guns::{Projectile, ProjectileType};
 use game::particles::{Particle, ParticleType};
 use game::physics::{LocalControl, Position};
+use log::info;
 use specs::{Entity, Join};
 use specs::world::WorldExt;
 use std::collections::hash_map::{Entry, HashMap};
@@ -12,7 +13,7 @@ use vecmath::*;
 use wasm_bindgen::prelude::*;
 
 use crate::App;
-use primitives::{BufType, VertexArrays, VertexVecs};
+use crate::primitives::{BufType, VertexArrays, VertexVecs};
 
 #[wasm_bindgen]
 extern "C" {

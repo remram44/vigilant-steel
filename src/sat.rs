@@ -4,10 +4,11 @@
 //! collisions and returns location, direction, and depth, but `SysCollision`
 //! actually handles it.
 
-use physics::{AABox, Position};
 use std::cmp::Ordering;
-use utils::IteratorExt;
 use vecmath::*;
+
+use crate::physics::{AABox, Position};
+use crate::utils::IteratorExt;
 
 #[derive(Clone, PartialEq)]
 struct Projection {

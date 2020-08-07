@@ -13,8 +13,9 @@
 
 use specs::{Component, Entities, Read, LazyUpdate, VecStorage};
 use std::num::Wrapping;
-use tree::Tree;
 use vecmath::*;
+
+use crate::tree::Tree;
 
 /// Active component of the block.
 #[derive(Debug, Clone)]

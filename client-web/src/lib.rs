@@ -1,16 +1,10 @@
-extern crate game;
-#[macro_use]
-extern crate log;
-extern crate specs;
-extern crate vecmath;
-extern crate wasm_bindgen;
-
 mod logger;
 mod primitives;
 mod render;
 
 use game::Game;
 use game::input::{Input, Press};
+use log::{error, info, warn};
 use specs::WorldExt;
 use std::cell::{RefCell, RefMut};
 use wasm_bindgen::prelude::*;

@@ -12,13 +12,6 @@
 //! * `asteroid.rs`: system spawning asteroids, deleting them when they fall
 //! off.
 
-extern crate byteorder;
-#[macro_use]
-extern crate log;
-extern crate rand;
-extern crate specs;
-extern crate vecmath;
-
 pub mod asteroid;
 pub mod blocks;
 pub mod guns;
@@ -36,6 +29,7 @@ use asteroid::{Asteroid, SysAsteroid};
 use blocks::Blocky;
 use guns::{Projectile, SysProjectile};
 use input::Input;
+use log::info;
 use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};

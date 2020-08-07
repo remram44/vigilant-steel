@@ -4,15 +4,16 @@
 //! so they are removed when falling off the screen, and more asteroids spawned
 //! when their number is low.
 
-use Role;
-use blocks::{Block, BlockInner, Blocky};
-#[cfg(feature = "network")]
-use net;
-use physics::{delete_entity, Position, Velocity};
 use rand::prelude::*;
 use specs::{Component, Entities, Read, Join, LazyUpdate, NullStorage,
             ReadStorage, System};
 use std::f32::consts::PI;
+
+use crate::Role;
+use crate::blocks::{Block, BlockInner, Blocky};
+#[cfg(feature = "network")]
+use crate::net;
+use crate::physics::{delete_entity, Position, Velocity};
 
 /// An asteroid
 #[derive(Default)]

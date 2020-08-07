@@ -1,12 +1,8 @@
 //! Entrypoint and eventloop for server.
 
-extern crate color_logger;
-extern crate game;
-#[macro_use]
-extern crate log;
-
 use game::Game;
 use game::net::udp::UdpServer;
+use log::{info, warn};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 

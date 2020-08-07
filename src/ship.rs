@@ -3,23 +3,24 @@
 //! A ship is just a `Blocky` object that has a cockpit. A `Ship` component
 //! gets tacked on to store controls and thruster state.
 // TODO: Take some behavior out of SysShip and into blocks.rs
-
-use asteroid::Asteroid;
-use blocks::{Block, BlockInner, Blocky};
-use guns::{Projectile, ProjectileType};
-use input::{Input, Press};
-#[cfg(feature = "network")]
-use net;
-use particles::{Effect, EffectInner, Particle, ParticleType};
-use physics::{find_collision_tree_ray, DeltaTime, HitEffect, Hits,
-              LocalControl, Position, Velocity};
+//
 use rand::{self, Rng};
 use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use std::f32::consts::PI;
-use utils::angle_wrap;
 use vecmath::*;
-use {Clock, Role};
+
+use crate::asteroid::Asteroid;
+use crate::blocks::{Block, BlockInner, Blocky};
+use crate::guns::{Projectile, ProjectileType};
+use crate::input::{Input, Press};
+#[cfg(feature = "network")]
+use crate::net;
+use crate::particles::{Effect, EffectInner, Particle, ParticleType};
+use crate::physics::{find_collision_tree_ray, DeltaTime, HitEffect, Hits,
+                     LocalControl, Position, Velocity};
+use crate::utils::angle_wrap;
+use crate::{Clock, Role};
 
 /// A ship.
 ///

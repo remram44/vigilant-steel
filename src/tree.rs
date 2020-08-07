@@ -2,8 +2,9 @@
 //!
 //! This is used to accelerate collision detection between `Blocky` objects.
 
-use physics::AABox;
 use std::cmp::Ordering;
+
+use crate::physics::AABox;
 
 #[derive(Debug, PartialEq)]
 pub enum Content {
