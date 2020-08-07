@@ -1,8 +1,7 @@
-use log::info;
+use log::{info, warn};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::io;
 
-use super::{Client, Server};
+use super::{NetError, Client, Server};
 
 pub struct UdpServer {
     socket: UdpSocket,
@@ -25,12 +24,21 @@ impl UdpServer {
 impl Server for UdpServer {
     type Address = SocketAddr;
 
-    fn send(&self, msg: &[u8], addr: &SocketAddr) -> io::Result<usize> {
+    fn send(&self, msg: &[u8], addr: &SocketAddr) -> Result<(), NetError> {
         self.socket.send_to(msg, addr)
+            .map(|_| ())
+            .map_err(|err| {
+                warn!("Send error: {}", err);
+                NetError::Disconnected
+            })
     }
 
-    fn recv(&self, buffer: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    fn recv(&self, buffer: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
         self.socket.recv_from(buffer)
+            .map_err(|err| {
+                warn!("Recv error: {}", err);
+                NetError::Disconnected
+            })
     }
 }
 
@@ -57,13 +65,22 @@ impl UdpClient {
 }
 
 impl Client for UdpClient {
-    fn send(&self, msg: &[u8]) -> io::Result<usize> {
+    fn send(&self, msg: &[u8]) -> Result<(), NetError> {
         self.socket.send_to(msg, self.server_address)
+            .map(|_| ())
+            .map_err(|err| {
+                warn!("Send error: {}", err);
+                NetError::Disconnected
+            })
     }
 
-    fn recv(&self, buffer: &mut [u8]) -> io::Result<usize> {
+    fn recv(&self, buffer: &mut [u8]) -> Result<usize, NetError> {
         loop {
-            let (len, addr) = self.socket.recv_from(buffer)?;
+            let (len, addr) = self.socket.recv_from(buffer)
+                .map_err(|err| {
+                    warn!("Send error: {}", err);
+                    NetError::Disconnected
+                })?;
             if addr != self.server_address {
                 info!("Got message from invalid source {}", addr);
             } else {

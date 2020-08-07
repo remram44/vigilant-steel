@@ -8,7 +8,7 @@ use log::{info, warn};
 use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
             WriteStorage};
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::io::{self, Cursor, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -192,24 +192,39 @@ impl Message {
     }
 }
 
+// TODO: Get rid of that, log somewhere else and drop connection
 /// Warns if a Result is an error.
-fn chk<T>(res: Result<T, io::Error>) {
+fn chk<T>(res: Result<T, NetError>) {
     match res {
         Ok(_) => {}
-        Err(e) => warn!("Network error: {}", e),
+        Err(e) => warn!("Network error: {:?}", e),
+    }
+}
+
+pub enum NetError {
+    Disconnected,
+    FlowControl,
+}
+
+impl fmt::Debug for NetError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            NetError::Disconnected => write!(f, "Disconnected"),
+            NetError::FlowControl => write!(f, "Flow control"),
+        }
     }
 }
 
 pub trait Server: Send + 'static {
     type Address: Clone + Display + Eq + Hash + Send;
 
-    fn send(&self, msg: &[u8], addr: &Self::Address) -> io::Result<usize>;
-    fn recv(&self, buffer: &mut [u8]) -> io::Result<(usize, Self::Address)>;
+    fn send(&self, msg: &[u8], addr: &Self::Address) -> Result<(), NetError>;
+    fn recv(&self, buffer: &mut [u8]) -> Result<(usize, Self::Address), NetError>;
 }
 
 pub trait Client: Send + 'static {
-    fn send(&self, msg: &[u8]) -> io::Result<usize>;
-    fn recv(&self, buffer: &mut [u8]) -> io::Result<usize>;
+    fn send(&self, msg: &[u8]) -> Result<(), NetError>;
+    fn recv(&self, buffer: &mut [u8]) -> Result<usize, NetError>;
 }
 
 pub struct ConnectedClient<A: Eq> {
@@ -241,7 +256,7 @@ impl<S: Server> SysNetServer<S> {
     }
 
     /// Sends a message.
-    fn send(&self, msg: &Message, addr: &S::Address) -> io::Result<usize> {
+    fn send(&self, msg: &Message, addr: &S::Address) -> Result<(), NetError> {
         self.server.send(&msg.bytes(), addr)
     }
 }
@@ -287,10 +302,9 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
         loop {
             let (len, src) = match self.server.recv(&mut buffer) {
                 Ok(r) => r,
-                Err(e) => {
-                    if e.kind() != io::ErrorKind::WouldBlock {
-                        warn!("Error reading from socket: {}", e);
-                    }
+                Err(NetError::FlowControl) => break,
+                Err(_) => {
+                    warn!("Error reading from socket");
                     break;
                 }
             };
@@ -538,7 +552,7 @@ impl<C: Client> SysNetClient<C> {
     }
 
     /// Sends a message
-    fn send(&self, msg: &Message) -> io::Result<usize> {
+    fn send(&self, msg: &Message) -> Result<(), NetError> {
         let mut bytes = Vec::new();
         msg.to_bytes(&mut bytes);
         self.client.send(&bytes)
@@ -578,10 +592,9 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
         loop {
             let len = match self.client.recv(&mut buffer) {
                 Ok(r) => r,
-                Err(e) => {
-                    if e.kind() != io::ErrorKind::WouldBlock {
-                        warn!("Error reading from socket: {}", e);
-                    }
+                Err(NetError::FlowControl) => break,
+                Err(_) => {
+                    warn!("Error reading from socket");
                     break;
                 }
             };
