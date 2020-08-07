@@ -10,6 +10,7 @@ build_game:
     - cargo install --version 0.2.63 wasm-bindgen-cli
   script:
     - cargo build
+    - cargo build --features network
     - cargo test
     - sh -c "cd client-web && cargo build --release --target wasm32-unknown-unknown"
     - wasm-bindgen target/wasm32-unknown-unknown/release/client_web.wasm --out-dir client-web --browser --no-typescript --no-modules --no-modules-global client_web
