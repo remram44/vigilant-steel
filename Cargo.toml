@@ -23,7 +23,7 @@ tokio-tungstenite = { version = "0.10", optional = true }
 
 [features]
 network = []
-websocket = ["network", "tokio", "tokio-tungstenite"]
+websocket = ["network", "tokio", "tokio/sync", "tokio-tungstenite"]
 
 [profile.release]
 lto = true
