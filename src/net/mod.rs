@@ -2,6 +2,8 @@
 
 mod base;
 pub mod udp;
+#[cfg(feature = "websocket")]
+pub mod websocket;
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use log::{info, warn};
