@@ -221,12 +221,12 @@ pub trait Server: Send + 'static {
     type Address: Clone + Display + Eq + Hash + Send;
 
     fn send(&self, msg: &[u8], addr: &Self::Address) -> Result<(), NetError>;
-    fn recv(&self, buffer: &mut [u8]) -> Result<(usize, Self::Address), NetError>;
+    fn recv(&mut self, buffer: &mut [u8]) -> Result<(usize, Self::Address), NetError>;
 }
 
 pub trait Client: Send + 'static {
     fn send(&self, msg: &[u8]) -> Result<(), NetError>;
-    fn recv(&self, buffer: &mut [u8]) -> Result<usize, NetError>;
+    fn recv(&mut self, buffer: &mut [u8]) -> Result<usize, NetError>;
 }
 
 pub struct ConnectedClient<A: Eq> {

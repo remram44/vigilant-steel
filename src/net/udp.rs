@@ -39,7 +39,7 @@ impl Server for UdpServer {
         }
     }
 
-    fn recv(&self, buffer: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
+    fn recv(&mut self, buffer: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
         match self.socket.recv_from(buffer) {
             Ok(r) => Ok(r),
             Err(err) => {
@@ -91,7 +91,7 @@ impl Client for UdpClient {
         }
     }
 
-    fn recv(&self, buffer: &mut [u8]) -> Result<usize, NetError> {
+    fn recv(&mut self, buffer: &mut [u8]) -> Result<usize, NetError> {
         loop {
             let (len, addr) = match self.socket.recv_from(buffer) {
                 Ok(r) => r,
