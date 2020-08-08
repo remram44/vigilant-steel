@@ -64,7 +64,7 @@ async fn handle_connection(
                     }
                 }
                 WsMessage::Close(_) => {
-                    /*sender.send((Message::Disconnection, addr)).unwrap();*/
+                    sender.send((Message::Disconnection, addr)).unwrap();
                     return futures_util::future::err(tungstenite::error::Error::ConnectionClosed);
                 }
             }
@@ -170,7 +170,7 @@ impl Server for WebsocketServer {
 
     fn recv(&mut self) -> Result<(Message, SocketAddr), NetError> {
         match self.recv_queue.try_recv() {
-            Err(TryRecvError::Empty) => Err(NetError::FlowControl),
+            Err(TryRecvError::Empty) => Err(NetError::NoMore),
             Err(TryRecvError::Closed) => panic!("Network thread error"),
             Ok((msg, src)) => {
                 Ok((msg, src))

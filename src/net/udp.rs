@@ -30,10 +30,9 @@ impl Server for UdpServer {
             Ok(_) => Ok(()),
             Err(err) => {
                 if err.kind() == io ::ErrorKind::WouldBlock {
-                    Err(NetError::FlowControl)
+                    Err(NetError::NoMore)
                 } else {
-                    warn!("Send error: {}", err);
-                    Err(NetError::Disconnected)
+                    Err(NetError::Error(Box::new(err)))
                 }
             }
         }
@@ -46,10 +45,9 @@ impl Server for UdpServer {
                 Ok(r) => r,
                 Err(err) => {
                     if err.kind() == io::ErrorKind::WouldBlock {
-                        return Err(NetError::FlowControl);
+                        return Err(NetError::NoMore);
                     } else {
-                        warn!("Recv error: {}", err);
-                        return Err(NetError::Disconnected);
+                        return Err(NetError::Error(Box::new(err)));
                     }
                 }
             };
@@ -90,10 +88,9 @@ impl Client for UdpClient {
             Ok(_) => Ok(()),
             Err(err) => {
                 if err.kind() == io ::ErrorKind::WouldBlock {
-                    Err(NetError::FlowControl)
+                    Err(NetError::NoMore)
                 } else {
-                    warn!("Send error: {}", err);
-                    Err(NetError::Disconnected)
+                    Err(NetError::Error(Box::new(err)))
                 }
             }
         }
@@ -106,10 +103,9 @@ impl Client for UdpClient {
                 Ok(r) => r,
                 Err(err) => {
                     if err.kind() == io ::ErrorKind::WouldBlock {
-                        return Err(NetError::FlowControl);
+                        return Err(NetError::NoMore);
                     } else {
-                        warn!("Send error: {}", err);
-                        return Err(NetError::Disconnected);
+                        return Err(NetError::Error(Box::new(err)));
                     }
                 }
             };

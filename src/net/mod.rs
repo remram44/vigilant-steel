@@ -10,6 +10,7 @@ use log::{info, warn};
 use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
             WriteStorage};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::io::{self, Cursor, Write};
@@ -61,6 +62,10 @@ pub enum Message {
     ClientHello,
     /// Message sent by the server to accept a client.
     ServerHello,
+    /// Disconnection (can be synthetic, not actually sent from peer).
+    ///
+    /// Sending this message should close the connection.
+    Disconnection,
     /// Ping request, other side should send bytes back as Pong.
     Ping(u32),
     /// Pong reply, with the bytes from the Ping request.
@@ -75,10 +80,6 @@ pub enum Message {
     EntityUpdate(u64, Vec<u8>),
     /// Entity deleted, from server.
     EntityDelete(u64),
-    /*
-    /// Disconnection (can be synthetic event, not actually sent from peer).
-    Disconnection,
-    */
 }
 
 impl Message {
@@ -103,6 +104,14 @@ impl Message {
                     None
                 } else {
                     Some(Message::ServerHello)
+                }
+            }
+            b"ds" => {
+                if msg.len() != 8 {
+                    info!("Invalid Disconnection length");
+                    None
+                } else {
+                    Some(Message::Disconnection)
                 }
             }
             b"pi" => {
@@ -163,10 +172,8 @@ impl Message {
         msg.extend_from_slice(b"SPAC\x00\x01");
         match *self {
             Message::ClientHello => msg.extend_from_slice(b"hc"),
-            Message::ServerHello => {
-                msg.extend_from_slice(b"hs");
-                assert_eq!(msg.len(), 8);
-            }
+            Message::ServerHello => msg.extend_from_slice(b"hs"),
+            Message::Disconnection => msg.extend_from_slice(b"ds"),
             Message::Ping(buf) => {
                 msg.extend_from_slice(b"pi");
                 msg.write_u32::<ORDER>(buf).unwrap();
@@ -208,16 +215,28 @@ fn chk<T>(res: Result<T, NetError>) {
     }
 }
 
+#[derive(Debug)]
 pub enum NetError {
-    Disconnected,
-    FlowControl,
+    /// Actual error, this is bad.
+    Error(Box<dyn Error>),
+    /// The link is full (when sending) or empty (when receiving).
+    NoMore,
 }
 
-impl fmt::Debug for NetError {
+impl fmt::Display for NetError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            NetError::Disconnected => write!(f, "Disconnected"),
-            NetError::FlowControl => write!(f, "Flow control"),
+            NetError::Error(_) => write!(f, "Error"),
+            NetError::NoMore => write!(f, "No more"),
+        }
+    }
+}
+
+impl Error for NetError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            NetError::Error(e) => Some(e.as_ref()),
+            NetError::NoMore => None,
         }
     }
 }
@@ -225,12 +244,26 @@ impl fmt::Debug for NetError {
 pub trait Server: Send + 'static {
     type Address: Clone + Display + Eq + Hash + Send;
 
+    /// Send a message to a specific client.
+    ///
+    /// Returns NetError::NoMore if the buffer is full.
     fn send(&self, msg: &Message, addr: &Self::Address) -> Result<(), NetError>;
+
+    /// Receive a message from any client.
+    ///
+    /// Returns NetError::NoMore once there are no more messages for now.
     fn recv(&mut self) -> Result<(Message, Self::Address), NetError>;
 }
 
 pub trait Client: Send + 'static {
+    /// Send a message to the server.
+    ///
+    /// Returns NetError::NoMore if the buffer is full.
     fn send(&self, msg: &Message) -> Result<(), NetError>;
+
+    /// Receive a message from the server.
+    ///
+    /// Returns NetError::NoMore once there are no more messages for now.
     fn recv(&mut self) -> Result<Message, NetError>;
 }
 
@@ -308,9 +341,9 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
         loop {
             let (msg, src) = match self.server.recv() {
                 Ok(r) => r,
-                Err(NetError::FlowControl) => break,
-                Err(_) => {
-                    warn!("Error reading from socket");
+                Err(NetError::NoMore) => break,
+                Err(NetError::Error(err)) => {
+                    warn!("Error reading from socket: {:?}", err);
                     break;
                 }
             };
@@ -378,6 +411,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                         }
                     }
                 }
+                Message::Disconnection => { /* TODO */ }
                 Message::EntityUpdate(_, _) => {
                     if let Some(client) = self.clients.get(&src) {
                         messages.push((client.client_id, msg));
@@ -586,15 +620,16 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
         loop {
             let msg = match self.client.recv() {
                 Ok(r) => r,
-                Err(NetError::FlowControl) => break,
-                Err(_) => {
-                    warn!("Error reading from socket");
+                Err(NetError::NoMore) => break,
+                Err(NetError::Error(err)) => {
+                    warn!("Error reading from socket: {}", err);
                     break;
                 }
             };
 
             match msg {
                 Message::ServerHello => warn!("Got ServerHello"),
+                Message::Disconnection => { /* TODO */ }
                 Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
                 Message::Pong(d) => {
                     let d = time_decode(d);
