@@ -1,4 +1,6 @@
-use futures_util::stream::{SplitSink, StreamExt, TryStreamExt};
+use futures_util::pin_mut;
+use futures_util::sink::SinkExt;
+use futures_util::stream::{StreamExt, TryStreamExt};
 use log::{error, warn};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -9,43 +11,56 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::mpsc::error::TryRecvError;
 use tungstenite::protocol::Message as WsMessage;
 
-use super::{NetError, Server};
+use super::{Message, NetError, Server};
 
-/// HashMap containing the sender halves of the websockets
+/// HashMap containing the sender channel for the websockets
 type Writers = Arc<Mutex<HashMap<
     SocketAddr,
-    SplitSink<
-        tokio_tungstenite::WebSocketStream<TcpStream>,
-        WsMessage,
-    >,
+    UnboundedSender<WsMessage>,
 >>>;
 
 async fn handle_connection(
-    sender: UnboundedSender<(Vec<u8>, SocketAddr)>,
+    sender: UnboundedSender<(Message, SocketAddr)>,
     writers: Writers,
     stream: TcpStream,
     addr: SocketAddr,
 ) {
-    //let ret = handle_connection_inner(sender, writers, stream, addr).await;
     let ret: Result<(), tungstenite::error::Error> = async {
         // Establish WebSocket
         let ws = tokio_tungstenite::accept_async(stream).await?;
         let (send, recv) = ws.split();
 
+        // Create an MPSC channel. We can't just pass the SplitSink because it
+        // is not Sync, so the sending task can't hold on to it across await
+        // (for example while it await sends on it)
+        let (tx, rx) = unbounded_channel();
+
         // Insert sender half in the HashMap
-        writers.lock().unwrap().insert(addr, send);
+        writers.lock().unwrap().insert(addr, tx);
+
+        let forward = rx.map(Ok).forward(send);
 
         // Get messages, put them in the queue
-        recv.try_for_each(|msg| {
+        let receive = recv.try_for_each(|msg| {
             match msg {
                 WsMessage::Text(_) => warn!("Got TEXT message from {}", addr),
-                WsMessage::Binary(b) => sender.send((b, addr)).unwrap(),
+                WsMessage::Binary(b) => {
+                    match Message::parse(&b) {
+                        Some(msg) => sender.send((msg, addr)).unwrap(),
+                        None => warn!("Invalid message from {}", addr),
+                    }
+                }
                 WsMessage::Ping(_) => {}
                 WsMessage::Pong(_) => {}
                 WsMessage::Close(r) => {}
             }
             futures_util::future::ok(())
-        }).await
+        });
+
+        pin_mut!(forward, receive);
+        futures_util::future::select(forward, receive).await;
+
+        Ok(())
     }.await;
     match ret {
         Ok(()) => {}
@@ -54,17 +69,37 @@ async fn handle_connection(
 }
 
 async fn handle_writes(
-    write_queue: UnboundedReceiver<(Vec<u8>, SocketAddr)>,
+    mut write_queue: UnboundedReceiver<(Message, SocketAddr)>,
     writers: Writers,
 ) {
-    // TODO
+    /*
+    loop {
+        let (msg, addr) = match write_queue.recv().await {
+            Some(r) => r,
+            None => break,
+        };
+
+        let mut writers = writers.lock().unwrap();
+
+        // Send message
+        match writers.get_mut(&addr) {
+            Some(w) => {
+                match w.send(WsMessage::Binary(msg.bytes())).await {
+                    Ok(()) => {}
+                    Err(err) => warn!("Error sending to {}: {}", addr, err),
+                }
+            }
+            None => warn!("Can't send message to disconnected {}", addr),
+        }
+    }
+    */
 }
 
 /// WebSocket server, accepting connections and starting tasks for them.
 async fn server(
     port: u16,
-    sender: UnboundedSender<(Vec<u8>, SocketAddr)>,
-    write_queue: UnboundedReceiver<(Vec<u8>, SocketAddr)>,
+    sender: UnboundedSender<(Message, SocketAddr)>,
+    write_queue: UnboundedReceiver<(Message, SocketAddr)>,
 ) {
     // Writers hashmap, connection handlers will add their sending half to it
     let writers = Arc::new(Mutex::new(HashMap::new()));
@@ -91,8 +126,8 @@ async fn server(
 }
 
 pub struct WebsocketServer {
-    recv_queue: UnboundedReceiver<(Vec<u8>, SocketAddr)>,
-    write_queue: UnboundedSender<(Vec<u8>, SocketAddr)>
+    recv_queue: UnboundedReceiver<(Message, SocketAddr)>,
+    write_queue: UnboundedSender<(Message, SocketAddr)>
 }
 
 impl WebsocketServer {
@@ -115,19 +150,18 @@ impl WebsocketServer {
 impl Server for WebsocketServer {
     type Address = SocketAddr;
 
-    fn send(&self, msg: &[u8], addr: &SocketAddr) -> Result<(), NetError> {
+    fn send(&self, msg: &Message, addr: &SocketAddr) -> Result<(), NetError> {
         // Add it to the queue, handle_writes() task will send it
         self.write_queue.send((msg.to_owned(), addr.clone())).unwrap();
         Ok(())
     }
 
-    fn recv(&mut self, buffer: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
+    fn recv(&mut self) -> Result<(Message, SocketAddr), NetError> {
         match self.recv_queue.try_recv() {
             Err(TryRecvError::Empty) => Err(NetError::FlowControl),
             Err(TryRecvError::Closed) => panic!("Network thread error"),
-            Ok((data, src)) => {
-                buffer[0..data.len()].clone_from_slice(&data);
-                Ok((data.len(), src))
+            Ok((msg, src)) => {
+                Ok((msg, src))
             }
         }
     }

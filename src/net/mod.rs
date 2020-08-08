@@ -53,6 +53,7 @@ fn read_float<R: io::Read>(mut reader: R) -> f32 {
 }
 
 /// The message exchanged by server and clients.
+#[derive(Clone, Debug)]
 pub enum Message {
     /// Message sent by a client to introduce itself.
     ///
