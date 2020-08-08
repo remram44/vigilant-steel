@@ -75,6 +75,10 @@ pub enum Message {
     EntityUpdate(u64, Vec<u8>),
     /// Entity deleted, from server.
     EntityDelete(u64),
+    /*
+    /// Disconnection (can be synthetic event, not actually sent from peer).
+    Disconnection,
+    */
 }
 
 impl Message {

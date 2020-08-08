@@ -1,7 +1,9 @@
+use byteorder::ReadBytesExt;
 use futures_util::pin_mut;
 use futures_util::stream::{StreamExt, TryStreamExt};
 use log::{error, warn};
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -10,7 +12,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::mpsc::error::TryRecvError;
 use tungstenite::protocol::Message as WsMessage;
 
-use super::{Message, NetError, Server};
+use super::{ORDER, Message, NetError, Server};
 
 /// HashMap containing the sender channel for the websockets
 type Writers = Arc<Mutex<HashMap<
@@ -45,13 +47,26 @@ async fn handle_connection(
                 WsMessage::Text(_) => warn!("Got TEXT message from {}", addr),
                 WsMessage::Binary(b) => {
                     match Message::parse(&b) {
+                        None|Some(Message::Ping(_))|Some(Message::Pong(_)) => warn!("Invalid message from {}", addr),
                         Some(msg) => sender.send((msg, addr)).unwrap(),
-                        None => warn!("Invalid message from {}", addr),
                     }
                 }
-                WsMessage::Ping(_) => {}
-                WsMessage::Pong(_) => {}
-                WsMessage::Close(r) => {}
+                WsMessage::Ping(ref b)|WsMessage::Pong(ref b) => {
+                    let mut rdr = Cursor::new(b);
+                    if let Ok(val) = rdr.read_u32::<ORDER>() {
+                        let msg = match msg {
+                            WsMessage::Ping(_) => Message::Ping(val),
+                            _ => Message::Pong(val),
+                        };
+                        sender.send((msg, addr)).unwrap();
+                    } else {
+                        warn!("Invalid pong message from {}", addr);
+                    }
+                }
+                WsMessage::Close(_) => {
+                    /*sender.send((Message::Disconnection, addr)).unwrap();*/
+                    return futures_util::future::err(tungstenite::error::Error::ConnectionClosed);
+                }
             }
             futures_util::future::ok(())
         });
