@@ -1,5 +1,4 @@
 use futures_util::pin_mut;
-use futures_util::sink::SinkExt;
 use futures_util::stream::{StreamExt, TryStreamExt};
 use log::{error, warn};
 use std::collections::HashMap;
@@ -72,7 +71,6 @@ async fn handle_writes(
     mut write_queue: UnboundedReceiver<(Message, SocketAddr)>,
     writers: Writers,
 ) {
-    /*
     loop {
         let (msg, addr) = match write_queue.recv().await {
             Some(r) => r,
@@ -84,7 +82,7 @@ async fn handle_writes(
         // Send message
         match writers.get_mut(&addr) {
             Some(w) => {
-                match w.send(WsMessage::Binary(msg.bytes())).await {
+                match w.send(WsMessage::Binary(msg.bytes())) {
                     Ok(()) => {}
                     Err(err) => warn!("Error sending to {}: {}", addr, err),
                 }
@@ -92,7 +90,6 @@ async fn handle_writes(
             None => warn!("Can't send message to disconnected {}", addr),
         }
     }
-    */
 }
 
 /// WebSocket server, accepting connections and starting tasks for them.

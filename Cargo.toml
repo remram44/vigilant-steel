@@ -19,13 +19,14 @@ rand = "0.7"
 specs = { version = "0.16", default-features = false, features = ["wasm-bindgen"] }
 vecmath = "1.0"
 tokio = { version = "0.2", optional = true }
+futures-channel = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
 tungstenite = { version = "*", optional = true }
-tokio-tungstenite = { version = "0.10", optional = true }
+tokio-tungstenite = { version = "0.11", optional = true }
 
 [features]
 network = []
-websocket = ["network", "tokio", "tokio/sync", "futures-util", "tungstenite", "tokio-tungstenite"]
+websocket = ["network", "tokio", "tokio/sync", "tokio/stream", "futures-channel", "futures-util", "tungstenite", "tokio-tungstenite"]
 
 [profile.release]
 lto = true
