@@ -53,7 +53,7 @@ fn read_float<R: io::Read>(mut reader: R) -> f32 {
 }
 
 /// The message exchanged by server and clients.
-enum Message {
+pub enum Message {
     /// Message sent by a client to introduce itself.
     ///
     /// The server will reply with ServerHello.
@@ -220,13 +220,13 @@ impl fmt::Debug for NetError {
 pub trait Server: Send + 'static {
     type Address: Clone + Display + Eq + Hash + Send;
 
-    fn send(&self, msg: &[u8], addr: &Self::Address) -> Result<(), NetError>;
-    fn recv(&mut self, buffer: &mut [u8]) -> Result<(usize, Self::Address), NetError>;
+    fn send(&self, msg: &Message, addr: &Self::Address) -> Result<(), NetError>;
+    fn recv(&mut self) -> Result<(Message, Self::Address), NetError>;
 }
 
 pub trait Client: Send + 'static {
-    fn send(&self, msg: &[u8]) -> Result<(), NetError>;
-    fn recv(&mut self, buffer: &mut [u8]) -> Result<usize, NetError>;
+    fn send(&self, msg: &Message) -> Result<(), NetError>;
+    fn recv(&mut self) -> Result<Message, NetError>;
 }
 
 pub struct ConnectedClient<A: Eq> {
@@ -259,7 +259,7 @@ impl<S: Server> SysNetServer<S> {
 
     /// Sends a message.
     fn send(&self, msg: &Message, addr: &S::Address) -> Result<(), NetError> {
-        self.server.send(&msg.bytes(), addr)
+        self.server.send(msg, addr)
     }
 }
 
@@ -300,9 +300,8 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
 
         // Receive messages
         let mut messages = Vec::new();
-        let mut buffer = [0; 1024];
         loop {
-            let (len, src) = match self.server.recv(&mut buffer) {
+            let (msg, src) = match self.server.recv() {
                 Ok(r) => r,
                 Err(NetError::FlowControl) => break,
                 Err(_) => {
@@ -310,89 +309,80 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     break;
                 }
             };
-            if len < 8 {
-                info!("Invalid message from {}", src);
-                continue;
-            }
 
-            if let Some(msg) = Message::parse(&buffer[0..len]) {
-                match msg {
-                    Message::ClientHello => {
-                        warn!("Got ClientHello from {}", src);
+            match msg {
+                Message::ClientHello => {
+                    warn!("Got ClientHello from {}", src);
 
-                        // Create a client
-                        let client_id = self.next_client;
-                        self.next_client += 1;
-                        let now = SystemTime::now();
-                        self.clients.insert(
-                            src.clone(),
-                            ConnectedClient {
-                                address: src.clone(),
-                                client_id: client_id,
-                                ping: 0.0,
-                                last_pong: now,
-                            },
-                        );
+                    // Create a client
+                    let client_id = self.next_client;
+                    self.next_client += 1;
+                    let now = SystemTime::now();
+                    self.clients.insert(
+                        src.clone(),
+                        ConnectedClient {
+                            address: src.clone(),
+                            client_id: client_id,
+                            ping: 0.0,
+                            last_pong: now,
+                        },
+                    );
 
-                        // Send ServerHello
-                        chk(self.send(&Message::ServerHello, &src));
+                    // Send ServerHello
+                    chk(self.send(&Message::ServerHello, &src));
 
-                        // Create a ship for the new player
-                        let newship = Ship::create(&entities, &lazy);
-                        lazy.insert(
-                            newship,
-                            ClientControlled {
-                                client_id: client_id,
-                            },
-                        );
-                        let ship_id = (newship.gen().id() as u64) << 32
-                            | newship.id() as u64;
-                        chk(self.send(
-                            &Message::StartEntityControl(ship_id),
-                            &src,
-                        ));
+                    // Create a ship for the new player
+                    let newship = Ship::create(&entities, &lazy);
+                    lazy.insert(
+                        newship,
+                        ClientControlled {
+                            client_id: client_id,
+                        },
+                    );
+                    let ship_id = (newship.gen().id() as u64) << 32
+                        | newship.id() as u64;
+                    chk(self.send(
+                        &Message::StartEntityControl(ship_id),
+                        &src,
+                    ));
 
-                        warn!(
-                            "Created Ship {} for new client {}",
-                            ship_id, client_id
-                        );
+                    warn!(
+                        "Created Ship {} for new client {}",
+                        ship_id, client_id
+                    );
 
-                        // Send initial Ping message
-                        let d = now.duration_since(UNIX_EPOCH).unwrap();
-                        let d = time_encode(d);
-                        chk(self.send(&Message::Ping(d), &src));
-                    }
-                    Message::Ping(buf) => {
-                        chk(self.send(&Message::Pong(buf), &src))
-                    }
-                    Message::Pong(_) => {
-                        if let Some(client) = self.clients.get_mut(&src) {
-                            if let Message::Pong(d) = msg {
-                                let d = time_decode(d);
-                                let now = SystemTime::now();
-                                let now_d = now.duration_since(UNIX_EPOCH).unwrap();
-                                if let Some(d) = now_d.checked_sub(d) {
-                                    client.last_pong = now;
-                                    client.ping = d.as_secs() as f32
-                                        + d.subsec_nanos() as f32 / 0.000_000_001;
-                                }
+                    // Send initial Ping message
+                    let d = now.duration_since(UNIX_EPOCH).unwrap();
+                    let d = time_encode(d);
+                    chk(self.send(&Message::Ping(d), &src));
+                }
+                Message::Ping(buf) => {
+                    chk(self.send(&Message::Pong(buf), &src))
+                }
+                Message::Pong(_) => {
+                    if let Some(client) = self.clients.get_mut(&src) {
+                        if let Message::Pong(d) = msg {
+                            let d = time_decode(d);
+                            let now = SystemTime::now();
+                            let now_d = now.duration_since(UNIX_EPOCH).unwrap();
+                            if let Some(d) = now_d.checked_sub(d) {
+                                client.last_pong = now;
+                                client.ping = d.as_secs() as f32
+                                    + d.subsec_nanos() as f32 / 0.000_000_001;
                             }
                         }
                     }
-                    Message::EntityUpdate(_, _) => {
-                        if let Some(client) = self.clients.get(&src) {
-                            messages.push((client.client_id, msg));
-                        }
-                    }
-                    Message::ServerHello
-                    | Message::StartEntityControl(_)
-                    | Message::EntityDelete(_) => {
-                        info!("Invalid message from {}", src)
+                }
+                Message::EntityUpdate(_, _) => {
+                    if let Some(client) = self.clients.get(&src) {
+                        messages.push((client.client_id, msg));
                     }
                 }
-            } else {
-                info!("Invalid message from {}", src);
-                continue;
+                Message::ServerHello
+                | Message::StartEntityControl(_)
+                | Message::EntityDelete(_) => {
+                    info!("Invalid message from {}", src)
+                }
             }
         }
 
@@ -407,7 +397,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
 
             // Deleted?
             if delete.get(ent).is_some() {
-                let message = Message::EntityDelete(repli.id).bytes();
+                let message = Message::EntityDelete(repli.id);
                 for client in self.clients.values_mut() {
                     chk(self.server.send(&message, &client.address));
                 }
@@ -473,7 +463,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
             } else {
                 panic!("Need to send update for unknown entity!");
             }
-            let update = Message::EntityUpdate(repli.id, data).bytes();
+            let update = Message::EntityUpdate(repli.id, data);
             for client in self.clients.values_mut() {
                 chk(self.server.send(&update, &client.address));
             }
@@ -555,9 +545,7 @@ impl<C: Client> SysNetClient<C> {
 
     /// Sends a message
     fn send(&self, msg: &Message) -> Result<(), NetError> {
-        let mut bytes = Vec::new();
-        msg.to_bytes(&mut bytes);
-        self.client.send(&bytes)
+        self.client.send(msg)
     }
 }
 
@@ -590,9 +578,8 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
     ) {
         // Receive messages
         let mut messages = Vec::new();
-        let mut buffer = [0; 1024];
         loop {
-            let len = match self.client.recv(&mut buffer) {
+            let msg = match self.client.recv() {
                 Ok(r) => r,
                 Err(NetError::FlowControl) => break,
                 Err(_) => {
@@ -601,30 +588,26 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
                 }
             };
 
-            if let Some(msg) = Message::parse(&buffer[..len]) {
-                match msg {
-                    Message::ServerHello => warn!("Got ServerHello"),
-                    Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
-                    Message::Pong(d) => {
-                        let d = time_decode(d);
-                        let now = SystemTime::now();
-                        let now_d = now.duration_since(UNIX_EPOCH).unwrap();
-                        if let Some(d) = now_d.checked_sub(d) {
-                            self.last_pong = now;
-                            self.ping = d.as_secs() as f32
-                                + d.subsec_nanos() as f32 / 0.000_000_001;
-                        }
+            match msg {
+                Message::ServerHello => warn!("Got ServerHello"),
+                Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
+                Message::Pong(d) => {
+                    let d = time_decode(d);
+                    let now = SystemTime::now();
+                    let now_d = now.duration_since(UNIX_EPOCH).unwrap();
+                    if let Some(d) = now_d.checked_sub(d) {
+                        self.last_pong = now;
+                        self.ping = d.as_secs() as f32
+                            + d.subsec_nanos() as f32 / 0.000_000_001;
                     }
-                    Message::StartEntityControl(id) => {
-                        self.controlled_entities.insert(id);
-                    }
-                    Message::EntityUpdate(_, _) | Message::EntityDelete(_) => {
-                        messages.push((msg, false))
-                    }
-                    Message::ClientHello => warn!("Invalid message"),
                 }
-            } else {
-                warn!("Invalid message");
+                Message::StartEntityControl(id) => {
+                    self.controlled_entities.insert(id);
+                }
+                Message::EntityUpdate(_, _) | Message::EntityDelete(_) => {
+                    messages.push((msg, false))
+                }
+                Message::ClientHello => warn!("Invalid message"),
             }
         }
 

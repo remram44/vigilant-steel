@@ -2,7 +2,7 @@ use log::{info, warn};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 
-use super::{NetError, Client, Server};
+use super::{Message, NetError, Client, Server};
 
 pub struct UdpServer {
     socket: UdpSocket,
@@ -25,8 +25,8 @@ impl UdpServer {
 impl Server for UdpServer {
     type Address = SocketAddr;
 
-    fn send(&self, msg: &[u8], addr: &SocketAddr) -> Result<(), NetError> {
-        match self.socket.send_to(msg, addr) {
+    fn send(&self, msg: &Message, addr: &SocketAddr) -> Result<(), NetError> {
+        match self.socket.send_to(&msg.bytes(), addr) {
             Ok(_) => Ok(()),
             Err(err) => {
                 if err.kind() == io ::ErrorKind::WouldBlock {
@@ -39,16 +39,24 @@ impl Server for UdpServer {
         }
     }
 
-    fn recv(&mut self, buffer: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
-        match self.socket.recv_from(buffer) {
-            Ok(r) => Ok(r),
-            Err(err) => {
-                if err.kind() == io ::ErrorKind::WouldBlock {
-                    Err(NetError::FlowControl)
-                } else {
-                    warn!("Send error: {}", err);
-                    Err(NetError::Disconnected)
+    fn recv(&mut self) -> Result<(Message, SocketAddr), NetError> {
+        let mut buffer = [0; 1024];
+        loop {
+            let (len, addr) = match self.socket.recv_from(&mut buffer) {
+                Ok(r) => r,
+                Err(err) => {
+                    if err.kind() == io::ErrorKind::WouldBlock {
+                        return Err(NetError::FlowControl);
+                    } else {
+                        warn!("Recv error: {}", err);
+                        return Err(NetError::Disconnected);
+                    }
                 }
+            };
+
+            match Message::parse(&buffer[0..len]) {
+                Some(msg) => return Ok((msg, addr)),
+                None => warn!("Invalid message from {}", addr),
             }
         }
     }
@@ -77,8 +85,8 @@ impl UdpClient {
 }
 
 impl Client for UdpClient {
-    fn send(&self, msg: &[u8]) -> Result<(), NetError> {
-        match self.socket.send_to(msg, self.server_address) {
+    fn send(&self, msg: &Message) -> Result<(), NetError> {
+        match self.socket.send_to(&msg.bytes(), self.server_address) {
             Ok(_) => Ok(()),
             Err(err) => {
                 if err.kind() == io ::ErrorKind::WouldBlock {
@@ -91,9 +99,10 @@ impl Client for UdpClient {
         }
     }
 
-    fn recv(&mut self, buffer: &mut [u8]) -> Result<usize, NetError> {
+    fn recv(&mut self) -> Result<Message, NetError> {
+        let mut buffer = [0; 1024];
         loop {
-            let (len, addr) = match self.socket.recv_from(buffer) {
+            let (len, addr) = match self.socket.recv_from(&mut buffer) {
                 Ok(r) => r,
                 Err(err) => {
                     if err.kind() == io ::ErrorKind::WouldBlock {
@@ -108,7 +117,10 @@ impl Client for UdpClient {
             if addr != self.server_address {
                 info!("Got message from invalid source {}", addr);
             } else {
-                return Ok(len);
+                match Message::parse(&buffer[0..len]) {
+                    Some(msg) => return Ok(msg),
+                    None => warn!("Got invalid message"),
+                }
             }
         }
     }
