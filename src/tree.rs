@@ -143,7 +143,7 @@ impl Tree {
 
 #[cfg(test)]
 mod tests {
-    use super::{Content, Node, Tree};
+    use super::{Content, Tree};
 
     #[test]
     fn test_empty() {

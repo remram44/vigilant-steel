@@ -340,7 +340,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                             &src,
                         ));
 
-                        info!(
+                        warn!(
                             "Created Ship {} for new client {}",
                             ship_id, client_id
                         );
@@ -474,7 +474,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
         }
 
         // Send particle effects
-        for (effect, _) in (&effects, &dirty).join() {
+        for (_effect, _) in (&effects, &dirty).join() {
             // TODO: Send particle effects
         }
 
@@ -490,7 +490,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                         repli.last_update = self.frame;
 
                         // Update entity from message data
-                        if data.len() != 1 {
+                        if data.len() != 9 {
                             info!("Invalid ship control update");
                             continue;
                         }
@@ -514,7 +514,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                         let mut data = Cursor::new(&data[1..]);
                         ship.want_target[0] = read_float(&mut data);
                         ship.want_target[1] = read_float(&mut data);
-                        lazy.insert(ent, Dirty);
+                        dirty.insert(ent, Dirty).unwrap();
                     }
                 }
             }
@@ -705,7 +705,7 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
                 continue;
             }
             if let Message::EntityUpdate(id, ref data) = *msg {
-                if data.len() == 48 {
+                if data.len() == 56 {
                     let mut data = Cursor::new(data);
                     let pos = Position {
                         pos: [read_float(&mut data), read_float(&mut data)],
@@ -729,7 +729,7 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
                         thrust: [read_float(&mut data), read_float(&mut data)],
                         thrust_rot: read_float(&mut data),
                     };
-                    assert_eq!(data.position(), 48);
+                    assert_eq!(data.position(), 56);
 
                     let entity = entities.create();
                     lazy.insert(entity, pos);
@@ -806,7 +806,11 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
                         },
                     );
                 } else {
-                    panic!("Need to create unknown entity!");
+                    panic!(
+                        "Need to create unknown entity! data {:?} (len {})",
+                        &data[0..50],
+                        data.len(),
+                    );
                 }
             }
         }
@@ -836,6 +840,7 @@ impl<'a, C: Client> System<'a> for SysNetClient<C> {
             data.write_u8(flags).unwrap();
             write_float(&mut data, ship.want_target[0]);
             write_float(&mut data, ship.want_target[1]);
+            assert_eq!(data.len(), 9);
             chk(self.send(&Message::EntityUpdate(repli.id, data)))
         }
 
