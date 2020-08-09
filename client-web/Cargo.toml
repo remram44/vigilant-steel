@@ -6,8 +6,8 @@ edition = "2018"
 authors = ["Remi Rampin <r@remirampin.com>"]
 license = "GPL-3.0"
 repository = "https://gitlab.com/remram44/vigilant-steel"
-description = "Space game with WebAssembly"
-keywords = ["game"]
+description = "Space game using WebAssembly - client"
+keywords = ["game", "web", "webgl"]
 
 [lib]
 crate-type = ["cdylib"]

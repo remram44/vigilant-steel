@@ -6,9 +6,8 @@ edition = "2018"
 authors = ["Remi Rampin <remirampin@gmail.com>"]
 license = "GPL-3.0"
 repository = "https://gitlab.com/remram44/vigilant-steel"
-description = "Space game with Piston"
-readme = "README.md"
-keywords = ["game"]
+description = "Space game using WebAssembly - server component"
+keywords = ["game", "web", "webgl"]
 
 [[bin]]
 name = "server"
