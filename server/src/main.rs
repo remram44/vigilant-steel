@@ -11,6 +11,7 @@ use std::time::{Duration, SystemTime};
 
 const TIME_STEP: f32 = 0.050; // 20 ticks per second
 const MAX_SKIPPED_STEPS: u32 = 5;
+const REPORT_INTERVAL: f32 = 10.0;
 
 fn to_secs(dt: Duration) -> f32 {
     dt.as_secs() as f32 + dt.subsec_nanos() as f32 * 0.000_000_001
@@ -33,6 +34,10 @@ fn main() {
     let mut previous = SystemTime::now();
     let mut timer = 0.0;
 
+    let mut last_report = SystemTime::now();
+    let mut frames = 0;
+    let mut compute_time = 0.0;
+
     loop {
         let now = SystemTime::now();
 
@@ -48,6 +53,33 @@ fn main() {
                 while timer >= TIME_STEP {
                     game.update(TIME_STEP);
                     timer -= TIME_STEP;
+                    frames += 1;
+                }
+
+                // Update statistics
+                if let Ok(c) = SystemTime::now().duration_since(now) {
+                    let c = to_secs(c);
+                    compute_time += c;
+                } else {
+                    frames = 0;
+                    compute_time = 0.0;
+                }
+
+                // Print statistics
+                let time_since_last_report = now.duration_since(last_report);
+                if let Ok(t) = time_since_last_report {
+                    let t = to_secs(t);
+                    if t > REPORT_INTERVAL {
+                        info!(
+                            "fps = {} average frame time = {} ({:.3}%)",
+                            frames as f32 / t,
+                            compute_time / frames as f32,
+                            compute_time / (frames as f32 * TIME_STEP),
+                        );
+                        frames = 0;
+                        compute_time = 0.0;
+                        last_report = now;
+                    }
                 }
 
                 if TIME_STEP - timer > 0.001 {
