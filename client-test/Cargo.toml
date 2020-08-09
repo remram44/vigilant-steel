@@ -1,0 +1,19 @@
+[package]
+workspace = ".."
+name = "client-test"
+version = "0.1.0"
+edition = "2018"
+authors = ["Remi Rampin <r@remirampin.com>"]
+license = "GPL-3.0"
+repository = "https://gitlab.com/remram44/vigilant-steel"
+description = "Space game using WebAssembly - test client"
+keywords = ["game", "web", "webgl"]
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
+
+[dependencies]
+color-logger = { path = "../color-logger" }
+game = { path = "..", features = ["network"] }
+log = "0.4"

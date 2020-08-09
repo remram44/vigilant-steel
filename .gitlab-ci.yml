@@ -18,6 +18,8 @@ build_game:
     # Test-build the server
     - (cd server && cargo build --features udp)
     - (cd server && cargo build --features websocket)
+    # Test-build the test client
+    - (cd client-test && cargo build)
     # Build the web client
     - sh -c "cd client-web && cargo build --release --target wasm32-unknown-unknown"
     - wasm-bindgen target/wasm32-unknown-unknown/release/client_web.wasm --out-dir client-web --browser --no-typescript --no-modules --no-modules-global client_web

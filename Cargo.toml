@@ -1,5 +1,5 @@
 [workspace]
-members = ["client-web", "server", "color-logger"]
+members = ["client-web", "server", "client-test", "color-logger"]
 
 [package]
 name = "game"
