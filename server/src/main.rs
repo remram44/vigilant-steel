@@ -1,7 +1,10 @@
 //! Entrypoint and eventloop for server.
 
 use game::Game;
+#[cfg(feature = "udp")]
 use game::net::udp::UdpServer;
+#[cfg(feature = "websocket")]
+use game::net::websocket::WebsocketServer;
 use log::{info, warn};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
@@ -17,7 +20,14 @@ fn main() {
     color_logger::init(log::Level::Info).unwrap();
     info!("Starting up");
 
+    #[cfg(all(feature = "udp", feature = "websocket"))]
+    compile_error!("Multiple transports enabled");
+    #[cfg(feature = "udp")]
     let mut game = Game::new_server(UdpServer::new(34244));
+    #[cfg(feature = "websocket")]
+    let mut game = Game::new_server(WebsocketServer::new(8080));
+    #[cfg(not(any(feature = "udp", feature = "websocket")))]
+    compile_error!("No transport enabled");
 
     let mut previous = SystemTime::now();
     let mut timer = 0.0;

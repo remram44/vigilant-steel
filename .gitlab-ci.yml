@@ -9,12 +9,19 @@ build_game:
     - rustup target add wasm32-unknown-unknown
     - cargo install --version 0.2.63 wasm-bindgen-cli
   script:
+    # Test-build the game
     - cargo build
     - cargo build --features network
     - cargo build --features websocket
+    # Run the tests
     - cargo test
+    # Test-build the server
+    - (cd server && cargo build --features udp)
+    - (cd server && cargo build --features websocket)
+    # Build the web client
     - sh -c "cd client-web && cargo build --release --target wasm32-unknown-unknown"
     - wasm-bindgen target/wasm32-unknown-unknown/release/client_web.wasm --out-dir client-web --browser --no-typescript --no-modules --no-modules-global client_web
+    # Prepare pages
     - mkdir output
     - cp client-web/client_web_bg.wasm client-web/client_web.js output/
     - cp client-web/index.html client-web/index.js output/

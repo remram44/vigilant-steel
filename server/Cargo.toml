@@ -16,8 +16,9 @@ path = "src/main.rs"
 
 [dependencies]
 color-logger = { path = "../color-logger" }
+game = { path = ".." }
 log = "0.4"
 
-[dependencies.game]
-path = ".."
-features = ["network"]
+[features]
+udp = ["game/network"]
+websocket = ["game/websocket"]
