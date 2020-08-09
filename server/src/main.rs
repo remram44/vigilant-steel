@@ -9,7 +9,8 @@ use log::{info, warn};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
-const TIME_STEP: f32 = 0.080;
+const TIME_STEP: f32 = 0.050; // 20 ticks per second
+const MAX_SKIPPED_STEPS: u32 = 5;
 
 fn to_secs(dt: Duration) -> f32 {
     dt.as_secs() as f32 + dt.subsec_nanos() as f32 * 0.000_000_001
@@ -38,13 +39,13 @@ fn main() {
         match now.duration_since(previous) {
             Ok(dt) => {
                 let dt = to_secs(dt);
-                if dt > 0.5 {
+                if dt > MAX_SKIPPED_STEPS as f32 * TIME_STEP {
                     warn!("Clock jumped forward by {} seconds!", dt);
-                    timer = 5.0 * TIME_STEP;
+                    timer = MAX_SKIPPED_STEPS as f32 * TIME_STEP;
                 } else {
                     timer += dt;
                 }
-                while timer > TIME_STEP {
+                while timer >= TIME_STEP {
                     game.update(TIME_STEP);
                     timer -= TIME_STEP;
                 }

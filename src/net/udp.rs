@@ -18,6 +18,7 @@ impl UdpServer {
         socket
             .set_nonblocking(true)
             .expect("Couldn't set socket nonblocking");
+        info!("Listening on UDP port {}", port);
         UdpServer { socket }
     }
 }
