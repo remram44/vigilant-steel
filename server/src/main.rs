@@ -29,7 +29,10 @@ fn main() {
     #[cfg(feature = "websocket")]
     let mut game = Game::new_server(WebsocketServer::new(8080));
     #[cfg(not(any(feature = "udp", feature = "websocket")))]
-    compile_error!("No transport enabled");
+    let mut game = {
+        compile_error!("No transport enabled");
+        Game::new_standalone()
+    };
 
     let mut previous = SystemTime::now();
     let mut timer = 0.0;
