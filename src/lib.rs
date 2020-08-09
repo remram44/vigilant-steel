@@ -139,7 +139,10 @@ pub struct Game {
 }
 
 impl Game {
-    fn new_common<'a, 'b>(role: Role) -> (World, DispatcherBuilder<'a, 'b>) {
+    fn new_common<'a, 'b>(
+        role: Role,
+        mut dispatcher: DispatcherBuilder<'a, 'b>,
+    ) -> (World, DispatcherBuilder<'a, 'b>) {
         let mut world = World::new();
         world.register::<Position>();
         world.register::<Velocity>();
@@ -165,30 +168,33 @@ impl Game {
         world.insert(<Input as Default>::default());
         world.insert(role);
 
-        let dispatcher = if role.authoritative() {
-            DispatcherBuilder::new()
-                .with(SysSimu, "simu", &[])
+        if role.authoritative() {
+            dispatcher = dispatcher
                 .with(SysProjectile, "projectile", &[])
                 .with(SysAsteroid, "asteroid", &[])
                 .with(SysShip, "ship", &[])
                 .with(SysParticles, "particles", &[])
+                .with(SysSimu, "simu", &[])
                 .with(
                     SysCollision,
                     "collision",
                     &["projectile", "asteroid", "ship"],
                 )
         } else {
-            DispatcherBuilder::new()
-                .with(SysSimu, "simu", &[])
+            dispatcher = dispatcher
                 .with(SysShip, "ship", &[])
                 .with(SysParticles, "particles", &[])
+                .with(SysSimu, "simu", &[])
         };
 
         (world, dispatcher)
     }
 
     pub fn new_standalone() -> Game {
-        let (world, dispatcher) = Self::new_common(Role::Standalone);
+        let (world, dispatcher) = Self::new_common(
+            Role::Standalone,
+            DispatcherBuilder::new(),
+        );
 
         let ship = Ship::create(
             &world.entities(),
@@ -206,14 +212,13 @@ impl Game {
 
     #[cfg(feature = "network")]
     pub fn new_server<S: net::Server>(server: S) -> Game {
-        let (world, mut dispatcher) = Self::new_common(Role::Server);
-
-        dispatcher = dispatcher.with(
-            net::SysNetServer::new(server),
-            "netserver",
-            &[],
-        );
-
+        let dispatcher = DispatcherBuilder::new()
+            .with(
+                net::SysNetServer::new(server),
+                "netserver",
+                &[],
+            );
+        let (world, dispatcher) = Self::new_common(Role::Server, dispatcher);
         Game {
             world: world,
             dispatcher: dispatcher.build(),
@@ -222,14 +227,13 @@ impl Game {
 
     #[cfg(feature = "network")]
     pub fn new_client<C: net::Client>(client: C) -> Game {
-        let (world, mut dispatcher) = Self::new_common(Role::Client);
-
-        dispatcher = dispatcher.with(
-            net::SysNetClient::new(client),
-            "netclient",
-            &[],
-        );
-
+        let dispatcher = DispatcherBuilder::new()
+            .with(
+                net::SysNetClient::new(client),
+                "netclient",
+                &[],
+            );
+        let (world, dispatcher) = Self::new_common(Role::Client, dispatcher);
         Game {
             world: world,
             dispatcher: dispatcher.build(),
