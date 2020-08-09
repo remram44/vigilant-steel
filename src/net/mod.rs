@@ -442,6 +442,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     chk(self.server.send(&message, &client.address));
                 }
                 entities.delete(ent).unwrap();
+                info!("Net delete {:?}", ent);
                 continue;
             }
 

@@ -53,6 +53,7 @@ impl<'a> System<'a> for SysAsteroid {
             if pos[0] < -150.0 || pos[0] > 150.0 || pos[1] < -150.0
                 || pos[1] > 150.0
             {
+                log::info!("Delete asteroid {:?}", entity);
                 delete_entity(*role, &entities, &lazy, entity);
                 continue;
             }
