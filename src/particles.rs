@@ -8,8 +8,8 @@
 //! once we got to replicate it to the clients.
 
 use rand::{self, Rng};
-use specs::{Component, Entities, Read, Join, LazyUpdate, ReadStorage,
-            System, VecStorage, WriteStorage};
+use specs::{Component, Entities, Read, ReadExpect, Join, LazyUpdate,
+            ReadStorage, System, VecStorage, WriteStorage};
 use std::f32::consts::PI;
 
 use crate::Role;
@@ -69,7 +69,7 @@ pub struct SysParticles;
 impl<'a> System<'a> for SysParticles {
     type SystemData = (
         Read<'a, DeltaTime>,
-        Read<'a, Role>,
+        ReadExpect<'a, Role>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,

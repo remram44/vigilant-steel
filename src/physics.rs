@@ -3,8 +3,8 @@
 //! This contains `Position`, `Velocity`, `Hits`, ... `SysSimu` integrates
 //! positions, finds collisions.
 
-use specs::{Component, Entities, Entity, Read, HashMapStorage, Join,
-            LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
+use specs::{Component, Entities, Entity, Read, ReadExpect, HashMapStorage,
+            Join, LazyUpdate, NullStorage, ReadStorage, System, VecStorage,
             WriteStorage};
 use std::f32::consts::PI;
 use std::ops::Deref;
@@ -224,7 +224,7 @@ pub struct SysCollision;
 
 impl<'a> System<'a> for SysCollision {
     type SystemData = (
-        Read<'a, Role>,
+        ReadExpect<'a, Role>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Position>,

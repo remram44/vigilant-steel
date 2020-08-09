@@ -5,7 +5,7 @@
 // TODO: Take some behavior out of SysShip and into blocks.rs
 //
 use rand::{self, Rng};
-use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Read, ReadExpect, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use std::f32::consts::PI;
 use vecmath::*;
@@ -171,7 +171,7 @@ pub struct SysShip;
 impl<'a> System<'a> for SysShip {
     type SystemData = (
         Read<'a, DeltaTime>,
-        Read<'a, Role>,
+        ReadExpect<'a, Role>,
         Read<'a, LazyUpdate>,
         Read<'a, Input>,
         Read<'a, Clock>,

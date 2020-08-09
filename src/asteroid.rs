@@ -5,8 +5,8 @@
 //! when their number is low.
 
 use rand::prelude::*;
-use specs::{Component, Entities, Read, Join, LazyUpdate, NullStorage,
-            ReadStorage, System};
+use specs::{Component, Entities, Read, ReadExpect, Join, LazyUpdate,
+            NullStorage, ReadStorage, System};
 use std::f32::consts::PI;
 
 use crate::Role;
@@ -31,7 +31,7 @@ pub struct SysAsteroid;
 
 impl<'a> System<'a> for SysAsteroid {
     type SystemData = (
-        Read<'a, Role>,
+        ReadExpect<'a, Role>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,

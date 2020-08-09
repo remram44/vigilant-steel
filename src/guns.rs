@@ -1,6 +1,6 @@
 //! Guns and projectiles.
 
-use specs::{Component, Entities, Entity, Read, Join, LazyUpdate,
+use specs::{Component, Entities, Entity, Read, ReadExpect, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
 
@@ -114,7 +114,7 @@ pub struct SysProjectile;
 
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
-        Read<'a, Role>,
+        ReadExpect<'a, Role>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Hits>,

@@ -49,12 +49,6 @@ pub enum Role {
     Client,
 }
 
-impl Default for Role {
-    fn default() -> Role {
-        Role::Standalone
-    }
-}
-
 impl Role {
     /// Whether the local machine is authoritative over the world.
     ///
