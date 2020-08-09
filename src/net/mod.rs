@@ -2,6 +2,7 @@
 
 mod base;
 pub mod udp;
+pub mod stub;
 #[cfg(feature = "websocket")]
 pub mod websocket;
 
