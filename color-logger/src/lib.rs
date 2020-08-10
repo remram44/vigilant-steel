@@ -39,8 +39,8 @@ impl Log for StderrLogger {
             let mut stderr = self.stderr.lock();
             let color = match record.metadata().level() {
                 Level::Error => Color::Red,
-                Level::Warn => Color::Magenta,
-                Level::Info => Color::Yellow,
+                Level::Warn => Color::Yellow,
+                Level::Info => Color::White,
                 Level::Debug => Color::Cyan,
                 Level::Trace => Color::Blue,
             };
