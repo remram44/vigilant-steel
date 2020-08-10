@@ -8,7 +8,7 @@ pub mod websocket;
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use log::{info, warn};
-use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
+use specs::{Entities, Read, ReadExpect, Join, LazyUpdate, ReadStorage, System,
             WriteExpect, WriteStorage};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -18,13 +18,14 @@ use std::io::{self, Cursor, Write};
 use std::marker::PhantomData;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::Deleter;
 use crate::asteroid::Asteroid;
 use crate::guns::{Projectile, ProjectileType};
 use crate::particles::Effect;
 use crate::physics::{LocalControl, Position, Velocity};
 use crate::ship::Ship;
 
-pub use self::base::{Replicated, Delete, Dirty, ClientControlled};
+pub use self::base::{Replicated, Dirty, ClientControlled};
 
 type ORDER = byteorder::BigEndian;
 
@@ -492,9 +493,9 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
     type SystemData = (
         WriteExpect<'a, ServerRes<S>>,
         Entities<'a>,
+        ReadExpect<'a, Deleter>,
         WriteStorage<'a, Replicated>,
         WriteStorage<'a, Dirty>,
-        ReadStorage<'a, Delete>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, Ship>,
@@ -508,9 +509,9 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
         (
             mut server,
             entities,
+            deleter,
             mut replicated,
             mut dirty,
-            delete,
             position,
             velocity,
             ship,
@@ -533,17 +534,6 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
             // Assign replicated object ID
             if repli.id == 0 {
                 repli.id = (ent.gen().id() as u64) << 32 | ent.id() as u64;
-            }
-
-            // Deleted?
-            if delete.get(ent).is_some() {
-                let message = Message::EntityDelete(repli.id);
-                for client in clients.values_mut() {
-                    chk(server.send(&message, &client.address));
-                }
-                entities.delete(ent).unwrap();
-                info!("Net delete {:?}", ent);
-                continue;
             }
 
             // Send an update if dirty, or if it hasn't been updated in a while
@@ -610,6 +600,18 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
             }
 
             repli.last_update = *frame;
+        }
+
+        // Delete entities
+        for ent in deleter.queue.lock().unwrap().drain(0..) {
+            if let Some(repli) = replicated.get(ent) {
+                let message = Message::EntityDelete(repli.id);
+                for client in clients.values_mut() {
+                    chk(server.send(&message, &client.address));
+                }
+                entities.delete(ent).unwrap();
+                info!("Net delete {:?}", ent);
+            }
         }
 
         // Send particle effects

@@ -69,29 +69,6 @@ impl AABox {
     }
 }
 
-/// Wrapper for entity deletion that triggers network update.
-pub fn delete_entity(
-    role: Role,
-    entities: &Entities,
-    lazy: &Read<LazyUpdate>,
-    entity: Entity,
-) {
-    #[cfg(feature = "network")]
-    {
-        assert!(role.authoritative());
-        if role.networked() {
-            lazy.insert(entity, net::Delete);
-        } else {
-            entities.delete(entity).unwrap();
-        }
-    }
-
-    #[cfg(not(feature = "network"))]
-    {
-        entities.delete(entity).unwrap();
-    }
-}
-
 /// Position component, for entities that are somewhere in the world.
 #[derive(Debug, Clone)]
 pub struct Position {

@@ -34,7 +34,8 @@ use particles::{Effect, Particle, SysParticles};
 use physics::{DeltaTime, DetectCollision, Hits, LocalControl, Position,
               SysCollision, SysSimu, Velocity};
 use ship::{Ship, SysShip};
-use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt};
+use specs::{Dispatcher, DispatcherBuilder, Entities, Entity, Join,
+            World, WorldExt};
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -132,6 +133,32 @@ impl Deref for Clock {
     }
 }
 
+/// Entity deletion queue.
+pub struct Deleter {
+    #[cfg(feature = "network")]
+    pub queue: std::sync::Mutex<Vec<Entity>>,
+}
+
+impl Deleter {
+    fn new() -> Deleter {
+        #[cfg(feature = "network")]
+        let d = Deleter { queue: std::sync::Mutex::new(Vec::new()) };
+
+        #[cfg(not(feature = "network"))]
+        let d = Deleter {};
+
+        d
+    }
+
+    pub fn delete(&self, entity: Entity, entities: &Entities) {
+        #[cfg(feature = "network")]
+        self.queue.lock().unwrap().push(entity);
+
+        #[cfg(not(feature = "network"))]
+        entities.delete(entity).unwrap();
+    }
+}
+
 /// The game structure, containing globals not specific to frontend.
 pub struct Game {
     pub world: World,
@@ -159,7 +186,6 @@ impl Game {
         {
             world.register::<net::Replicated>();
             world.register::<net::Dirty>();
-            world.register::<net::Delete>();
             world.register::<net::ClientControlled>();
         }
 
@@ -167,6 +193,7 @@ impl Game {
         world.insert(<Clock as Default>::default());
         world.insert(<Input as Default>::default());
         world.insert(role);
+        world.insert(Deleter::new());
 
         if role.authoritative() {
             dispatcher = dispatcher

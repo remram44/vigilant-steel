@@ -9,11 +9,11 @@ use specs::{Component, Entities, Read, ReadExpect, Join, LazyUpdate,
             NullStorage, ReadStorage, System};
 use std::f32::consts::PI;
 
-use crate::Role;
+use crate::{Deleter, Role};
 use crate::blocks::{Block, BlockInner, Blocky};
 #[cfg(feature = "network")]
 use crate::net;
-use crate::physics::{delete_entity, Position, Velocity};
+use crate::physics::{Position, Velocity};
 
 /// An asteroid
 #[derive(Default)]
@@ -32,6 +32,7 @@ pub struct SysAsteroid;
 impl<'a> System<'a> for SysAsteroid {
     type SystemData = (
         ReadExpect<'a, Role>,
+        ReadExpect<'a, Deleter>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         ReadStorage<'a, Position>,
@@ -40,7 +41,7 @@ impl<'a> System<'a> for SysAsteroid {
 
     fn run(
         &mut self,
-        (role, lazy, entities, pos, asteroid): Self::SystemData,
+        (role, deleter, lazy, entities, pos, asteroid): Self::SystemData,
     ) {
         assert!(role.authoritative());
 
@@ -54,7 +55,7 @@ impl<'a> System<'a> for SysAsteroid {
                 || pos[1] > 150.0
             {
                 log::info!("Delete asteroid {:?}", entity);
-                delete_entity(*role, &entities, &lazy, entity);
+                deleter.delete(entity, &entities);
                 continue;
             }
         }

@@ -4,12 +4,12 @@ use specs::{Component, Entities, Entity, Read, ReadExpect, Join, LazyUpdate,
             ReadStorage, System, VecStorage, WriteStorage};
 use vecmath::*;
 
-use crate::Role;
+use crate::{Deleter, Role};
 use crate::blocks::Blocky;
 #[cfg(feature = "network")]
 use crate::net;
 use crate::particles::{Effect, EffectInner};
-use crate::physics::{affect_area, delete_entity, AABox, DetectCollision,
+use crate::physics::{affect_area, AABox, DetectCollision,
                      HitEffect, Hits, Position, Velocity};
 
 pub enum ProjectileType {
@@ -115,6 +115,7 @@ pub struct SysProjectile;
 impl<'a> System<'a> for SysProjectile {
     type SystemData = (
         ReadExpect<'a, Role>,
+        ReadExpect<'a, Deleter>,
         Read<'a, LazyUpdate>,
         Entities<'a>,
         WriteStorage<'a, Hits>,
@@ -127,6 +128,7 @@ impl<'a> System<'a> for SysProjectile {
         &mut self,
             (
                 role,
+                deleter,
                 lazy,
                 entities,
                 mut
@@ -144,7 +146,7 @@ impl<'a> System<'a> for SysProjectile {
             if pos.pos[0] < -150.0 || pos.pos[0] > 150.0 || pos.pos[1] < -150.0
                 || pos.pos[1] > 150.0
             {
-                delete_entity(*role, &entities, &lazy, entity);
+                deleter.delete(entity, &entities);
             }
 
             // Hit projectiles go off and affect an area
@@ -174,7 +176,7 @@ impl<'a> System<'a> for SysProjectile {
                 None => {}
             };
             if delete {
-                delete_entity(*role, &entities, &lazy, entity);
+                deleter.delete(entity, &entities);
             }
             let hit_loc = match hit_loc {
                 None => continue,
