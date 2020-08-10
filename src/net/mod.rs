@@ -295,11 +295,6 @@ impl<S: Server> SysNetServer<S> {
             clients: HashMap::new(),
         }
     }
-
-    /// Sends a message.
-    fn send(&self, msg: &Message, addr: &S::Address) -> Result<(), NetError> {
-        self.server.send(msg, addr)
-    }
 }
 
 impl<'a, S: Server> System<'a> for SysNetServer<S> {
@@ -368,7 +363,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     );
 
                     // Send ServerHello
-                    chk(self.send(&Message::ServerHello, &src));
+                    chk(self.server.send(&Message::ServerHello, &src));
 
                     // Create a ship for the new player
                     let newship = Ship::create(&entities, &lazy);
@@ -380,7 +375,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     );
                     let ship_id = (newship.gen().id() as u64) << 32
                         | newship.id() as u64;
-                    chk(self.send(
+                    chk(self.server.send(
                         &Message::StartEntityControl(ship_id),
                         &src,
                     ));
@@ -393,10 +388,10 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     // Send initial Ping message
                     let d = now.duration_since(UNIX_EPOCH).unwrap();
                     let d = time_encode(d);
-                    chk(self.send(&Message::Ping(d), &src));
+                    chk(self.server.send(&Message::Ping(d), &src));
                 }
                 Message::Ping(buf) => {
-                    chk(self.send(&Message::Pong(buf), &src))
+                    chk(self.server.send(&Message::Pong(buf), &src))
                 }
                 Message::Pong(_) => {
                     if let Some(client) = self.clients.get_mut(&src) {
