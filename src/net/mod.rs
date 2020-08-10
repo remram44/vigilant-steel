@@ -9,12 +9,13 @@ pub mod websocket;
 use byteorder::{self, ReadBytesExt, WriteBytesExt};
 use log::{info, warn};
 use specs::{Entities, Read, Join, LazyUpdate, ReadStorage, System,
-            WriteStorage};
+            WriteExpect, WriteStorage};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::io::{self, Cursor, Write};
+use std::marker::PhantomData;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::asteroid::Asteroid;
@@ -275,20 +276,17 @@ pub struct ConnectedClient<A: Eq> {
     last_pong: SystemTime,
 }
 
-/// Network server system.
-///
-/// Gets controls from clients and sends game updates.
-pub struct SysNetServer<S: Server> {
+pub struct ServerRes<S: Server> {
     server: S,
     frame: u32,
     next_client: u64,
     clients: HashMap<S::Address, ConnectedClient<S::Address>>,
 }
 
-impl<S: Server> SysNetServer<S> {
+impl<S: Server> ServerRes<S> {
     /// Create a server, listening on the given port.
-    pub fn new(server: S) -> SysNetServer<S> {
-        SysNetServer {
+    pub fn new(server: S) -> ServerRes<S> {
+        ServerRes {
             server,
             frame: 0,
             next_client: 1,
@@ -297,45 +295,72 @@ impl<S: Server> SysNetServer<S> {
     }
 }
 
-impl<'a, S: Server> System<'a> for SysNetServer<S> {
+/// Network server system (receiver part).
+///
+/// Runs at the beginning of a frame to get messages from clients.
+pub struct SysServerRecv<S: Server> {
+    _server: PhantomData<S>,
+}
+
+impl<S: Server> SysServerRecv<S> {
+    pub fn new() -> SysServerRecv<S> {
+        SysServerRecv {
+            _server: PhantomData,
+        }
+    }
+}
+
+/// Network server system (sender part).
+///
+/// Runs at the end of a frame to send updates to clients.
+pub struct SysServerSend<S: Server> {
+    _server: PhantomData<S>,
+}
+
+impl<S: Server> SysServerSend<S> {
+    pub fn new() -> SysServerSend<S> {
+        SysServerSend {
+            _server: PhantomData,
+        }
+    }
+}
+
+impl<'a, S: Server> System<'a> for SysServerRecv<S> {
     type SystemData = (
         Read<'a, LazyUpdate>,
+        WriteExpect<'a, ServerRes<S>>,
         Entities<'a>,
         ReadStorage<'a, ClientControlled>,
         WriteStorage<'a, Replicated>,
         WriteStorage<'a, Dirty>,
-        ReadStorage<'a, Delete>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Velocity>,
         WriteStorage<'a, Ship>,
-        ReadStorage<'a, Asteroid>,
-        ReadStorage<'a, Projectile>,
-        ReadStorage<'a, Effect>,
     );
 
     fn run(
         &mut self,
         (
             lazy,
+            mut server,
             entities,
             ctrl,
             mut replicated,
             mut dirty,
-            delete,
-            position,
-            velocity,
             mut ship,
-            asteroid,
-            projectile,
-            effects,
         ): Self::SystemData,
     ) {
-        self.frame = self.frame.wrapping_add(1);
+        let ServerRes {
+            ref mut server,
+            ref mut frame,
+            ref mut next_client,
+            ref mut clients,
+        } = &mut *server;
+
+        *frame = frame.wrapping_add(1);
 
         // Receive messages
         let mut messages = Vec::new();
         loop {
-            let (msg, src) = match self.server.recv() {
+            let (msg, src) = match server.recv() {
                 Ok(r) => r,
                 Err(NetError::NoMore) => break,
                 Err(NetError::Error(err)) => {
@@ -349,10 +374,10 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     warn!("Got ClientHello from {}", src);
 
                     // Create a client
-                    let client_id = self.next_client;
-                    self.next_client += 1;
+                    let client_id = *next_client;
+                    *next_client += 1;
                     let now = SystemTime::now();
-                    self.clients.insert(
+                    clients.insert(
                         src.clone(),
                         ConnectedClient {
                             address: src.clone(),
@@ -363,7 +388,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     );
 
                     // Send ServerHello
-                    chk(self.server.send(&Message::ServerHello, &src));
+                    chk(server.send(&Message::ServerHello, &src));
 
                     // Create a ship for the new player
                     let newship = Ship::create(&entities, &lazy);
@@ -375,7 +400,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     );
                     let ship_id = (newship.gen().id() as u64) << 32
                         | newship.id() as u64;
-                    chk(self.server.send(
+                    chk(server.send(
                         &Message::StartEntityControl(ship_id),
                         &src,
                     ));
@@ -388,13 +413,13 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                     // Send initial Ping message
                     let d = now.duration_since(UNIX_EPOCH).unwrap();
                     let d = time_encode(d);
-                    chk(self.server.send(&Message::Ping(d), &src));
+                    chk(server.send(&Message::Ping(d), &src));
                 }
                 Message::Ping(buf) => {
-                    chk(self.server.send(&Message::Pong(buf), &src))
+                    chk(server.send(&Message::Pong(buf), &src))
                 }
                 Message::Pong(_) => {
-                    if let Some(client) = self.clients.get_mut(&src) {
+                    if let Some(client) = clients.get_mut(&src) {
                         if let Message::Pong(d) = msg {
                             let d = time_decode(d);
                             let now = SystemTime::now();
@@ -409,7 +434,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                 }
                 Message::Disconnection => { /* TODO */ }
                 Message::EntityUpdate(_, _) => {
-                    if let Some(client) = self.clients.get(&src) {
+                    if let Some(client) = clients.get(&src) {
                         messages.push((client.client_id, msg));
                     }
                 }
@@ -420,6 +445,86 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                 }
             }
         }
+
+        // Handle messages
+        for (ent, ship, repli, ctrl) in
+            (&*entities, &mut ship, &mut replicated, &ctrl).join()
+        {
+            for &(ref client_id, ref msg) in &messages {
+                if let Message::EntityUpdate(id, ref data) = *msg {
+                    if repli.id == id && client_id == &ctrl.client_id {
+                        repli.last_update = *frame;
+
+                        // Update entity from message data
+                        if data.len() != 9 {
+                            info!("Invalid ship control update");
+                            continue;
+                        }
+                        let flags = data[0];
+                        ship.want_fire = flags & 0x01 == 0x01;
+                        ship.want_thrust[0] = match flags & 0x06 {
+                            0x02 => 1.0,
+                            0x04 => -1.0,
+                            _ => 0.0,
+                        };
+                        ship.want_thrust[1] = if flags & 0x08 == 0x08 {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        ship.want_thrust_rot = match flags & 0x30 {
+                            0x10 => 1.0,
+                            0x20 => -1.0,
+                            _ => 0.0,
+                        };
+                        let mut data = Cursor::new(&data[1..]);
+                        ship.want_target[0] = read_float(&mut data);
+                        ship.want_target[1] = read_float(&mut data);
+                        dirty.insert(ent, Dirty).unwrap();
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<'a, S: Server> System<'a> for SysServerSend<S> {
+    type SystemData = (
+        WriteExpect<'a, ServerRes<S>>,
+        Entities<'a>,
+        WriteStorage<'a, Replicated>,
+        WriteStorage<'a, Dirty>,
+        ReadStorage<'a, Delete>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, Ship>,
+        ReadStorage<'a, Asteroid>,
+        ReadStorage<'a, Projectile>,
+        ReadStorage<'a, Effect>,
+    );
+
+    fn run(
+        &mut self,
+        (
+            mut server,
+            entities,
+            mut replicated,
+            mut dirty,
+            delete,
+            position,
+            velocity,
+            ship,
+            asteroid,
+            projectile,
+            effects,
+        ): Self::SystemData,
+    ) {
+        let ServerRes {
+            ref mut server,
+            ref mut frame,
+            next_client: _,
+            ref mut clients,
+        } = &mut *server;
 
         // TODO: Drop old clients
 
@@ -433,8 +538,8 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
             // Deleted?
             if delete.get(ent).is_some() {
                 let message = Message::EntityDelete(repli.id);
-                for client in self.clients.values_mut() {
-                    chk(self.server.send(&message, &client.address));
+                for client in clients.values_mut() {
+                    chk(server.send(&message, &client.address));
                 }
                 entities.delete(ent).unwrap();
                 info!("Net delete {:?}", ent);
@@ -443,7 +548,7 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
 
             // Send an update if dirty, or if it hasn't been updated in a while
             if dirty.get(ent).is_none()
-                && self.frame.wrapping_sub(repli.last_update) < 200
+                && frame.wrapping_sub(repli.last_update) < 200
             {
                 continue;
             }
@@ -500,11 +605,11 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
                 panic!("Need to send update for unknown entity!");
             }
             let update = Message::EntityUpdate(repli.id, data);
-            for client in self.clients.values_mut() {
-                chk(self.server.send(&update, &client.address));
+            for client in clients.values_mut() {
+                chk(server.send(&update, &client.address));
             }
 
-            repli.last_update = self.frame;
+            repli.last_update = *frame;
         }
 
         // Send particle effects
@@ -513,63 +618,23 @@ impl<'a, S: Server> System<'a> for SysNetServer<S> {
         }
 
         dirty.clear();
-
-        // Handle messages
-        for (ent, ship, repli, ctrl) in
-            (&*entities, &mut ship, &mut replicated, &ctrl).join()
-        {
-            for &(ref client_id, ref msg) in &messages {
-                if let Message::EntityUpdate(id, ref data) = *msg {
-                    if repli.id == id && client_id == &ctrl.client_id {
-                        repli.last_update = self.frame;
-
-                        // Update entity from message data
-                        if data.len() != 9 {
-                            info!("Invalid ship control update");
-                            continue;
-                        }
-                        let flags = data[0];
-                        ship.want_fire = flags & 0x01 == 0x01;
-                        ship.want_thrust[0] = match flags & 0x06 {
-                            0x02 => 1.0,
-                            0x04 => -1.0,
-                            _ => 0.0,
-                        };
-                        ship.want_thrust[1] = if flags & 0x08 == 0x08 {
-                            1.0
-                        } else {
-                            0.0
-                        };
-                        ship.want_thrust_rot = match flags & 0x30 {
-                            0x10 => 1.0,
-                            0x20 => -1.0,
-                            _ => 0.0,
-                        };
-                        let mut data = Cursor::new(&data[1..]);
-                        ship.want_target[0] = read_float(&mut data);
-                        ship.want_target[1] = read_float(&mut data);
-                        dirty.insert(ent, Dirty).unwrap();
-                    }
-                }
-            }
-        }
     }
 }
 
 /// Network client system.
 ///
 /// Sends controls to server and gets game updates.
-pub struct SysNetClient<C: Client> {
+pub struct SysClient<C: Client> {
     client: C,
     last_pong: SystemTime,
     ping: f32,
     controlled_entities: HashSet<u64>,
 }
 
-impl<C: Client> SysNetClient<C> {
+impl<C: Client> SysClient<C> {
     /// Create a client, connected to the specified server.
-    pub fn new(client: C) -> SysNetClient<C> {
-        let client = SysNetClient {
+    pub fn new(client: C) -> SysClient<C> {
+        let client = SysClient {
             client,
             last_pong: SystemTime::now(),
             ping: 0.0,
@@ -585,7 +650,7 @@ impl<C: Client> SysNetClient<C> {
     }
 }
 
-impl<'a, C: Client> System<'a> for SysNetClient<C> {
+impl<'a, C: Client> System<'a> for SysClient<C> {
     type SystemData = (
         Entities<'a>,
         Read<'a, LazyUpdate>,

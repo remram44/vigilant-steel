@@ -214,11 +214,18 @@ impl Game {
     pub fn new_server<S: net::Server>(server: S) -> Game {
         let dispatcher = DispatcherBuilder::new()
             .with(
-                net::SysNetServer::new(server),
-                "netserver",
+                net::SysServerRecv::<S>::new(),
+                "netserverrecv",
                 &[],
             );
-        let (world, dispatcher) = Self::new_common(Role::Server, dispatcher);
+        let (mut world, mut dispatcher) = Self::new_common(Role::Server, dispatcher);
+        dispatcher = dispatcher
+            .with(
+                net::SysServerSend::<S>::new(),
+                "netserversend",
+                &[],
+            );
+        world.insert(net::ServerRes::new(server));
         Game {
             world: world,
             dispatcher: dispatcher.build(),
@@ -229,7 +236,7 @@ impl Game {
     pub fn new_client<C: net::Client>(client: C) -> Game {
         let dispatcher = DispatcherBuilder::new()
             .with(
-                net::SysNetClient::new(client),
+                net::SysClient::new(client),
                 "netclient",
                 &[],
             );
