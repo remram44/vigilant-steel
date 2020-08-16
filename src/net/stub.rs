@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 
@@ -37,27 +38,25 @@ impl Server for StubServer {
     }
 }
 
-pub struct StubClient {
+pub struct StubClient<S: Fn(&Message) -> Result<(), Box<dyn Error>> + Send + 'static> {
     recvq: Receiver<Message>,
-    destq: Sender<Message>,
+    sender: S,
 }
 
-impl StubClient {
-    pub fn new() -> (StubClient, Sender<Message>, Receiver<Message>) {
+impl<S: Fn(&Message) -> Result<(), Box<dyn Error>> + Send + 'static> StubClient<S> {
+    pub fn new(sender: S) -> (StubClient<S>, Sender<Message>) {
         let (recvq_send, recvq_recv) = channel();
-        let (destq_send, destq_recv) = channel();
         let client = StubClient {
             recvq: recvq_recv,
-            destq: destq_send,
+            sender,
         };
-        (client, recvq_send, destq_recv)
+        (client, recvq_send)
     }
 }
 
-impl Client for StubClient {
+impl<S: Fn(&Message) -> Result<(), Box<dyn Error>> + Send + 'static> Client for StubClient<S> {
     fn send(&self, msg: &Message) -> Result<(), NetError> {
-        self.destq.send(msg.to_owned())
-            .map_err(|e| NetError::Error(Box::new(e)))
+        (self.sender)(msg).map_err(|e| NetError::Error(e))
     }
 
     fn recv(&mut self) -> Result<Message, NetError> {
