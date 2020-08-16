@@ -627,8 +627,6 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
 /// Sends controls to server and gets game updates.
 pub struct SysClient<C: Client> {
     client: C,
-    last_pong: SystemTime,
-    ping: f32,
     controlled_entities: HashSet<u64>,
 }
 
@@ -637,8 +635,6 @@ impl<C: Client> SysClient<C> {
     pub fn new(client: C) -> SysClient<C> {
         let client = SysClient {
             client,
-            last_pong: SystemTime::now(),
-            ping: 0.0,
             controlled_entities: HashSet::new(),
         };
         client.send(&Message::ClientHello).unwrap();
@@ -694,16 +690,7 @@ impl<'a, C: Client> System<'a> for SysClient<C> {
                 Message::ServerHello => warn!("Got ServerHello"),
                 Message::Disconnection => { /* TODO */ }
                 Message::Ping(buf) => chk(self.send(&Message::Pong(buf))),
-                Message::Pong(d) => {
-                    let d = time_decode(d);
-                    let now = SystemTime::now();
-                    let now_d = now.duration_since(UNIX_EPOCH).unwrap();
-                    if let Some(d) = now_d.checked_sub(d) {
-                        self.last_pong = now;
-                        self.ping = d.as_secs() as f32
-                            + d.subsec_nanos() as f32 / 0.000_000_001;
-                    }
-                }
+                Message::Pong(_) => {}
                 Message::StartEntityControl(id) => {
                     self.controlled_entities.insert(id);
                 }
