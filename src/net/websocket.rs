@@ -8,16 +8,19 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender, channel, unbounded_channel};
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::error::TryRecvError;
 use tungstenite::protocol::Message as WsMessage;
 
 use super::{ORDER, Message, NetError, Server};
 
+const BUFFER_NB_MESSAGES: usize = 32;
+
 /// HashMap containing the sender channel for the websockets
 type Writers = Arc<Mutex<HashMap<
     SocketAddr,
-    UnboundedSender<WsMessage>,
+    Sender<WsMessage>,
 >>>;
 
 async fn handle_connection(
@@ -34,7 +37,7 @@ async fn handle_connection(
         // Create an MPSC channel. We can't just pass the SplitSink because it
         // is not Sync, so the sending task can't hold on to it across await
         // (for example while it await sends on it)
-        let (tx, rx) = unbounded_channel();
+        let (tx, rx) = channel(BUFFER_NB_MESSAGES);
 
         // Insert sender half in the HashMap
         writers.lock().unwrap().insert(addr, tx);
@@ -97,9 +100,10 @@ async fn handle_writes(
         // Send message
         match writers.get_mut(&addr) {
             Some(w) => {
-                match w.send(WsMessage::Binary(msg.bytes())) {
+                match w.try_send(WsMessage::Binary(msg.bytes())) {
                     Ok(()) => {}
-                    Err(err) => warn!("Error sending to {}: {}", addr, err),
+                    Err(TrySendError::Full(_)) => {}
+                    Err(TrySendError::Closed(_)) => warn!("Error sending to {}", addr),
                 }
             }
             None => warn!("Can't send message to disconnected {}", addr),
