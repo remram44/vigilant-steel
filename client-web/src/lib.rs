@@ -1,4 +1,5 @@
 mod logger;
+mod net;
 mod primitives;
 mod render;
 
@@ -7,12 +8,14 @@ use game::input::{Input, Press};
 use log::{error, info, warn};
 use specs::WorldExt;
 use std::cell::{RefCell, RefMut};
+use std::sync::mpsc::Sender;
 use wasm_bindgen::prelude::*;
 
 const MAX_TIME_STEP: f32 = 0.040;
 
 pub struct App {
     game: Game,
+    recvq: Option<Sender<game::net::Message>>,
     render_app: render::RenderApp,
 }
 
@@ -25,16 +28,30 @@ fn get_app<'a>() -> Option<RefMut<'a, App>> {
     }
 }
 
-#[wasm_bindgen(start)]
-pub extern "C" fn start() {
+#[wasm_bindgen]
+pub extern "C" fn setup(networked: bool) {
     logger::init(log::LevelFilter::Info).unwrap();
 
     if unsafe { _APP.is_some() } {
         error!("init() called again");
     }
-    let app = App {
-        game: Game::new_standalone(),
-        render_app: Default::default(),
+    let app = match networked {
+        false => {
+            App {
+                game: Game::new_standalone(),
+                recvq: None,
+                render_app: Default::default(),
+            }
+        }
+        true => {
+            let (client, recvq) = net::setup();
+            let game = Game::new_client(client);
+            App {
+                game,
+                recvq: Some(recvq),
+                render_app: Default::default(),
+            }
+        }
     };
     unsafe {
         _APP = Some(RefCell::new(app));

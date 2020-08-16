@@ -87,7 +87,7 @@ pub enum Message {
 
 impl Message {
     /// Parse a message from some bytes.
-    fn parse(msg: &[u8]) -> Option<Message> {
+    pub fn parse(msg: &[u8]) -> Option<Message> {
         if msg.len() < 8 || &msg[..6] != b"SPAC\x00\x01" {
             return None;
         }
@@ -171,7 +171,7 @@ impl Message {
     }
 
     /// Write a message into a vector of bytes.
-    fn to_bytes(&self, msg: &mut Vec<u8>) {
+    pub fn to_bytes(&self, msg: &mut Vec<u8>) {
         msg.extend_from_slice(b"SPAC\x00\x01");
         match *self {
             Message::ClientHello => msg.extend_from_slice(b"hc"),
@@ -202,7 +202,7 @@ impl Message {
     }
 
     /// Turn a message into bytes.
-    fn bytes(&self) -> Vec<u8> {
+    pub fn bytes(&self) -> Vec<u8> {
         let mut msg: Vec<u8> = Vec::with_capacity(20);
         self.to_bytes(&mut msg);
         msg

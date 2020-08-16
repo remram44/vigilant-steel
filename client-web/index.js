@@ -208,6 +208,37 @@ function render(now) {
 
 
 /*
+ * Networking
+ */
+var networked = true;
+
+if(networked) {
+  var websocket;
+  if(window.location.protocol === 'https:') {
+    websocket = new WebSocket('wss://' + window.location.host + '/game');
+  } else {
+    websocket = new WebSocket('ws://' + window.location.hostname + ':8080/game');
+  }
+  console.log("Connecting to server...");
+  websocket.binaryType = 'arraybuffer';
+  websocket.onmessage = function(event) {
+    var data = new Uint8Array(event.data);
+    if(_wasm_instance) {
+      client_web.recv_message(data);
+    }
+  };
+  function error(event) {
+    console.error("Network error: ", event);
+  }
+  websocket.onclose = error;
+  websocket.onerror = error;
+  websocket.onopen = function(event) {
+    console.log("Connection established");
+  };
+}
+
+
+/*
  * WebAssembly setup
  */
 
@@ -273,11 +304,22 @@ function draw(position_x, position_y, angle, scale, color, buffer_id) {
   gl.drawArrays(gl.TRIANGLES, 0, buffer.length);
 }
 
+// Send message from WebAssembly
+function send_message(msg) {
+  if(!networked) {
+    console.error("Trying to send messages in non-networked mode");
+    return;
+  }
+  websocket.send(msg);
+}
+
 // Load module
 var _wasm_instance;
 client_web('client_web_bg.wasm')
 .then(function(obj) {
   _wasm_instance = obj;
+
+  client_web.setup(networked);
 
   requestAnimationFrame(render);
 }, console.error);
