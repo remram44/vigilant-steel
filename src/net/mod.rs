@@ -609,7 +609,6 @@ impl<'a, S: Server> System<'a> for SysServerSend<S> {
                 for client in clients.values_mut() {
                     chk(server.send(&message, &client.address));
                 }
-                entities.delete(ent).unwrap();
                 info!("Net delete {:?}", ent);
             }
         }

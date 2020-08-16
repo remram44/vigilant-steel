@@ -154,7 +154,6 @@ impl Deleter {
         #[cfg(feature = "network")]
         self.queue.lock().unwrap().push(entity);
 
-        #[cfg(not(feature = "network"))]
         entities.delete(entity).unwrap();
     }
 }
