@@ -191,7 +191,7 @@ function render(now) {
   gl.useProgram(shaderProgram);
 
   // Call WebAssembly
-  _wasm_instance.update(
+  client_web.update(
     delta, gl.drawingBufferWidth, gl.drawingBufferHeight,
     input.x, input.y, input.r, input.fire,
     input.mouse[0], input.mouse[1],
@@ -210,9 +210,6 @@ function render(now) {
 /*
  * WebAssembly setup
  */
-
-// Keep a reference for callbacks
-var _wasm_instance;
 
 // Log a string
 function log_str(s) {
@@ -277,6 +274,7 @@ function draw(position_x, position_y, angle, scale, color, buffer_id) {
 }
 
 // Load module
+var _wasm_instance;
 client_web('client_web_bg.wasm')
 .then(function(obj) {
   _wasm_instance = obj;
